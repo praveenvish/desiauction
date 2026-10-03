@@ -1,3 +1,4 @@
+import { isRealAuction } from "@desiauction/auction";
 import {
   auctionOwnerInvites,
   auctions,
@@ -96,7 +97,11 @@ async function conductedSeasons(competitionIds: string[]): Promise<ConductedSeas
     .from(competitions)
     .leftJoin(
       auctions,
-      and(eq(auctions.competitionId, competitions.id), ne(auctions.status, "abandoned")),
+      and(
+        eq(auctions.competitionId, competitions.id),
+        ne(auctions.status, "abandoned"),
+        isRealAuction(),
+      ),
     )
     .where(inArray(competitions.id, competitionIds));
   return rows;
@@ -132,7 +137,13 @@ export async function conductSetup(competitionId: string): Promise<ConductSetup>
     systemDb
       .select({ id: auctions.id })
       .from(auctions)
-      .where(and(eq(auctions.competitionId, competitionId), ne(auctions.status, "abandoned")))
+      .where(
+        and(
+          eq(auctions.competitionId, competitionId),
+          ne(auctions.status, "abandoned"),
+          isRealAuction(),
+        ),
+      )
       .limit(1),
   ]);
   if (auction === undefined) {
@@ -180,6 +191,7 @@ async function ownedTeams(personId: string): Promise<OwnedTeam[]> {
           isNotNull(auctionOwnerInvites.acceptedAt),
           isNull(auctionOwnerInvites.revokedAt),
           ne(auctions.status, "abandoned"),
+          isRealAuction(),
         ),
       ),
     systemDb
@@ -193,6 +205,7 @@ async function ownedTeams(personId: string): Promise<OwnedTeam[]> {
           eq(paddleGrants.personId, personId),
           isNull(paddleGrants.revokedAt),
           ne(auctions.status, "abandoned"),
+          isRealAuction(),
         ),
       ),
   ]);

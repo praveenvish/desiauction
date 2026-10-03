@@ -701,6 +701,27 @@
       "when": 1792339200000,
       "tag": "0100_demo_founding_25",
       "breakpoints": true
+    },
+    {
+      "idx": 100,
+      "version": "7",
+      "when": 1792425600000,
+      "tag": "0101_practice_auctions",
+      "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1792512000000,
+      "tag": "0102_admin_control_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "7",
+      "when": 1792598400000,
+      "tag": "0103_people_admin_control",
+      "breakpoints": true
     }
   ]
 }

@@ -3,10 +3,12 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { env } from "../../../../env";
+import { recordJobRun } from "../../../../server/jobs/job-runs";
 import { sweepRegistrationDigests } from "../../../../server/competition/registration-digest";
 import { logger, withRequestId } from "../../../../server/logger";
 import { scheduledTemplateSync } from "../../../../server/messaging/provider-template-writer";
 import { sweepReviewAsks } from "../../../../server/reviews/review-sweep";
+import { endStalePractices } from "../../../../server/auction/practice-engine";
 import {
   purgeExpiredProblemReports,
   purgeSpentSecurityRecords,
@@ -63,7 +65,13 @@ async function handle(request: Request): Promise<NextResponse> {
   // own: this job already runs every fifteen minutes, and the refresh never
   // throws, so a Meta outage cannot fail the purge beside it.
   const templates = await scheduledTemplateSync();
+  // Practice auctions nobody ended (0101). Never allowed to fail the sweep.
+  const practices = await endStalePractices().catch((error: unknown) => {
+    logger().error({ err: error }, "practice.stale_sweep_failed");
+    return "failed" as const;
+  });
   return NextResponse.json({
+    practices,
     purged,
     security,
     whatsappInbound,
@@ -77,6 +85,7 @@ async function handle(request: Request): Promise<NextResponse> {
   });
 }
 
-export function POST(request: Request): Promise<NextResponse> {
-  return withRequestId(request.headers, () => handle(request));
+export function POST(request: Request): Promise<Response> {
+  // Every run, and how it went, lands in job_runs for /admin (AC-1.1).
+  return withRequestId(request.headers, () => recordJobRun("feedback", () => handle(request)));
 }

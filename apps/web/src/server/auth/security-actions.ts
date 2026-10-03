@@ -5,6 +5,8 @@
  */
 export type SecurityAction =
   | "auth.login.otp"
+  /** A correct code or passkey for a SUSPENDED account (0103): no session issued. */
+  | "auth.login.refused_suspended"
   /** Signed in with a code sent to a verified mailbox (email sign-in). */
   | "auth.login.email"
   /**

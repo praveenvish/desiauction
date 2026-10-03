@@ -75,6 +75,7 @@ const PERSON_EVENT_LABELS = {
   "profile.player.updated": "Player profile updated",
   "privacy.erasure.requested": "You asked for your account to be deleted",
   "privacy.erasure.withdrawn": "You withdrew your account deletion request",
+  "auth.login.refused_suspended": "A sign-in was refused because the account is suspended",
 } satisfies Record<SecurityAction, string>;
 
 /**

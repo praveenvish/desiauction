@@ -1,3 +1,4 @@
+import { inRealAuction } from "@desiauction/auction";
 import {
   competitions,
   finopsDocuments,
@@ -72,17 +73,20 @@ export async function myDocuments(personId: string): Promise<MyDocument[]> {
     .where(
       and(
         eq(paddles.personId, personId),
+        inRealAuction(paddles.auctionId),
         sql`not (
           exists (
             select 1 from paddle_grants g
              where g.person_id = ${personId}
                and g.team_id = ${paddles.teamId}
+               and g.auction_id in (select id from auctions where kind = 'real')
                and g.revoked_at is not null
           )
           and not exists (
             select 1 from paddle_grants g
              where g.person_id = ${personId}
                and g.team_id = ${paddles.teamId}
+               and g.auction_id in (select id from auctions where kind = 'real')
                and g.revoked_at is null
           )
         )`,

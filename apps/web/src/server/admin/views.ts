@@ -1,7 +1,9 @@
+import { isRealAuction } from "@desiauction/auction";
 import {
   auctions,
   auditLog,
   competitions,
+  emailSends,
   finopsJobs,
   finopsProfiles,
   grants,
@@ -9,7 +11,9 @@ import {
   organizations,
   orgMembers,
   people,
+  platformInvites,
   registrations,
+  sessions,
   settlementCases,
   sports,
   suppressions,
@@ -33,6 +37,7 @@ import {
   asc,
   desc,
   eq,
+  gt,
   gte,
   ilike,
   inArray,
@@ -49,7 +54,7 @@ import { isMatchAction } from "../../lib/event-names";
 import { matchNames } from "../competition/match-names";
 import { SMS_TEMPLATES } from "../messaging/templates";
 import { ADMIN_ACCESS_ACTION } from "./capabilities";
-import { countNoun, waitedFor } from "./format";
+import { countNoun, maskPersonContact, waitedFor } from "./format";
 import { containsPattern } from "../../lib/like-pattern";
 
 /**
@@ -57,7 +62,7 @@ import { containsPattern } from "../../lib/like-pattern";
  *
  * READ ONLY, structurally. This module imports no writer, no server action and
  * no command from any domain: only tables and the certified FinOps SNAPSHOTS.
- * The `admin-is-read-only` dependency-cruiser rule keeps it that way at merge
+ * The `admin-writes-only-through-platform-ops` dependency-cruiser rule keeps it that way at merge
  * time, and the foundation suite proves it at runtime by driving every function
  * here through a db handle that throws on insert/update/delete.
  *
@@ -358,6 +363,7 @@ async function auctionsByStatusOf(db: Db): Promise<StatusLine[]> {
   return db
     .select({ status: auctions.status, count: sql<number>`count(*)::int` })
     .from(auctions)
+    .where(isRealAuction())
     .groupBy(auctions.status)
     .orderBy(asc(auctions.status));
 }
@@ -388,7 +394,7 @@ async function liveAuctionsOf(db: Db, nowMs: number): Promise<{ total: number; s
       stale: sql<number>`count(*) filter (where ${auctions.createdAt} < ${cutoff}::timestamptz)::int`,
     })
     .from(auctions)
-    .where(eq(auctions.status, "live"));
+    .where(and(eq(auctions.status, "live"), isRealAuction()));
   return { total: row?.total ?? 0, stale: row?.stale ?? 0 };
 }
 
@@ -409,7 +415,10 @@ export async function platformOverview(deps: FinopsDeps, db: Db): Promise<Platfo
     db.select({ n: sql<number>`count(*)::int` }).from(organizations),
     db.select({ n: sql<number>`count(*)::int` }).from(competitions),
     db.select({ n: sql<number>`count(*)::int` }).from(people),
-    db.select({ n: sql<number>`count(*)::int` }).from(auctions),
+    db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(auctions)
+      .where(isRealAuction()),
     db.select({ n: sql<number>`count(*)::int` }).from(settlementCases),
     db.select({ n: sql<number>`count(*)::int` }).from(finopsProfiles),
     auctionsByStatusOf(db),
@@ -581,7 +590,7 @@ export async function attentionQueue(
     })
     .from(auctions)
     .innerJoin(organizations, eq(organizations.id, auctions.orgId))
-    .where(and(eq(auctions.status, "live"), lt(auctions.createdAt, staleCutoff)))
+    .where(and(eq(auctions.status, "live"), lt(auctions.createdAt, staleCutoff), isRealAuction()))
     .groupBy(organizations.slug, organizations.name)
     .orderBy(asc(sql`min(${auctions.createdAt})`))
     .limit(20);
@@ -803,7 +812,7 @@ export async function organizationDirectory(
       createdAt: organizations.createdAt,
       competitions: sql<number>`(select count(*)::int from competitions c where c.org_id = organizations.id)`,
       members: sql<number>`(select count(*)::int from org_members m where m.org_id = organizations.id)`,
-      auctions: sql<number>`(select count(*)::int from auctions a where a.org_id = organizations.id)`,
+      auctions: sql<number>`(select count(*)::int from auctions a where a.org_id = organizations.id and a.kind = 'real')`,
       cases: sql<number>`(select count(*)::int from settlement_cases sc where sc.org_id = organizations.id)`,
       openCases: sql<number>`(select count(*)::int from settlement_cases sc where sc.org_id = organizations.id and sc.status not in ('closed', 'voided', 'settled'))`,
       settledCases: sql<number>`(select count(*)::int from settlement_cases sc where sc.org_id = organizations.id and sc.status = 'settled')`,
@@ -925,10 +934,10 @@ export async function organizationDetail(db: Db, slug: string): Promise<OrgDetai
         createdAt: competitions.createdAt,
         auctionStatus: sql<
           string | null
-        >`(select a.status from auctions a where a.competition_id = competitions.id order by a.created_at desc limit 1)`,
+        >`(select a.status from auctions a where a.competition_id = competitions.id and a.kind = 'real' order by a.created_at desc limit 1)`,
         auctionId: sql<
           string | null
-        >`(select a.id from auctions a where a.competition_id = competitions.id order by a.created_at desc limit 1)`,
+        >`(select a.id from auctions a where a.competition_id = competitions.id and a.kind = 'real' order by a.created_at desc limit 1)`,
         held: sql<boolean>`competitions.platform_hold_at is not null`,
         caseStatus: sql<
           string | null
@@ -1008,10 +1017,12 @@ export interface UserDirectoryRow {
   /** Seasons they entered as a player — the row says "Player · 2 seasons". */
   readonly seasons: number;
   readonly lastActivityAt: Date | null;
+  /** AC-1.2: the row says "Suspended" when this is set. */
+  readonly suspendedAt: Date | null;
 }
 
 /** PI-1 P6: the directory's profile-aware facets. */
-export type UserDirectoryFilter = "all" | "players" | "profiled";
+export type UserDirectoryFilter = "all" | "players" | "profiled" | "staff" | "suspended";
 
 export interface UserDirectory {
   readonly rows: readonly UserDirectoryRow[];
@@ -1027,8 +1038,6 @@ export interface UserDirectory {
 }
 
 const USER_PAGE = 50;
-const USER_FILTERS: readonly UserDirectoryFilter[] = ["all", "players", "profiled"];
-
 async function userCursor(db: Db, after: string | undefined): Promise<SQL | undefined> {
   if (after === undefined || after === "") {
     return undefined;
@@ -1082,7 +1091,13 @@ export async function userDirectory(
       ? sql`exists (select 1 from registrations r where r.person_id = ${people.id})`
       : f === "profiled"
         ? sql`exists (select 1 from player_profiles pp where pp.person_id = ${people.id})`
-        : undefined;
+        : f === "staff"
+          ? // AC-1.2: anyone holding a live PLATFORM role.
+            sql`exists (select 1 from grants g where g.person_id = ${people.id}
+                  and g.scope_type = 'platform' and g.revoked_at is null)`
+          : f === "suspended"
+            ? sql`${people.suspendedAt} is not null`
+            : undefined;
   const whereFor = (f: UserDirectoryFilter): SQL | undefined => {
     const facet = facetOf(f);
     return search === undefined ? facet : facet === undefined ? search : and(search, facet);
@@ -1098,6 +1113,7 @@ export async function userDirectory(
       phone: people.phone,
       email: people.email,
       createdAt: people.createdAt,
+      suspendedAt: people.suspendedAt,
       orgs: sql<number>`(select count(*)::int from org_members m where m.person_id = people.id)`,
       activeGrants: sql<number>`(select count(*)::int from grants g where g.person_id = people.id and g.revoked_at is null)`,
       seasons: sql<number>`(select count(distinct r.competition_id)::int from registrations r where r.person_id = people.id)`,
@@ -1109,20 +1125,33 @@ export async function userDirectory(
     .where(pageWhere)
     .orderBy(desc(people.createdAt), desc(people.id))
     .limit(USER_PAGE + 1);
-  const [facetRows, everything] = await Promise.all([
-    Promise.all(
-      USER_FILTERS.map((f) =>
-        db
-          .select({ n: sql<number>`count(*)::int` })
-          .from(people)
-          .where(whereFor(f)),
-      ),
-    ),
-    db.select({ n: sql<number>`count(*)::int` }).from(people),
-  ]);
-  const counts = Object.fromEntries(
-    USER_FILTERS.map((f, index) => [f, facetRows[index]?.[0]?.n ?? 0]),
-  ) as Record<UserDirectoryFilter, number>;
+  // ONE pass over `people` for every facet's count and the platform total
+  // (AC-1.2): six separate counts, each a scan under a search term, grew with
+  // the platform on every page view. `filter (where …)` asks them together.
+  const facetCount = (f: UserDirectoryFilter) => {
+    const condition = whereFor(f);
+    return condition === undefined
+      ? sql<number>`count(*)::int`
+      : sql<number>`(count(*) filter (where ${condition}))::int`;
+  };
+  const [tally] = await db
+    .select({
+      all: facetCount("all"),
+      players: facetCount("players"),
+      profiled: facetCount("profiled"),
+      staff: facetCount("staff"),
+      suspended: facetCount("suspended"),
+      everyone: sql<number>`count(*)::int`,
+    })
+    .from(people);
+  const counts: Record<UserDirectoryFilter, number> = {
+    all: tally?.all ?? 0,
+    players: tally?.players ?? 0,
+    profiled: tally?.profiled ?? 0,
+    staff: tally?.staff ?? 0,
+    suspended: tally?.suspended ?? 0,
+  };
+  const everything = [{ n: tally?.everyone ?? 0 }];
   const more = rows.length > USER_PAGE;
   const page = more ? rows.slice(0, USER_PAGE) : rows;
   return {
@@ -1216,6 +1245,12 @@ export interface UserDetail {
     sport: string;
     status: string;
   }[];
+  /** AC-1.2: suspended, by whom and why — null when the account is open. */
+  readonly suspension: { at: Date; reason: string; byName: string | null } | null;
+  /** AC-1.2: signed-in devices right now (live sessions), newest first. */
+  readonly devices: readonly { userAgent: string | null; createdAt: Date; lastSeenAt: Date }[];
+  /** AC-1.2: the last mails sent to this person — kind and outcome, never content. */
+  readonly messages: readonly { kind: string; outcome: string; at: Date }[];
 }
 
 export async function userDetail(db: Db, personId: string): Promise<UserDetail | null> {
@@ -1226,6 +1261,9 @@ export async function userDetail(db: Db, personId: string): Promise<UserDetail |
       phone: people.phone,
       email: people.email,
       createdAt: people.createdAt,
+      suspendedAt: people.suspendedAt,
+      suspendedReason: people.suspendedReason,
+      suspendedBy: people.suspendedBy,
     })
     .from(people)
     .where(eq(people.id, personId))
@@ -1233,64 +1271,105 @@ export async function userDetail(db: Db, personId: string): Promise<UserDetail |
   if (person === undefined) {
     return null;
   }
-  const [orgRows, seasonRows, grantRows, activity] = await Promise.all([
-    db
-      .select({ slug: organizations.slug, name: organizations.name, joinedAt: orgMembers.joinedAt })
-      .from(orgMembers)
-      .innerJoin(organizations, eq(organizations.id, orgMembers.orgId))
-      .where(eq(orgMembers.personId, personId))
-      .orderBy(asc(orgMembers.joinedAt)),
-    db
-      .select({
-        competitionName: competitions.name,
-        orgName: organizations.name,
-        startsOn: competitions.startsOn,
-        role: registrations.role,
-        sport: competitions.sport,
-        status: registrations.status,
-      })
-      .from(registrations)
-      .innerJoin(competitions, eq(competitions.id, registrations.competitionId))
-      .innerJoin(organizations, eq(organizations.id, competitions.orgId))
-      .where(eq(registrations.personId, personId))
-      .orderBy(asc(competitions.startsOn))
-      .limit(50),
-    db
-      .select({
-        id: grants.id,
-        scopeType: grants.scopeType,
-        scopeId: grants.scopeId,
-        capabilitySet: grants.capabilitySet,
-        grantedBy: grants.grantedBy,
-        createdAt: grants.createdAt,
-        revokedAt: grants.revokedAt,
-        orgName: organizations.name,
-        granterName: people.name,
-      })
-      .from(grants)
-      .leftJoin(organizations, eq(organizations.id, grants.scopeId))
-      .leftJoin(people, eq(people.id, grants.grantedBy))
-      .where(eq(grants.personId, personId))
-      .orderBy(asc(grants.createdAt)),
-    db
-      .select({
-        id: auditLog.id,
-        action: auditLog.action,
-        actor: auditLog.actor,
-        actorName: people.name,
-        scopeType: auditLog.scopeType,
-        scopeId: auditLog.scopeId,
-        subject: auditLog.subject,
-        at: auditLog.at,
-      })
-      .from(auditLog)
-      .leftJoin(people, eq(people.id, auditLog.actor))
-      .where(eq(auditLog.actor, personId))
-      .orderBy(desc(auditLog.at))
-      .limit(15),
-  ]);
+  const { suspendedAt, suspendedReason, suspendedBy, ...profile } = person;
+  const [orgRows, seasonRows, grantRows, activity, deviceRows, messageRows, suspenderRows] =
+    await Promise.all([
+      db
+        .select({
+          slug: organizations.slug,
+          name: organizations.name,
+          joinedAt: orgMembers.joinedAt,
+        })
+        .from(orgMembers)
+        .innerJoin(organizations, eq(organizations.id, orgMembers.orgId))
+        .where(eq(orgMembers.personId, personId))
+        .orderBy(asc(orgMembers.joinedAt)),
+      db
+        .select({
+          competitionName: competitions.name,
+          orgName: organizations.name,
+          startsOn: competitions.startsOn,
+          role: registrations.role,
+          sport: competitions.sport,
+          status: registrations.status,
+        })
+        .from(registrations)
+        .innerJoin(competitions, eq(competitions.id, registrations.competitionId))
+        .innerJoin(organizations, eq(organizations.id, competitions.orgId))
+        .where(eq(registrations.personId, personId))
+        .orderBy(asc(competitions.startsOn))
+        .limit(50),
+      db
+        .select({
+          id: grants.id,
+          scopeType: grants.scopeType,
+          scopeId: grants.scopeId,
+          capabilitySet: grants.capabilitySet,
+          grantedBy: grants.grantedBy,
+          createdAt: grants.createdAt,
+          revokedAt: grants.revokedAt,
+          orgName: organizations.name,
+          granterName: people.name,
+        })
+        .from(grants)
+        .leftJoin(organizations, eq(organizations.id, grants.scopeId))
+        .leftJoin(people, eq(people.id, grants.grantedBy))
+        .where(eq(grants.personId, personId))
+        .orderBy(asc(grants.createdAt)),
+      db
+        .select({
+          id: auditLog.id,
+          action: auditLog.action,
+          actor: auditLog.actor,
+          actorName: people.name,
+          scopeType: auditLog.scopeType,
+          scopeId: auditLog.scopeId,
+          subject: auditLog.subject,
+          at: auditLog.at,
+        })
+        .from(auditLog)
+        .leftJoin(people, eq(people.id, auditLog.actor))
+        .where(eq(auditLog.actor, personId))
+        .orderBy(desc(auditLog.at))
+        .limit(15),
+      db
+        .select({
+          userAgent: sessions.userAgent,
+          createdAt: sessions.createdAt,
+          lastSeenAt: sessions.lastSeenAt,
+        })
+        .from(sessions)
+        .where(
+          and(
+            eq(sessions.personId, personId),
+            isNull(sessions.revokedAt),
+            gt(sessions.expiresAt, new Date()),
+          ),
+        )
+        .orderBy(desc(sessions.lastSeenAt))
+        .limit(20),
+      db
+        .select({ kind: emailSends.kind, outcome: emailSends.outcome, at: emailSends.createdAt })
+        .from(emailSends)
+        .where(eq(emailSends.personId, personId))
+        .orderBy(desc(emailSends.createdAt))
+        .limit(10),
+      suspendedBy === null
+        ? Promise.resolve([])
+        : db.select({ name: people.name }).from(people).where(eq(people.id, suspendedBy)).limit(1),
+    ]);
   return {
-    person,
+    person: profile,
+    suspension:
+      suspendedAt === null
+        ? null
+        : {
+            at: suspendedAt,
+            reason: suspendedReason ?? "",
+            byName: suspenderRows[0]?.name ?? null,
+          },
+    devices: deviceRows,
+    messages: messageRows,
     orgs: orgRows,
     grants: grantRows.map((row) => ({
       id: row.id,
@@ -1838,5 +1917,135 @@ export async function messagingOverview(
       failed: whatsappBy.get("failed") ?? 0,
       stops: whatsappStops[0]?.count ?? 0,
     },
+  };
+}
+
+// --- Platform roles (AC-1.2, /admin/roles) -----------------------------------------------
+
+export interface PlatformRoleHolder {
+  readonly personId: string;
+  readonly name: string | null;
+  readonly contact: string;
+  readonly since: Date;
+  readonly grantedByName: string | null;
+}
+
+export interface PlatformRolesView {
+  /** Every platform set, and who holds it now. */
+  readonly holders: readonly { set: string; people: readonly PlatformRoleHolder[] }[];
+  /** The last hundred grants and revocations, newest first. */
+  readonly history: readonly {
+    personId: string;
+    name: string | null;
+    set: string;
+    grantedByName: string | null;
+    createdAt: Date;
+    revokedAt: Date | null;
+  }[];
+  /** Invitations still waiting for a first sign-in. */
+  readonly invites: readonly {
+    id: string;
+    name: string;
+    contact: string;
+    sets: readonly string[];
+    invitedByName: string | null;
+    createdAt: Date;
+    expiresAt: Date;
+  }[];
+}
+
+/**
+ * WHO HOLDS WHAT ON THE PLATFORM — the superadmin's page. Reads the platform
+ * scope only (the singleton scope id), on the system pool like every admin
+ * projection; contacts are masked, as in every list.
+ */
+export async function platformRoles(db: Db, sets: readonly string[]): Promise<PlatformRolesView> {
+  const granter = sql<
+    string | null
+  >`(select g2.name from people g2 where g2.id = ${grants.grantedBy})`;
+  const [current, history, invites] = await Promise.all([
+    db
+      .select({
+        set: grants.capabilitySet,
+        personId: people.id,
+        name: people.name,
+        phone: people.phone,
+        email: people.email,
+        since: grants.createdAt,
+        grantedByName: granter,
+      })
+      .from(grants)
+      .innerJoin(people, eq(people.id, grants.personId))
+      .where(
+        and(
+          eq(grants.scopeType, "platform"),
+          eq(grants.scopeId, "00000000000000000000000000"),
+          isNull(grants.revokedAt),
+        ),
+      )
+      .orderBy(asc(grants.createdAt)),
+    db
+      .select({
+        personId: people.id,
+        name: people.name,
+        set: grants.capabilitySet,
+        grantedByName: granter,
+        createdAt: grants.createdAt,
+        revokedAt: grants.revokedAt,
+      })
+      .from(grants)
+      .innerJoin(people, eq(people.id, grants.personId))
+      .where(
+        and(eq(grants.scopeType, "platform"), eq(grants.scopeId, "00000000000000000000000000")),
+      )
+      .orderBy(desc(sql`coalesce(${grants.revokedAt}, ${grants.createdAt})`))
+      .limit(100),
+    db
+      .select({
+        id: platformInvites.id,
+        name: platformInvites.name,
+        phone: platformInvites.phone,
+        email: platformInvites.email,
+        sets: platformInvites.capabilitySets,
+        invitedByName: sql<
+          string | null
+        >`(select p.name from people p where p.id = ${platformInvites.invitedBy})`,
+        createdAt: platformInvites.createdAt,
+        expiresAt: platformInvites.expiresAt,
+      })
+      .from(platformInvites)
+      .where(
+        and(
+          isNull(platformInvites.acceptedAt),
+          isNull(platformInvites.revokedAt),
+          gt(platformInvites.expiresAt, new Date()),
+        ),
+      )
+      .orderBy(desc(platformInvites.createdAt))
+      .limit(100),
+  ]);
+  return {
+    holders: sets.map((set) => ({
+      set,
+      people: current
+        .filter((row) => row.set === set)
+        .map((row) => ({
+          personId: row.personId,
+          name: row.name,
+          contact: maskPersonContact(row),
+          since: row.since,
+          grantedByName: row.grantedByName,
+        })),
+    })),
+    history,
+    invites: invites.map((row) => ({
+      id: row.id,
+      name: row.name,
+      contact: maskPersonContact({ phone: row.phone, email: row.email }),
+      sets: row.sets,
+      invitedByName: row.invitedByName,
+      createdAt: row.createdAt,
+      expiresAt: row.expiresAt,
+    })),
   };
 }

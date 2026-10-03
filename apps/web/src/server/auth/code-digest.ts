@@ -26,7 +26,13 @@ import { authCodeSecret } from "./auth-secret";
  */
 const KEY = `short-code-digest:${authCodeSecret(env)}`;
 
-export type CodePurpose = "otp:login" | "otp:phone_change" | "email:login" | "email:email_change";
+export type CodePurpose =
+  | "otp:login"
+  | "otp:phone_change"
+  | "otp:step_up"
+  | "email:login"
+  | "email:email_change"
+  | "email:step_up";
 
 export function codeDigest(purpose: CodePurpose, subject: string, code: string): string {
   return createHmac("sha256", KEY).update(`${purpose}\0${subject}\0${code}`).digest("hex");

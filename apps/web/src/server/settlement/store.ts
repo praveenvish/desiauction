@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { inRealAuction, isRealAuction } from "@desiauction/auction";
 import {
   auctionEvents,
   auctions,
@@ -570,7 +571,8 @@ export function createAuctionSource(db: Db): AuctionSourcePort {
           status: auctions.status,
         })
         .from(auctions)
-        .where(eq(auctions.id, auctionId))
+        // A practice is never settled: its id reads as no auction at all.
+        .where(and(eq(auctions.id, auctionId), isRealAuction()))
         .limit(1);
       return row === undefined
         ? null
@@ -593,7 +595,7 @@ export function createAuctionSource(db: Db): AuctionSourcePort {
           payload: auctionEvents.payload,
         })
         .from(auctionEvents)
-        .where(eq(auctionEvents.auctionId, auctionId))
+        .where(and(eq(auctionEvents.auctionId, auctionId), inRealAuction(auctionEvents.auctionId)))
         .orderBy(asc(auctionEvents.seq));
       return rows.map((row) => ({
         ...row,

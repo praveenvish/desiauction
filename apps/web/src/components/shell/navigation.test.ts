@@ -242,7 +242,7 @@ describe("exactly one item is ever active", () => {
     "/account",
     "/help",
     "/admin",
-    "/admin/users",
+    "/admin/people",
     "/seasons/demo-pl/teams",
   ];
 
@@ -327,6 +327,7 @@ describe("every operator gets a door, and it opens on something they hold", () =
     ["platform.privacy", "/admin/erasure"],
     ["platform.pass", "/admin/passes"],
     ["platform.demo", "/admin/demos"],
+    ["platform.grant", "/admin/roles"],
   ];
 
   for (const [capability, href] of cases) {

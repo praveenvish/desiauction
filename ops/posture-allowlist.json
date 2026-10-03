@@ -18,6 +18,26 @@
     "  before launch."
   ],
   "allow": {
+    "apps/web/src/server/auction/practice-engine.ts": {
+      "class": "by-design",
+      "reason": "Practice auctions (0101): endStalePractices is the scheduled sweep (/api/jobs/feedback behind FEEDBACK_JOB_SECRET) that finds idle, overage or superseded practices across every club — a SELECT only on the system pool. Ending one is the engine's AbortAuction command, attributed to the organiser who started it; this module writes nothing itself."
+    },
+    "apps/web/src/server/auth/step-up-actions.ts": {
+      "class": "by-design",
+      "reason": "AC-1.1 step-up: re-confirming the signed-in person with a fresh code. Identity tables only (otp_codes, email_verifications, sessions.stepped_up_at) — no org_id, no RLS arm, the same class as auth/actions.ts."
+    },
+    "apps/web/src/server/jobs/job-runs.ts": {
+      "class": "by-design",
+      "reason": "AC-1.1 job_runs (0102): a platform table recording each scheduled job's run — no org_id, no RLS. Written on the app pool after the job, reachable only from /api/jobs/* behind their secrets."
+    },
+    "apps/web/src/server/platform-ops/club-actions.ts": {
+      "class": "by-design",
+      "reason": "AC-1.3 club roles desk: cross-tenant platform administration, superadmin only (operatorFor('platform.grant') with reason and step-up). The system pool resolves the club by slug and reads the desk; every write runs in club.ts inside inOrg on the app role (proved by club-desk.posture.test.ts)."
+    },
+    "apps/web/src/server/platform-ops/people-actions.ts": {
+      "class": "by-design",
+      "reason": "AC-1.2 /admin/people: person-scoped and platform data — people.suspended_*, sessions, platform_invites, platform grants — none carries an org_id. Superadmin only behind operatorFor; platform grants are written on desiauction_system (pinned by grants:verify), the rest on the app pool (proved by people-admin.posture.test.ts)."
+    },
     "apps/web/src/server/messaging/email-events.ts": {
       "class": "by-design",
       "reason": "FIXED (PA-1R 2.1); moved here from the delivery-status route so the SES/SNS route shares it. The finops write runs inside withTenantDb on the app role, and the suppression (deduplicated) on the app pool \u2014 suppressions carries no org_id and no RLS: a bounce is a fact about an address. The remaining system-pool use is ONE id\u2192org lookup that opens that boundary \u2014 the dispatch's org is the only thing that can, and reading it is itself org-scoped. Adapter-verified id, single column, no write."

@@ -1,3 +1,4 @@
+import { isRealAuction } from "@desiauction/auction";
 import { sportPackFor } from "@desiauction/core";
 import {
   auctionOwnerInvites,
@@ -190,7 +191,7 @@ export async function teamsWorkspace(
     db
       .select({ id: auctions.id, status: auctions.status, config: auctions.config })
       .from(auctions)
-      .where(eq(auctions.competitionId, competition.id))
+      .where(and(eq(auctions.competitionId, competition.id), isRealAuction()))
       .limit(1),
     // Everyone approved and placed on a squad. The names and phones are read
     // here but only LEAVE this function when `options.roster` says they may.

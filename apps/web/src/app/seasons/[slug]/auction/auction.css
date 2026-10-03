@@ -3987,3 +3987,91 @@ details.squad-team[open] .squad-team-caret {
     border-top: 1px solid var(--border-subtle);
   }
 }
+
+/* --- the practice bar (0101) ---------------------------------------------- */
+/* One strip that tells a room it is a rehearsal, on every screen of it. Amber,
+   the colour of "not for real", never the green of a live night. */
+.practice-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--warning-base);
+  border-radius: var(--radius-md);
+  background: var(--warning-subtle);
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+}
+.practice-bar[data-room="real"] {
+  border-color: var(--border-subtle);
+  background: var(--surface-raised);
+}
+.practice-bar-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.practice-bar-tag {
+  padding: 0 var(--space-2);
+  border: 1px solid var(--warning-base);
+  border-radius: var(--radius-sm);
+  color: var(--warning-strong);
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.practice-bar-switch {
+  display: flex;
+  gap: var(--space-1);
+}
+
+/* --- the practice card (0101) --------------------------------------------- */
+.practice-setup,
+.practice-running {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+}
+.practice-size {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.practice-size-label {
+  margin-inline-end: var(--space-1);
+  font-weight: 600;
+}
+.practice-sum {
+  margin: 0;
+}
+.practice-teams {
+  display: grid;
+  gap: var(--space-2);
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.practice-teams li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-block: var(--space-1);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.practice-team-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.practice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

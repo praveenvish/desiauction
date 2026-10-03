@@ -1,6 +1,6 @@
 "use server";
 
-import { auctionOf, type AuctionRecord } from "@desiauction/auction";
+import { auctionOf, roomAuctionOf, type AuctionRecord } from "@desiauction/auction";
 import {
   isAuctionCommandType,
   isTransportCommandId,
@@ -16,6 +16,7 @@ import {
   type Db,
 } from "@desiauction/db";
 import { and, asc, eq, isNotNull, isNull, ne } from "drizzle-orm";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { currentSession } from "../auth/actions";
@@ -23,11 +24,13 @@ import { canCompetition } from "../competition/authz";
 import { type CompetitionSummary } from "../competition/competitions";
 import { resolveMemberCompetition } from "../competition/resolve";
 import { dbHandle } from "../db";
+import { env } from "../../env";
 import { featureEnabled } from "../feature-settings";
 import { storage } from "../media";
 import { completeAuctionOnce } from "./auction-notify";
 import { isSeasonAuctioneer, lockSeasonAppointments } from "./auctioneers";
 import { engineWsUrl, sendEngineCommand } from "./engine-client";
+import { endPractice } from "./practice-engine";
 import {
   preSignedPlayers,
   resolvedLots,
@@ -77,6 +80,66 @@ interface LiveGate {
   myTeamIds: string[];
   /** Teams whose private plan this person may open — see participantTeamIds. */
   planTeamIds: string[];
+  /**
+   * The season's practice (0101), when one is running beside a real auction
+   * that has not started — on the ROOM gate only (`liveGate(slug, { room:
+   * true })`); every other gate is the real auction's and says null.
+   */
+  practice: PracticeRoom | null;
+  /**
+   * Both auctions the room could mean, server-side only (never serialised to a
+   * screen): a command names the auction its screen was showing, and is sent
+   * to that one if it is still one of these — see `submitAuctionCommand`.
+   */
+  rooms: { real: AuctionRecord; practice: AuctionRecord | null };
+}
+
+export interface PracticeRoom {
+  /** This gate's `auction` IS the practice (the room switch says which). */
+  inPractice: boolean;
+  practiceId: string;
+  realAuctionId: string;
+}
+
+/**
+ * THE ROOM SWITCH (0101): Practice | Real auction.
+ *
+ * While a practice runs, the room shows it. Anyone in the room can step out to
+ * look at the real auction's waiting room and back; that choice is a cookie
+ * per season, so it follows them to the cockpit, the board and back without a
+ * parameter on every link. It means nothing once the practice is over.
+ */
+const ROOM_COOKIE_PREFIX = "da-room-";
+
+/**
+ * The practice this person stepped out of, if any. The choice names the
+ * practice, so a NEW practice (Run again, or tomorrow's) brings everyone back
+ * in rather than leaving someone in the waiting room by an old click.
+ */
+async function steppedOutOf(competitionId: string): Promise<string | null> {
+  const value = (await cookies()).get(`${ROOM_COOKIE_PREFIX}${competitionId}`)?.value;
+  return value?.startsWith("real:") === true ? value.slice("real:".length) : null;
+}
+
+export async function chooseRoomAction(slug: string, room: "practice" | "real"): Promise<void> {
+  const gate = await liveGate(slug, { room: true });
+  if (gate === null) {
+    return;
+  }
+  const store = await cookies();
+  const name = `${ROOM_COOKIE_PREFIX}${gate.competition.id}`;
+  if (room === "real" && gate.practice !== null) {
+    store.set(name, `real:${gate.practice.practiceId}`, {
+      path: "/",
+      httpOnly: true,
+      sameSite: "lax",
+      secure: env.NODE_ENV === "production" && !env.ALLOW_INSECURE_LOCAL_PRODUCTION,
+      // Long enough for an evening; a practice does not outlive one.
+      maxAge: 60 * 60 * 12,
+    });
+  } else {
+    store.delete(name);
+  }
 }
 
 /**
@@ -169,8 +232,11 @@ export async function participantTeamIds(
  * club gets `null` — the same 404 `/seasons/…/money` has always correctly
  * given them, and /spectate remains the door for watching.
  */
-export async function liveGate(slug: string): Promise<LiveGate | null> {
-  const gate = await auctionMemberGate(slug);
+export async function liveGate(
+  slug: string,
+  options: { room?: boolean; join?: boolean } = {},
+): Promise<LiveGate | null> {
+  const gate = await auctionMemberGate(slug, options);
   if (gate === null) {
     return null;
   }
@@ -187,39 +253,151 @@ export async function liveGate(slug: string): Promise<LiveGate | null> {
  * private season. It is NOT the right gate for the room where money is spent,
  * which is what `liveGate` above now says.
  */
-export async function auctionMemberGate(slug: string): Promise<LiveGate | null> {
+export async function auctionMemberGate(
+  slug: string,
+  options: { room?: boolean; join?: boolean } = {},
+): Promise<LiveGate | null> {
   const session = await requireSession(slug);
   const competition = await resolveMemberCompetition(session.personId, slug);
   if (competition === null) {
     return null;
   }
-  return withTenantDb(
-    dbHandle,
-    { personId: session.personId, orgId: competition.orgId },
-    async (db) => {
-      const auction = await auctionOf(db, competition.id);
-      if (auction === null) {
-        return null;
-      }
-      const scope = { orgId: competition.orgId, competitionId: competition.id };
-      const [canConduct, canOverride, canManage, teamsOf] = await Promise.all([
-        canCompetition(db, session.personId, scope, "auction.conduct"),
-        canCompetition(db, session.personId, scope, "auction.override"),
-        canCompetition(db, session.personId, scope, "competition.manage"),
-        participantTeamIds(db, auction.id, session.personId),
-      ]);
-      return {
-        personId: session.personId,
-        competition,
-        auction,
-        canConduct,
-        canOverride,
-        canManage,
-        myTeamIds: teamsOf.all,
-        planTeamIds: teamsOf.plan,
-      };
-    },
-  );
+  const outOf = options.room === true ? await steppedOutOf(competition.id) : null;
+  const inTenant = <T>(fn: (db: Db) => Promise<T>): Promise<T> =>
+    withTenantDb(dbHandle, { personId: session.personId, orgId: competition.orgId }, fn);
+  const read = await inTenant(async (db) => {
+    // THE ROOM resolves the practice while one runs (0101); every other
+    // caller of this gate — setup, owner links, plans, the ledger — means the
+    // real auction, always.
+    const room = options.room === true ? await roomAuctionOf(db, competition.id) : null;
+    const resolved =
+      options.room === true
+        ? room === null
+          ? null
+          : room.practice !== null && room.practice.id === outOf
+            ? { ...room, auction: room.real }
+            : room
+        : await auctionOf(db, competition.id).then((real) =>
+            real === null ? null : { auction: real, real, practice: null },
+          );
+    if (resolved === null) {
+      return null;
+    }
+    const scope = { orgId: competition.orgId, competitionId: competition.id };
+    const [canConduct, canOverride, canManage, teamsOf] = await Promise.all([
+      canCompetition(db, session.personId, scope, "auction.conduct"),
+      canCompetition(db, session.personId, scope, "auction.override"),
+      canCompetition(db, session.personId, scope, "competition.manage"),
+      participantTeamIds(db, resolved.auction.id, session.personId),
+    ]);
+    const joinTeam =
+      options.join === true && resolved.practice !== null && resolved.auction.kind === "practice"
+        ? await practiceTeamToJoin(db, resolved.real.id, resolved.auction.id, session.personId)
+        : null;
+    return { resolved, canConduct, canOverride, canManage, teamsOf, joinTeam };
+  });
+  if (read === null) {
+    return null;
+  }
+  const { resolved, canConduct, canOverride, canManage, joinTeam } = read;
+  let { teamsOf } = read;
+  /*
+   * AN OWNER WALKS STRAIGHT INTO THE PRACTICE. The practice copied every owner
+   * who had joined when it was made; one who joined since is added the first
+   * time they open the room — the engine checks they own that team on the real
+   * auction. Only on a page view (`join`), never on a command, and AFTER the
+   * read's transaction: an engine round trip must not hold a pooled connection.
+   */
+  if (joinTeam !== null) {
+    const ack = await sendEngineCommand({
+      auctionId: resolved.auction.id,
+      type: "PracticeAddOwner",
+      actor: session.personId,
+      conduct: false,
+      payload: { teamId: joinTeam, personId: session.personId },
+    });
+    if (ack.accepted) {
+      teamsOf = await inTenant((db) =>
+        participantTeamIds(db, resolved.auction.id, session.personId),
+      );
+    }
+  }
+  const { auction } = resolved;
+  return {
+    personId: session.personId,
+    competition,
+    auction,
+    canConduct,
+    canOverride,
+    canManage,
+    myTeamIds: teamsOf.all,
+    planTeamIds: teamsOf.plan,
+    practice:
+      resolved.practice === null
+        ? null
+        : {
+            inPractice: auction.id === resolved.practice.id,
+            practiceId: resolved.practice.id,
+            realAuctionId: resolved.real.id,
+          },
+    rooms: { real: resolved.real, practice: resolved.practice },
+  };
+}
+
+/**
+ * The team this person should be added to the running practice for, or null.
+ *
+ * Only an OWNER — an accepted owner link or a paddle grant on the real
+ * auction; a paddle merely held (the organiser bidding for a team, DA-02) is
+ * not ownership, and the engine would refuse it on every page view. And only
+ * someone with no practice grant yet: one person, one team (invariant 18).
+ */
+async function practiceTeamToJoin(
+  db: Db,
+  realId: string,
+  practiceId: string,
+  personId: string,
+): Promise<string | null> {
+  const [inPractice] = await db
+    .select({ id: paddleGrants.id })
+    .from(paddleGrants)
+    .where(
+      and(
+        eq(paddleGrants.auctionId, practiceId),
+        eq(paddleGrants.personId, personId),
+        isNull(paddleGrants.revokedAt),
+      ),
+    )
+    .limit(1);
+  if (inPractice !== undefined) {
+    return null;
+  }
+  const [owned] = await db
+    .select({ teamId: auctionOwnerInvites.teamId })
+    .from(auctionOwnerInvites)
+    .where(
+      and(
+        eq(auctionOwnerInvites.auctionId, realId),
+        eq(auctionOwnerInvites.acceptedBy, personId),
+        isNull(auctionOwnerInvites.revokedAt),
+      ),
+    )
+    .limit(1);
+  if (owned !== undefined) {
+    return owned.teamId;
+  }
+  const [granted] = await db
+    .select({ teamId: paddleGrants.teamId })
+    .from(paddleGrants)
+    .where(
+      and(
+        eq(paddleGrants.auctionId, realId),
+        eq(paddleGrants.personId, personId),
+        isNull(paddleGrants.revokedAt),
+      ),
+    )
+    .limit(1);
+  return granted?.teamId ?? null;
 }
 
 export interface LiveAuctionView {
@@ -305,6 +483,12 @@ export interface LiveAuctionView {
    * it (see `lotMedia`): the client folds it against each frame.
    */
   plan?: LivePlan;
+  /**
+   * The season's practice (0101), when one is running: whether this room IS
+   * it (banner, points, no plan) and that the switch to the real auction's
+   * waiting room exists. Null on every night without a practice.
+   */
+  practice: PracticeRoom | null;
 }
 
 /**
@@ -376,10 +560,11 @@ async function myPaddles(dbc: Db, auctionId: string, personId: string) {
 }
 
 export async function liveAuctionView(slug: string): Promise<LiveAuctionView | null> {
-  const gate = await liveGate(slug);
+  const gate = await liveGate(slug, { room: true, join: true });
   if (gate === null) {
     return null;
   }
+  const inPractice = gate.practice?.inPractice === true;
   const [teamRows, paddleRows, grantRows, resolved, preSigned, lotMedia, planning] =
     await withTenantDb(dbHandle, { personId: gate.personId, orgId: gate.competition.orgId }, (db) =>
       Promise.all([
@@ -409,9 +594,14 @@ export async function liveAuctionView(slug: string): Promise<LiveAuctionView | n
             ),
           ),
         resolvedLots(db, gate.auction.id),
-        preSignedPlayers(db, gate.competition.id, (key) => storage.readUrl(key)),
+        // A practice squad starts empty: the season's pre-signed players are
+        // not on a rehearsal team.
+        inPractice
+          ? Promise.resolve([])
+          : preSignedPlayers(db, gate.competition.id, (key) => storage.readUrl(key)),
         lotMediaOf(db, gate.auction.id, (key) => storage.readUrl(key)),
-        livePlanFor(db, gate),
+        // Plans are for the night; the practice has none.
+        inPractice ? Promise.resolve({ available: false, plan: null }) : livePlanFor(db, gate),
       ]),
     );
   // THE PARTITION. Everything below the gate is decided HERE, before the read
@@ -492,6 +682,7 @@ export async function liveAuctionView(slug: string): Promise<LiveAuctionView | n
     preSigned,
     planAvailable: planning.available,
     ...(planning.plan === null ? {} : { plan: planning.plan }),
+    practice: gate.practice,
   };
 }
 
@@ -564,7 +755,8 @@ async function holdsPaddle(gate: LiveGate, paddleId: unknown): Promise<boolean> 
 // Token-flow commands never travel the generic gateway: invitations mint
 // secrets (dedicated action returns the URL) and acceptance must present the
 // TOKEN, not an invite id (owner-actions.ts owns both).
-const GATEWAY_BLOCKED = new Set(["InviteOwner", "AcceptOwnerInvite"]);
+// `PracticeAddOwner` is the room gate's own (see `auctionMemberGate`).
+const GATEWAY_BLOCKED = new Set(["InviteOwner", "AcceptOwnerInvite", "PracticeAddOwner"]);
 
 /**
  * A paddle in hand makes a person a team owner, and the season's auctioneer
@@ -607,6 +799,15 @@ export async function submitAuctionCommand(
   commandId: string,
   type: string,
   payload: Record<string, unknown>,
+  /**
+   * The auction the screen was showing when the person pressed the button
+   * (0101). With a practice beside the night, "this season's room" can change
+   * under a screen — a co-organiser ends the practice — and a stale cockpit's
+   * Open would otherwise land on the REAL auction. The command goes to exactly
+   * this auction while it is still one of the room's; otherwise it is refused
+   * and the screen refreshes.
+   */
+  auctionId?: string,
 ): Promise<CommandAck> {
   // The id is the idempotency key and it comes from the browser, so its SHAPE
   // is part of the trust boundary: the engine keys its cache on it, and its own
@@ -615,10 +816,28 @@ export async function submitAuctionCommand(
   if (!isTransportCommandId(commandId)) {
     return { commandId, accepted: false, reason: "invalid_command_id", version: 0 };
   }
-  const gate = await liveGate(slug);
-  if (gate === null) {
+  const roomGate = await liveGate(slug, { room: true });
+  if (roomGate === null) {
     return { commandId, accepted: false, reason: "unknown_auction", version: 0 };
   }
+  const target =
+    auctionId === undefined
+      ? roomGate.auction
+      : [roomGate.rooms.real, roomGate.rooms.practice].find((room) => room?.id === auctionId);
+  if (target === undefined || target === null) {
+    return { commandId, accepted: false, reason: "room_changed", version: 0 };
+  }
+  const gate: LiveGate =
+    target.id === roomGate.auction.id
+      ? roomGate
+      : {
+          ...roomGate,
+          auction: target,
+          practice:
+            roomGate.practice === null
+              ? null
+              : { ...roomGate.practice, inPractice: target.kind === "practice" },
+        };
   if (!isAuctionCommandType(type) || GATEWAY_BLOCKED.has(type)) {
     return { commandId, accepted: false, reason: "unknown_command", version: 0 };
   }
@@ -649,6 +868,23 @@ export async function submitAuctionCommand(
       manage: gate.canManage,
       payload,
     });
+  // A practice ends by "End practice", never by completing: completing is what
+  // sends the results (the aggregate refuses it too — this answers sooner).
+  if (type === "CompleteAuction" && gate.auction.kind === "practice") {
+    return { commandId, accepted: false, reason: "illegal_transition", version: 0 };
+  }
+  // OPENING THE NIGHT ENDS THE PRACTICE (0101) — after the night has opened,
+  // never before: a refused open (paddles, queue) must not cost the room its
+  // rehearsal, and a practice the engine cannot end must not hold the night.
+  // Once the real auction leaves `scheduled` no screen shows the practice; the
+  // sweep ends any the engine missed.
+  if (type === "OpenAuction" && gate.auction.kind === "real" && gate.practice !== null) {
+    const opened = await send();
+    if (opened.accepted) {
+      await endPractice(gate.practice.practiceId, gate.personId);
+    }
+    return opened;
+  }
   if (type === "CompleteAuction") {
     return completeAuctionOnce(
       {
@@ -670,4 +906,45 @@ export async function submitAuctionCommand(
       ? await issueUnlessAuctioneer(gate, commandId, payload, send)
       : await send();
   return ack;
+}
+
+export interface PracticeRoomState {
+  /** The practice running now, or null. */
+  practiceId: string | null;
+  /** The real auction has left `scheduled` — the night has begun. */
+  realStarted: boolean;
+}
+
+/**
+ * What the room's practice bar polls (0101): is a practice running, and has
+ * the night begun? Cheap by design — two indexed reads — so every phone in
+ * the room can ask every few seconds while the real auction waits to start.
+ */
+export async function practiceRoomStateAction(slug: string): Promise<PracticeRoomState | null> {
+  // NOT the room gate: that one checks capabilities, reads the person's teams
+  // and may add an owner to the practice — fine once per page, wasteful every
+  // five seconds from every phone. Club membership is enough to learn whether
+  // a rehearsal is running; everything else is asked again by the refresh.
+  const session = await currentSession();
+  if (session === null) {
+    return null;
+  }
+  const competition = await resolveMemberCompetition(session.personId, slug);
+  if (competition === null) {
+    return null;
+  }
+  return withTenantDb(
+    dbHandle,
+    { personId: session.personId, orgId: competition.orgId },
+    async (db) => {
+      const room = await roomAuctionOf(db, competition.id);
+      if (room === null) {
+        return null;
+      }
+      return {
+        practiceId: room.practice?.id ?? null,
+        realStarted: room.real.status !== "scheduled",
+      };
+    },
+  );
 }

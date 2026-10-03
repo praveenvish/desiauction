@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { env } from "../../../../env";
+import { recordJobRun } from "../../../../server/jobs/job-runs";
 import { sweepAuctionReminders } from "../../../../server/competition/auction-reminders";
 import { sweepMatchDays } from "../../../../server/competition/match-day";
 import { logger, withRequestId } from "../../../../server/logger";
@@ -51,6 +52,7 @@ async function handle(request: Request): Promise<NextResponse> {
   return NextResponse.json({ reminders, matchDays, drained });
 }
 
-export function POST(request: Request): Promise<NextResponse> {
-  return withRequestId(request.headers, () => handle(request));
+export function POST(request: Request): Promise<Response> {
+  // Every run, and how it went, lands in job_runs for /admin (AC-1.1).
+  return withRequestId(request.headers, () => recordJobRun("messages", () => handle(request)));
 }

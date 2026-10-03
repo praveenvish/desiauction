@@ -42,15 +42,28 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
-      - run: pnpm typecheck
-      - run: pnpm test
       # A journal entry whose `when` is not strictly after its predecessor is
       # SKIPPED by the migrator on every database that already ran the one
       # before — green here on a fresh database, absent in production.
       - run: node packages/db/scripts/check-journal.mjs
       - run: pnpm --filter @desiauction/db db:migrate
-      - run: pnpm build
+      # Next's own incremental build cache (webpack/SWC), never the build's
+      # output: a stale entry can only cost time, not correctness. PRs restore
+      # main's; every run saves its own.
+      - uses: actions/cache@v4
+        with:
+          path: apps/web/.next/cache
+          key: next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+            next-${{ runner.os }}-
+      # Lint, typecheck, unit tests and the build in ONE turbo run, so they
+      # share the runner's cores instead of queueing: run one after another
+      # they took 8–9 of this job's 10 minutes, and a slow runner timed it out.
+      # turbo.json orders each after its dependencies' builds (the ui tokens),
+      # so nothing reads a generated file while it is rewritten. --continue
+      # reports every failure, not just the first.
+      - run: pnpm turbo run lint typecheck test build --continue
       # Audit P3 F14 — THE FIRST-LOAD JS BUDGET. Every app route's gzipped
       # first-load JS, read from the build's manifests, against
       # bundle-budget.json (a default ceiling + per-route overrides, ~10% over

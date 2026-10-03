@@ -69,6 +69,16 @@ const COMMAND_REFUSAL_COPY: Record<string, string> = {
   already_accepted: "That invitation has already been accepted.",
   unknown_invite: "That invitation can't be found — it may have been withdrawn.",
   expired: "That invitation has expired. Ask the organizer for a new link.",
+  // The practice auction (0101).
+  not_real: "A practice can only be made from the season's real auction.",
+  real_not_scheduled:
+    "The real auction has already started, so there's no practice any more — this is the real thing.",
+  too_few_teams: "A practice needs at least two teams. Add your teams first.",
+  no_players: "A practice needs players to sell. Add or approve some players first.",
+  exists: "A practice is already set up for this season.",
+  not_practice: "That only applies to a practice auction.",
+  room_changed:
+    "The room changed while you were looking — the practice started or ended. Your screen is refreshing.",
   // ENGINE HALTED. The single most serious state the runtime has — the ledger
   // and the projections disagreed, or a replay failed, so the engine STOPPED
   // rather than serve a state it cannot prove. Its ack reason is

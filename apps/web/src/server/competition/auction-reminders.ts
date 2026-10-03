@@ -1,3 +1,4 @@
+import { isRealAuction } from "@desiauction/auction";
 import { auctions, auditLog, teams, type Db } from "@desiauction/db";
 import { messageLanguagesOf } from "@desiauction/messaging/language";
 import { and, count, eq, like, max, ne, sql } from "drizzle-orm";
@@ -63,7 +64,8 @@ async function seasonsStartingWithinADay(db: Db, now: Date): Promise<DueSeason[]
       and c.auction_starts_at <= ${new Date(now.getTime() + DAY_BEFORE_FROM).toISOString()}::timestamptz
       and not exists (
         select 1 from auctions a
-        where a.competition_id = c.id and a.status in ('live', 'paused', 'completed', 'reconciled')
+        where a.competition_id = c.id and a.kind = 'real'
+          and a.status in ('live', 'paused', 'completed', 'reconciled')
       )
   `);
 }
@@ -87,7 +89,13 @@ async function readinessOf(db: Db, competitionId: string): Promise<Readiness> {
   const [auction] = await db
     .select({ id: auctions.id })
     .from(auctions)
-    .where(and(eq(auctions.competitionId, competitionId), ne(auctions.status, "abandoned")))
+    .where(
+      and(
+        eq(auctions.competitionId, competitionId),
+        isRealAuction(),
+        ne(auctions.status, "abandoned"),
+      ),
+    )
     .limit(1);
   const people = await auctionPeopleOf(db, competitionId);
   const owners = people.filter((person) => person.teamName !== null);

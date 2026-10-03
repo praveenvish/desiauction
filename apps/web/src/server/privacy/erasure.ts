@@ -1,3 +1,4 @@
+import { isRealAuction } from "@desiauction/auction";
 import {
   competitions,
   auctions,
@@ -166,6 +167,7 @@ async function refusalIn(tx: Db, personId: string, orgIds: readonly string[]) {
       .from(auctions)
       .where(
         and(
+          isRealAuction(),
           inArray(auctions.status, [...LIVE_AUCTION]),
           sql`(
             exists (select 1 from ${registrations} r

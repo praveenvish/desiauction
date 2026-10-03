@@ -1,3 +1,4 @@
+import { isRealAuction } from "@desiauction/auction";
 import { auctions, lots, registrations, settlementCases, teams, type Db } from "@desiauction/db";
 import { and, eq, inArray, ne, sql } from "drizzle-orm";
 
@@ -70,7 +71,13 @@ export async function auctionFactsIn(
         status: auctions.status,
       })
       .from(auctions)
-      .where(and(inArray(auctions.competitionId, ids), ne(auctions.status, "abandoned"))),
+      .where(
+        and(
+          inArray(auctions.competitionId, ids),
+          ne(auctions.status, "abandoned"),
+          isRealAuction(),
+        ),
+      ),
     db
       .select({ competitionId: teams.competitionId, count: sql<number>`count(*)::int` })
       .from(teams)

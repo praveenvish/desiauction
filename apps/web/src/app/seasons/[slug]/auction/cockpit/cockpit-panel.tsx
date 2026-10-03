@@ -41,6 +41,7 @@ import {
   revokeOwnerInviteAction,
 } from "../../../../../server/auction/owner-actions";
 import { submitAuctionCommand } from "../../../../../server/auction/live-actions";
+import { endPracticeAction } from "../../../../../server/auction/practice-actions";
 import { PageStatus } from "../../../../../components/shell/page-status";
 import { AuctionAnnouncer } from "../auction-announcer";
 import { BroadcastLinks } from "../broadcast-links";
@@ -146,7 +147,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
       setPending(key);
       let ack;
       try {
-        ack = await submitAuctionCommand(slug, commandId(), type, payload);
+        ack = await submitAuctionCommand(slug, commandId(), type, payload, view.auctionId);
       } catch {
         // See live-panel.tsx: a rejected promise means the answer is missing, not
         // that the command failed, so the message says only that and sends the
@@ -168,9 +169,13 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
         return true;
       }
       toast({ title: commandRefusalMessage(ack.reason), tone: "danger" });
+      // The practice started or ended under this screen: show the room as it is.
+      if (ack.reason === "room_changed") {
+        router.refresh();
+      }
       return false;
     },
-    [slug, router, toast],
+    [slug, router, toast, view.auctionId],
   );
 
   /**
@@ -187,7 +192,13 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
     let refusal: string | null = null;
     try {
       for (const lotId of lotIds) {
-        const ack = await submitAuctionCommand(slug, commandId(), "RequeueLot", { lotId });
+        const ack = await submitAuctionCommand(
+          slug,
+          commandId(),
+          "RequeueLot",
+          { lotId },
+          view.auctionId,
+        );
         if (!ack.accepted) {
           refusal = commandRefusalMessage(ack.reason);
           break;
@@ -225,6 +236,26 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
    * e2e journey.
    */
   const [completeOpen, setCompleteOpen] = useState(false);
+
+  /** A practice ends here, not by completing: completing sends the results. */
+  const practiceRoom = view.practice?.inPractice === true;
+  const endThePractice = async () => {
+    setPending("complete");
+    try {
+      const result = await endPracticeAction(slug);
+      if (!result.ok) {
+        toast({ title: result.error, tone: "danger" });
+        return;
+      }
+      toast({
+        title: "Practice ended — everyone is back in the real auction's waiting room",
+        tone: "success",
+      });
+      router.push(`/seasons/${slug}/auction`);
+    } finally {
+      setPending(null);
+    }
+  };
   const [shortSquads, setShortSquads] = useState(false);
   const [overrideReason, setOverrideReason] = useState("");
 
@@ -235,7 +266,13 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
     setPending("complete");
     let ack;
     try {
-      ack = await submitAuctionCommand(slug, commandId(), "CompleteAuction", payload);
+      ack = await submitAuctionCommand(
+        slug,
+        commandId(),
+        "CompleteAuction",
+        payload,
+        view.auctionId,
+      );
     } catch {
       toast({
         title:
@@ -595,6 +632,10 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
     },
     recover: () => void send("recover", "RecoverAuction", {}, "Recovered — state verified"),
     complete: () => {
+      if (practiceRoom) {
+        void endThePractice();
+        return;
+      }
       setCompleteOpen(true);
     },
     queueLots: () => void send("queue", "QueueLots", {}, "Lots queued"),
@@ -773,6 +814,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
           undoable={undoTarget !== null}
           gavelRef={gavelRef}
           controls={deskControls}
+          practice={practiceRoom}
         />
       )}
 
@@ -957,7 +999,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
               (DA-20 — their only door) a tab away instead of above both. */}
             <HashTabs
               label="Room panels"
-              defaultId={status === "scheduled" ? "owners" : "purses"}
+              defaultId={status === "scheduled" && !practiceRoom ? "owners" : "purses"}
               tabs={[
                 {
                   id: "purses",
@@ -1205,7 +1247,9 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                     </div>
                   ),
                 },
-              ]}
+                // A practice's owners came from the real auction and its
+                // screens are the real night's: only the purses belong to it.
+              ].filter((tab) => !practiceRoom || tab.id === "purses")}
             />
           </div>
         </div>

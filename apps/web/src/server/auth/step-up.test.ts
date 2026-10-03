@@ -13,6 +13,7 @@ function session(signedInAt: number): SessionInfo {
     email: null,
     name: null,
     signedInAt: new Date(signedInAt),
+    steppedUpAt: null,
   };
 }
 
@@ -48,4 +49,16 @@ describe("every credential change asks for it", () => {
       expect(body(name)).toContain("signedInRecently(session)");
     },
   );
+});
+
+describe("admin step-up: a fresh code on this session", () => {
+  it("lasts ten minutes from the code, whatever the session's age", async () => {
+    const { steppedUpRecently, STEP_UP_FRESH_MS } = await import("./step-up");
+    const now = Date.now();
+    expect(steppedUpRecently({ steppedUpAt: null }, now)).toBe(false);
+    expect(steppedUpRecently({ steppedUpAt: new Date(now - 60_000) }, now)).toBe(true);
+    expect(steppedUpRecently({ steppedUpAt: new Date(now - STEP_UP_FRESH_MS - 1) }, now)).toBe(
+      false,
+    );
+  });
 });

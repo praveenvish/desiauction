@@ -1,3 +1,4 @@
+import { isRealAuction } from "@desiauction/auction";
 import {
   auctionEvents,
   auctions,
@@ -144,7 +145,7 @@ export async function liveAuctionBoard(db: Db, nowMs: number): Promise<LiveBoard
       .from(auctions)
       .innerJoin(organizations, eq(organizations.id, auctions.orgId))
       .innerJoin(competitions, eq(competitions.id, auctions.competitionId))
-      .where(inArray(auctions.status, [...LIVE_STATUSES]))
+      .where(and(inArray(auctions.status, [...LIVE_STATUSES]), isRealAuction()))
       .limit(200),
     db
       .select({
@@ -165,6 +166,7 @@ export async function liveAuctionBoard(db: Db, nowMs: number): Promise<LiveBoard
       .where(
         and(
           inArray(auctions.status, [...ENDED_STATUSES]),
+          isRealAuction(),
           // Only auctions whose log moved inside the window — each probe reads
           // that one auction's own events through auction_events_auction_idx.
           sql`exists (select 1 from auction_events e where e.auction_id = auctions.id and e.at_ms > ${nowMs - ENDED_WINDOW_MS})`,

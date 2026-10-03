@@ -700,6 +700,50 @@ export function defaultAuctionConfigFor(unit: MoneyUnit): AuctionConfig {
   return unit === "points" ? DEFAULT_POINTS_AUCTION_CONFIG : DEFAULT_AUCTION_CONFIG;
 }
 
+/**
+ * THE PRACTICE AUCTION'S RULES (0101).
+ *
+ * A practice is ten minutes in which every owner learns the screens before the
+ * night. It is meant to FEEL tight, so the lessons arrive by themselves: a
+ * small purse (100 points) spent on a squad of exactly 2 or 3, so an owner who
+ * spends big on the first player meets the reserve rule ("keep enough for the
+ * rest of your squad") and one who fills up meets "squad full". Every sample
+ * player opens at 10 and the ladder is the points ladder for that purse
+ * (+1 / +2 / +5). Timer and unsold rule stay the real auction's, so the pace
+ * owners learn is the pace of the night.
+ */
+export const PRACTICE_PURSE_POINTS = 100;
+export const PRACTICE_BASE_POINTS = 10;
+export const PRACTICE_SQUAD_SIZES = [2, 3] as const;
+export type PracticeSquadSize = (typeof PRACTICE_SQUAD_SIZES)[number];
+
+export function isPracticeSquadSize(value: unknown): value is PracticeSquadSize {
+  return value === 2 || value === 3;
+}
+
+export function practiceAuctionConfig(
+  real: AuctionConfig,
+  perTeam: PracticeSquadSize,
+): AuctionConfig {
+  const purse = paise(PRACTICE_PURSE_POINTS * 100);
+  return {
+    pursePerTeam: purse,
+    squadMin: perTeam,
+    squadMax: perTeam,
+    slabs: pointsSlabs(purse),
+    timer: real.timer,
+    unsoldPolicy: real.unsoldPolicy,
+    basePriceBands: {},
+    basePriceDefault: paise(PRACTICE_BASE_POINTS * 100),
+    roleQuotas: {},
+  };
+}
+
+/** Sample players for a practice: every team's places, plus two nobody can buy. */
+export function practiceLotCount(teamCount: number, perTeam: PracticeSquadSize): number {
+  return teamCount * perTeam + 2;
+}
+
 export type ConfigValidation = { ok: true } | { ok: false; reason: string };
 
 export function validateAuctionConfig(config: AuctionConfig): ConfigValidation {

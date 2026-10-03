@@ -12,6 +12,7 @@ import {
   teams,
   tournaments,
 } from "@desiauction/db";
+import { isRealAuction } from "@desiauction/auction";
 import { sportPackFor, type MoneyUnit } from "@desiauction/core";
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -128,6 +129,7 @@ export async function playerCareer(personId: string, sport?: string): Promise<Pl
       and(
         eq(auctions.competitionId, registrations.competitionId),
         ne(auctions.status, "abandoned"),
+        isRealAuction(),
       ),
     )
     .leftJoin(lots, and(eq(lots.registrationId, registrations.id), eq(lots.auctionId, auctions.id)))

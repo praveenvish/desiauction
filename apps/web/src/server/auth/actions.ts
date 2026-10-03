@@ -17,7 +17,8 @@ import { eq } from "drizzle-orm";
 
 import { env } from "../../env";
 import { clientIp } from "../../lib/client-ip";
-import { db, dbHandle } from "../db";
+import { db, dbHandle, systemDb } from "../db";
+import { applyPlatformInvites } from "../platform-ops/people";
 import { sendAccountAlert } from "../messaging/account-alert";
 import { openChallenge, sealChallenge } from "./challenge-cookie";
 import { authCodeSecret } from "./auth-secret";
@@ -68,6 +69,8 @@ import {
   signedInRecently,
   revokeSession,
   revokeSessionByToken,
+  isSuspended,
+  SUSPENDED_MESSAGE,
   type SessionSummary,
 } from "./sessions";
 import { describeUserAgent } from "./user-agent";
@@ -185,6 +188,13 @@ async function issueSessionCookie(personId: string): Promise<void> {
     await revokeSessionByToken(db, replaced);
   }
   const session = await createSession(db, personId, agent);
+  // A platform role a superadmin invited this phone or email to (AC-1.2)
+  // attaches now that the contact is proven. Never allowed to fail a sign-in.
+  try {
+    await applyPlatformInvites(db, systemDb, personId);
+  } catch (error) {
+    logger().error({ err: error }, "platform_invites.apply_failed");
+  }
   // A sign-in moves this browser onto the current name for good.
   clearSessionCookies(store);
   store.set(SESSION_NAME, session.token, {
@@ -369,6 +379,15 @@ export async function verifyOtpAction(
             } left.`,
     };
   }
+  if (await isSuspended(db, result.personId)) {
+    await logSecurityEvent(result.personId, "auth.login.refused_suspended");
+    return {
+      step: "phone",
+      phone: previous.phone,
+      ...(previous.next !== undefined ? { next: previous.next } : {}),
+      error: SUSPENDED_MESSAGE,
+    };
+  }
   await logSecurityEvent(result.personId, "auth.login.otp");
   // PI-1 P2: the login form carries the terms/privacy notice; this records the
   // acceptance once per person per notice version. The same try/catch
@@ -506,6 +525,10 @@ export async function verifyEmailLoginAction(
             } left.`,
     };
   }
+  if (await isSuspended(db, result.personId)) {
+    await logSecurityEvent(result.personId, "auth.login.refused_suspended");
+    return { ...previous, error: SUSPENDED_MESSAGE };
+  }
   await logSecurityEvent(
     result.personId,
     result.created ? "auth.signup.email" : "auth.login.email",
@@ -627,6 +650,10 @@ export async function finishPasskeyLoginAction(
     return { ok: false };
   }
   if (!result.ok) {
+    return { ok: false };
+  }
+  if (await isSuspended(db, result.personId)) {
+    await logSecurityEvent(result.personId, "auth.login.refused_suspended");
     return { ok: false };
   }
   await issueSessionCookie(result.personId);

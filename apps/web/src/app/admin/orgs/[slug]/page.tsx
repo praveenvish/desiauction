@@ -1,9 +1,10 @@
-import { LoadingState } from "@desiauction/ui";
+import { ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
-import { Suspense } from "react";
 
 import { adminOrganization, adminOrganizationExists } from "../../../../server/admin/actions";
 import { platformAdminPageGate } from "../../../../server/admin/authz";
+import { adminClubDesk } from "../../../../server/platform-ops/club-actions";
+import { ClubDeskPanel } from "./club-desk-panel";
 import { OrgDetailPanel } from "./org-detail-panel";
 import "../../../seasons/seasons.css";
 import "../../admin.css";
@@ -30,20 +31,40 @@ export default async function AdminOrgPage({ params }: { params: Promise<{ slug:
     notFound();
   }
   return (
-    <main className="registrations-dash">
-      <div className="dash-stack admin-stack">
-        <Suspense fallback={<LoadingState variant="page" />}>
+    <ToastProvider>
+      <main className="registrations-dash">
+        <div className="dash-stack admin-stack">
+          {/* Rendered whole, not streamed under <Suspense>: these pages carry
+              write controls, and a router.refresh() of a streamed boundary was
+              only committed on the NEXT unrelated update — the page showed the
+              old state for five seconds after every action (measured; AC-1). */}
           <Detail slug={slug} />
-        </Suspense>
-      </div>
-    </main>
+        </div>
+      </main>
+    </ToastProvider>
   );
 }
 
 async function Detail({ slug }: { slug: string }) {
-  const detail = await adminOrganization(slug);
+  const [detail, desk] = await Promise.all([adminOrganization(slug), adminClubDesk(slug)]);
   if (detail === null) {
     notFound();
   }
-  return <OrgDetailPanel detail={detail} />;
+  return (
+    <>
+      <OrgDetailPanel detail={detail} />
+      {/* AC-1.3: the superadmin's controls for a stuck club. */}
+      {desk === null ? null : (
+        <ClubDeskPanel
+          slug={slug}
+          clubName={detail.org.name}
+          desk={desk}
+          members={detail.members.map((member) => ({
+            personId: member.personId,
+            name: member.name,
+          }))}
+        />
+      )}
+    </>
+  );
 }

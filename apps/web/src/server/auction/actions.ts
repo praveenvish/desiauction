@@ -30,6 +30,7 @@ import {
   auctionOf,
   auctionView,
   ownerBoard,
+  practiceOf,
   type AuctionView,
   type OwnerBoard,
   type PaddleView,
@@ -55,6 +56,7 @@ import { storage } from "../media";
 import { completeAuctionOnce } from "./auction-notify";
 import { isSeasonAuctioneer } from "./auctioneers";
 import { engineWsUrl, sendEngineCommand } from "./engine-client";
+import { endPractice } from "./practice-engine";
 import { auctionOverview, type AuctionOverview } from "./auction-overview";
 
 // Auction internal RPC (M-IP4-1, rewired M-IP4-3). One gate: session → tenant
@@ -538,6 +540,17 @@ async function conductCommand(
   });
   if (!ack.accepted) {
     return { ok: false, reason: ack.reason ?? "", error: ack.reason ?? "Refused." };
+  }
+  // Opening the night ends the practice (0101), as it does from the cockpit —
+  // only once the night HAS opened, and never holding it up (the sweep ends a
+  // practice the engine could not).
+  if (type === "OpenAuction") {
+    const practice = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+      practiceOf(db, gate.competition.id),
+    );
+    if (practice !== null) {
+      await endPractice(practice.id, gate.personId);
+    }
   }
   return { ok: true, reason: ack.reason ?? "", version: ack.version };
 }

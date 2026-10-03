@@ -944,6 +944,7 @@ export async function queryRegistrations(
         where ${lots.registrationId} = ${registrations.id}
           and ${lots.status} = 'sold'
           and ${auctions.status} <> 'abandoned'
+          and ${auctions.kind} = 'real'
         limit 1
       )`,
       isIcon: registrations.isIcon,

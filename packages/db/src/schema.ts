@@ -17,6 +17,7 @@ import {
   timestamp,
   unique,
   uniqueIndex,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
 // IP-2_DESIGN §4. ids are ULIDs (char 26, app-generated via newId()).
@@ -75,6 +76,16 @@ export const people = pgTable("people", {
    * never opened /inbox on this build.
    */
   inboxSeenAt: ts("inbox_seen_at"),
+  /**
+   * SUSPENDED by a platform operator (0103, AC-1.2): every session stops on
+   * its next request and every sign-in refuses. Grants are kept, so lifting
+   * it restores the account exactly. At and reason are set together (CHECK).
+   */
+  suspendedAt: ts("suspended_at"),
+  suspendedReason: text("suspended_reason"),
+  suspendedBy: char("suspended_by", { length: 26 }).references((): AnyPgColumn => people.id, {
+    onDelete: "set null",
+  }),
 });
 
 /**
@@ -240,7 +251,7 @@ export const emailVerifications = pgTable(
      * must not silently confirm an address change. That bug already happened on
      * the phone side once; this table is not going to repeat it.
      */
-    purpose: text("purpose", { enum: ["email_change", "login"] })
+    purpose: text("purpose", { enum: ["email_change", "login", "step_up"] })
       .notNull()
       .default("email_change"),
     expiresAt: ts("expires_at").notNull(),
@@ -306,6 +317,12 @@ export const sessions = pgTable(
     expiresAt: ts("expires_at").notNull(),
     revokedAt: ts("revoked_at"),
     userAgent: text("user_agent"),
+    /**
+     * Proof of presence on THIS session (0102): set when the session is made
+     * from a code and again when a step-up code is entered. A risky admin act
+     * needs it within ten minutes; a second session does not inherit it.
+     */
+    steppedUpAt: ts("stepped_up_at"),
   },
   (table) => [index("sessions_person_idx").on(table.personId)],
 );
@@ -588,7 +605,7 @@ export const otpCodes = pgTable(
      * number change on the same phone. Purposes stay phone-shaped — email
      * codes live in `email_verifications`, which says what it is.
      */
-    purpose: text("purpose", { enum: ["login", "phone_change"] })
+    purpose: text("purpose", { enum: ["login", "phone_change", "step_up"] })
       .notNull()
       .default("login"),
     expiresAt: ts("expires_at").notNull(),
@@ -1546,6 +1563,15 @@ export const auctions = pgTable(
       .default("scheduled"),
     // AuctionConfig (doc 41), locked at creation; changes are audited overrides.
     config: jsonb("config").notNull(),
+    /*
+     * 'practice' (0101): the short rehearsal an organiser runs in the same
+     * season before the night. Same engine and screens; nothing it does reaches
+     * the season — every reader of "the season's auction" filters to 'real'
+     * (`isRealAuction` in @desiauction/auction).
+     */
+    kind: text("kind", { enum: ["real", "practice"] })
+      .notNull()
+      .default("real"),
     createdBy: char("created_by", { length: 26 })
       .notNull()
       .references(() => people.id, { onDelete: "restrict" }),
@@ -1554,11 +1580,17 @@ export const auctions = pgTable(
   (table) => [
     index("auctions_org_idx").on(table.orgId),
     index("auctions_competition_idx").on(table.competitionId),
-    // At most ONE non-abandoned auction per competition (0029). createAuction
-    // checks this too, but read-then-insert cannot stop a race; this can.
+    // At most ONE non-abandoned REAL auction per competition (0029, 0101).
+    // createAuction checks this too, but read-then-insert cannot stop a race;
+    // this can.
     uniqueIndex("auctions_competition_active_uq")
       .on(table.competitionId)
-      .where(sql`${table.status} <> 'abandoned'`),
+      .where(sql`${table.status} <> 'abandoned' and ${table.kind} = 'real'`),
+    // And at most one practice beside it (0101).
+    uniqueIndex("auctions_competition_practice_uq")
+      .on(table.competitionId)
+      .where(sql`${table.status} <> 'abandoned' and ${table.kind} = 'practice'`),
+    check("auctions_kind_check", sql`${table.kind} in ('real', 'practice')`),
     /*
      * THE `enum:` ABOVE IS A TYPE, NOT A COLUMN DEFINITION.
      *
@@ -2393,6 +2425,56 @@ export const finopsSchedules = pgTable("finops_schedules", {
   nextDueMs: bigint("next_due_ms", { mode: "number" }).notNull(),
   lastFiredMs: bigint("last_fired_ms", { mode: "number" }),
 });
+
+// A superadmin's invitation to a platform role (0103, AC-1.2). It waits until
+// the phone or email is PROVEN at sign-in, then becomes grants. No tenant, no
+// RLS; read by the web tier only (engine and runner hold no grant on it).
+export const platformInvites = pgTable(
+  "platform_invites",
+  {
+    id: id(),
+    phone: text("phone"),
+    email: text("email"),
+    name: text("name").notNull(),
+    capabilitySets: text("capability_sets").array().notNull(),
+    invitedBy: char("invited_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
+    reason: text("reason").notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    expiresAt: ts("expires_at").notNull(),
+    acceptedBy: char("accepted_by", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
+    acceptedAt: ts("accepted_at"),
+    revokedAt: ts("revoked_at"),
+  },
+  (table) => [
+    check(
+      "platform_invites_contact_check",
+      sql`(${table.phone} is null) <> (${table.email} is null)`,
+    ),
+  ],
+);
+
+// Every scheduled job's runs (0102, AC-1). The scheduler has no database, so
+// each job route records its own run. Platform-level, ZERO tenant data (the
+// finops_schedules posture): no org_id, no RLS.
+export const jobRuns = pgTable(
+  "job_runs",
+  {
+    id: id(),
+    job: text("job").notNull(),
+    startedAt: ts("started_at").notNull().defaultNow(),
+    finishedAt: ts("finished_at"),
+    ok: boolean("ok"),
+    detail: jsonb("detail").notNull().default({}),
+  },
+  (table) => [
+    index("job_runs_job_started_idx").on(table.job, table.startedAt.desc()),
+    index("job_runs_started_idx").on(table.startedAt),
+  ],
+);
 
 // Home page "Stay updated" capture. Platform-level, ZERO tenant data (same
 // posture as finops_schedules above) — no org_id, no RLS.

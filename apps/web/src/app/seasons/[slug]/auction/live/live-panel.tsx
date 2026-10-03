@@ -131,7 +131,13 @@ export function LivePanel({
         // the previous id. The engine, correctly, returned the cached ack for
         // the earlier command. The bidder was told "accepted" for a bid that
         // never landed, on a player they did not buy.
-        ack = await submitAuctionCommand(slug, intents.idFor(key, payload), type, payload);
+        ack = await submitAuctionCommand(
+          slug,
+          intents.idFor(key, payload),
+          type,
+          payload,
+          view.auctionId,
+        );
       } catch {
         // DO NOT CLAIM THE COMMAND FAILED. A rejected promise means the ANSWER
         // did not come back; it does not mean the request never arrived. The
@@ -163,9 +169,13 @@ export function LivePanel({
         return true;
       }
       toast({ title: commandRefusalMessage(ack.reason), tone: "danger" });
+      // The practice started or ended under this screen: show the room as it is.
+      if (ack.reason === "room_changed") {
+        router.refresh();
+      }
       return false;
     },
-    [slug, toast, intents],
+    [slug, toast, intents, router, view.auctionId],
   );
   const bidBusy = pending === "bid";
 
@@ -229,6 +239,7 @@ export function LivePanel({
         intents.idFor("complete", payload),
         "CompleteAuction",
         payload,
+        view.auctionId,
       );
     } catch {
       // Same rule as `send` above: an unanswered request is not a failed one,

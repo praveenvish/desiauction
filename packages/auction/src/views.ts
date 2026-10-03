@@ -18,7 +18,7 @@ import {
   teams,
   type Db,
 } from "@desiauction/db";
-import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, sql, type AnyColumn, type SQL } from "drizzle-orm";
 
 import { loadEvents, type AuctionRecord } from "./aggregate";
 import { lotPlayerName, snapshotRefs } from "./live";
@@ -27,24 +27,93 @@ import { lotPlayerName, snapshotRefs } from "./live";
 // discipline as the Competition snapshots. Mutations live ONLY in the
 // aggregate; nothing here writes.
 
+/**
+ * "THE SEASON'S AUCTION" MEANS THE REAL ONE (0101).
+ *
+ * A season can also carry a practice auction — the organiser's rehearsal,
+ * same engine, same screens. Every query that finds an auction BY SEASON (or
+ * by org, person, player…) rather than by an auction id it was handed must
+ * say which it means, or a rehearsal sale turns up on a public page, a
+ * poster or a career. These two are how it says so; the guard test
+ * `real-auction-filter.regression.test.ts` (apps/web) keeps it said.
+ */
+export function isRealAuction(): SQL {
+  return eq(auctions.kind, "real");
+}
+
+/** For an `auction_id` column on lots, paddles, bids…: it belongs to a real auction. */
+export function inRealAuction(auctionIdColumn: AnyColumn): SQL {
+  return sql`${auctionIdColumn} in (select ${auctions.id} from ${auctions} where ${auctions.kind} = 'real')`;
+}
+
+const RECORD_FIELDS = {
+  id: auctions.id,
+  orgId: auctions.orgId,
+  competitionId: auctions.competitionId,
+  name: auctions.name,
+  status: auctions.status,
+  config: auctions.config,
+  kind: auctions.kind,
+} as const;
+
+/** The season's REAL auction (the newest, as before 0101). Never a practice. */
 export async function auctionOf(db: Db, competitionId: string): Promise<AuctionRecord | null> {
   const [row] = await db
-    .select({
-      id: auctions.id,
-      orgId: auctions.orgId,
-      competitionId: auctions.competitionId,
-      name: auctions.name,
-      status: auctions.status,
-      config: auctions.config,
-    })
+    .select(RECORD_FIELDS)
     .from(auctions)
-    .where(eq(auctions.competitionId, competitionId))
+    .where(and(eq(auctions.competitionId, competitionId), isRealAuction()))
     .orderBy(desc(auctions.createdAt))
     .limit(1);
   if (row === undefined) {
     return null;
   }
   return { ...row, config: row.config as AuctionConfig };
+}
+
+/** The season's practice that has not ended (scheduled, live or paused), if any. */
+export async function practiceOf(db: Db, competitionId: string): Promise<AuctionRecord | null> {
+  const [row] = await db
+    .select(RECORD_FIELDS)
+    .from(auctions)
+    .where(
+      and(
+        eq(auctions.competitionId, competitionId),
+        eq(auctions.kind, "practice"),
+        sql`${auctions.status} <> 'abandoned'`,
+      ),
+    )
+    .orderBy(desc(auctions.createdAt))
+    .limit(1);
+  if (row === undefined) {
+    return null;
+  }
+  return { ...row, config: row.config as AuctionConfig };
+}
+
+/**
+ * WHICH AUCTION THE ROOM SHOWS — the one question the live screens ask.
+ *
+ * The practice, while one is running and the real auction has not started;
+ * the real auction otherwise. `prefer: "real"` is the room switch: anyone can
+ * step out of a practice to look at the real auction's waiting room. Once the
+ * real auction leaves `scheduled`, the practice is over (opening it ends the
+ * practice) and the room is the night's, whatever was asked.
+ */
+export async function roomAuctionOf(
+  db: Db,
+  competitionId: string,
+  prefer: "practice" | "real" = "practice",
+): Promise<{ auction: AuctionRecord; real: AuctionRecord; practice: AuctionRecord | null } | null> {
+  const real = await auctionOf(db, competitionId);
+  if (real === null) {
+    return null;
+  }
+  const practice = real.status === "scheduled" ? await practiceOf(db, competitionId) : null;
+  return {
+    auction: practice !== null && prefer === "practice" ? practice : real,
+    real,
+    practice,
+  };
 }
 
 export interface PaddleView {

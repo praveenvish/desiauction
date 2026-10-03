@@ -330,9 +330,17 @@ const ADMIN_SECTIONS: readonly Omit<AdminSection, "dividerBefore">[] = [
   },
   {
     key: "users",
-    label: "Users",
-    href: "/admin/users",
+    label: "People",
+    href: "/admin/people",
     capability: "platform.admin",
+    group: "trust",
+  },
+  // AC-1.2: who holds which platform role, and the superadmin's controls.
+  {
+    key: "roles",
+    label: "Roles",
+    href: "/admin/roles",
+    capability: "platform.grant",
     group: "trust",
   },
   // Can take a public page down, overriding an organizer's own decision.
@@ -435,7 +443,7 @@ const ADMIN_PRIMARY_KEYS: ReadonlySet<string> = new Set([
 const ADMIN_INLINE_MAX = 7;
 
 const ADMIN_MENU_GROUPS: readonly { label: string; keys: readonly string[] }[] = [
-  { label: "Trust & safety", keys: ["moderation", "erasure", "reports"] },
+  { label: "Trust & safety", keys: ["roles", "moderation", "erasure", "reports"] },
   { label: "Growth", keys: ["passes", "demos", "reviews", "newsletter"] },
   { label: "Comms", keys: ["notifications"] },
 ];
@@ -486,8 +494,11 @@ export function activeAdminTab(pathname: string): string {
   if (pathname.startsWith("/admin/orgs")) {
     return "orgs";
   }
-  if (pathname.startsWith("/admin/users")) {
+  if (pathname.startsWith("/admin/people") || pathname.startsWith("/admin/users")) {
     return "users";
+  }
+  if (pathname.startsWith("/admin/roles")) {
+    return "roles";
   }
   if (pathname.startsWith("/admin/audit")) {
     return "audit";
@@ -554,9 +565,10 @@ export function activeOrgMoneyTab(pathname: string, slug: string): string | null
 const SECTION_LABELS: [RegExp, string][] = [
   // PX-9 admin, longest-first — the detail pages must not read "Organizations".
   [/^\/admin\/orgs\/[^/]+$/, "Organization"],
-  [/^\/admin\/users\/[^/]+$/, "User"],
+  [/^\/admin\/people\/[^/]+$/, "Person"],
   [/^\/admin\/orgs$/, "Organizations"],
-  [/^\/admin\/users$/, "Users"],
+  [/^\/admin\/people$/, "People"],
+  [/^\/admin\/roles$/, "Roles"],
   [/^\/admin\/audit$/, "Audit"],
   [/^\/admin\/health$/, "Health"],
   // Messaging was missing from BOTH admin lists — this one and ADMIN_TABS. The
@@ -979,7 +991,8 @@ export type PlatformDoorCapability =
   | "platform.moderate"
   | "platform.privacy"
   | "platform.pass"
-  | "platform.demo";
+  | "platform.demo"
+  | "platform.grant";
 
 /** A team this person owns, or a season they were appointed to run. */
 export interface NavScope {
@@ -1081,6 +1094,8 @@ const PLATFORM_DOORS: [PlatformDoorCapability, string][] = [
   ["platform.privacy", "/admin/erasure"],
   ["platform.pass", "/admin/passes"],
   ["platform.demo", "/admin/demos"],
+  // A superadmin without the console grant lands on the one page that is theirs.
+  ["platform.grant", "/admin/roles"],
 ];
 
 export function operatorDoorHref(held: readonly PlatformDoorCapability[]): string | null {

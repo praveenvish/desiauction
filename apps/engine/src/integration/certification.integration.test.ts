@@ -187,6 +187,7 @@ beforeAll(async () => {
     name: `Cert League ${RUN}`,
     status: "scheduled",
     config: CONFIG,
+    kind: "real",
   };
 
   // Owner model → paddles for both teams.

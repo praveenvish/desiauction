@@ -178,6 +178,15 @@ export default {
         destination: "/admin/notifications/templates",
         permanent: false,
       },
+      // AC-1.2: /admin/users became /admin/people — the directory now manages
+      // people and their platform roles. Temporary, like the one above. The
+      // query (search, filter, page) travels with it.
+      { source: "/admin/users", destination: "/admin/people", permanent: false },
+      {
+        source: "/admin/users/:personId",
+        destination: "/admin/people/:personId",
+        permanent: false,
+      },
     ]);
   },
 };
