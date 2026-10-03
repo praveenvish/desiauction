@@ -42,7 +42,8 @@ export default async function CockpitPage({ params }: { params: Promise<{ slug: 
               realStarted={view.practice === null && status !== "scheduled"}
               watch={view.practice !== null || status === "scheduled"}
             />
-            <CockpitPanel slug={slug} view={view} />
+            {/* Keyed by the auction it conducts — see the live page. */}
+            <CockpitPanel key={view.auctionId} slug={slug} view={view} />
             {/* After the night the closing card carries every door (the auction
                 page, ledger, replay, recap); the row below is the live room's. */}
             {finished ? null : inPractice ? (
