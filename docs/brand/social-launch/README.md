@@ -142,7 +142,7 @@ re-encoded HEVC 640 kbps two-pass (SSIM 0.994 against the source).
 The 2.5 s logo strike (`docs/brand/kit/motion/da-strike-lockup-1920x1080.mp4`)
 is the intro for future YouTube videos, not a post.
 
-### Film v2 — re-cut for the no-controversy checklist (2026-10-03, awaiting founder approval)
+### Film v2 — re-cut for the no-controversy checklist (2026-10-03, founder-approved, live)
 
 v1 breaks [`SOCIAL_CONTENT_PLAN.md` §1a](../../operations/SOCIAL_CONTENT_PLAN.md):
 "Ab IPL jaisa." on the logo card (rule 2) and "2 minute mein season ready." as the
@@ -170,15 +170,23 @@ its organiser label now reads "Season ready, bina kaagaz").
   `#SportsTech #Cricket #StartupIndia #DesiAuction`. Video via the YouTube link card.
 - YouTube: title and description unchanged (no time claim), chapters still match.
 
-**Swap plan** (no platform lets a published video file be replaced):
+**Swapped (2026-10-03).** No platform lets a published video file be replaced, so v2 went
+up as new posts. Old posts are hidden where that can be undone; a permanent delete is
+left to the founder.
 
-| Network | v1 | v2 |
+| Network | v2 (live) | v1 |
 |---|---|---|
-| YouTube | set v1 to Private (reversible) | upload v2; make it the channel trailer |
-| Instagram | Archive (reversible) | post the 9:16 v2 |
-| Facebook | delete the v1 reel | post v2 from `facebook.com/reels/create` |
-| X | delete, unpin | post 16:9 v2, pin |
-| LinkedIn | delete | post the v2 YouTube link card |
+| YouTube | https://youtu.be/_8DwpfF0CM4 — channel trailer | Private (restorable) |
+| Instagram | https://www.instagram.com/desiauction/reel/DeB_QHqi-DB/ | **founder:** archive from the app (web has no Archive) — `Dd-7JsvCZLJ` |
+| Facebook | https://www.facebook.com/reel/2469654843443125 | **founder:** delete `facebook.com/reel/897160070146829` |
+| X | https://x.com/thedesiauction/status/2106349854415061309 — pinned | **founder:** delete `status/2105931810979164532` (and its #DesiAuction reply) |
+| LinkedIn | https://www.linkedin.com/feed/update/urn:li:activity:7512117665554010112/ (YouTube card) | **founder:** delete `urn:li:activity:7511686484962344961` |
+
+Upload files (not in git, 10 MB browser bridge): `film/film-01-16x9-upload-v2.mp4` (HEVC,
+YouTube), `film/film-01-16x9-meta-v2.mp4` (H.264 720p 7 MB — Facebook and X),
+`reels/film-01-9x16-ig-v2.mp4` (H.264 720p 7 MB — Instagram). Meta's and X's web
+uploaders stalled on the ~9.5 MB files and whenever another tab in the group was stuck on
+a "Leave site?" dialog; the 7 MB H.264 files went through once that tab was cleared.
 
 ---
 
