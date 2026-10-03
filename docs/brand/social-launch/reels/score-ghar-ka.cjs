@@ -97,9 +97,10 @@ function makeScore({ beats, footLen, total, out }) {
   };
 
   // --- arrangement ---------------------------------------------------------
-  const at = (id) => beats.find((b) => b.id === id);
-  const quietFrom = at("b09").start; // Dadi waits: the band stops
-  const backAt = at("b10").start; // Dadi bids: everything comes back
+  // Cues are found by what a beat DOES, so any reel can reuse the score.
+  const bySound = (sound) => beats.find((b) => b.sound === sound);
+  const quietFrom = bySound("wait")?.start ?? Infinity; // the band stops
+  const backAt = bySound("dadi")?.start ?? Infinity; // everything comes back
   const STEP = 0.125; // 16ths at 120 BPM
   const BASS = [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0];
   const TREB = [0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 1];
@@ -108,8 +109,8 @@ function makeScore({ beats, footLen, total, out }) {
     if (t >= quietFrom && t < backAt) return 0;
     if (t >= strikeAt && t < strikeAt + 2) return 0.35; // under the strike's own sting
     if (t >= strikeAt + 2) return 0.7 * Math.max(0, Math.min(1, (total - t) / 0.9));
-    const b07 = at("b07");
-    if (t >= b07.start && t < b07.start + b07.secs) return 0.45; // let the wah-wah land
+    const wahBeat = bySound("wah");
+    if (wahBeat && t >= wahBeat.start && t < wahBeat.start + wahBeat.secs) return 0.45; // let the wah-wah land
     return 1;
   };
   for (let k = 0; k * STEP < total; k++) {
@@ -134,7 +135,7 @@ function makeScore({ beats, footLen, total, out }) {
 
   // --- hits on the picture -------------------------------------------------
   add(0, 1.2, boom, 0.45); // a hit on frame one: stop the scroll
-  add(at("b02").start + 0.1, 0.3, gavel, 0.5);
+  for (const b of beats.filter((x) => x.sound === "gavel")) add(b.start + 0.1, 0.3, gavel, 0.5);
   const BELLS = [523.3, 587.3, 659.3, 698.5, 784.0, 880.0, 987.8]; // climbs with the price
   let bellIx = 0;
   for (const b of beats) {

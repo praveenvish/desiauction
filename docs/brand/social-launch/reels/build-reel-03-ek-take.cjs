@@ -1,18 +1,17 @@
-// build-reel-02-ghar-ka-auction.cjs — "Remote kiska?" 9:16 Reel, ~23 s.
+// build-reel-03-ek-take.cjs — "Ek take." 9:16 Reel, ~22 s. The practice auction.
 //
-// A family auctions the TV remote: four phones bid in a POINTS auction while
-// the TV shows the big screen. Every product frame is a real screen of a real
-// auction run on the local stack with fictional owners (Papa, Mummy, Beta,
-// Dadi) — captured by capture-ghar-ka-auction.spec.ts (see its header). The
-// tie is real too: Papa and Beta tap the same amount together, the server
-// takes the first, and Beta's phone shows the product's own refusal.
+// Auction night has one take: an owner who meets the bidding screen for the
+// first time in front of the whole hall freezes. So the organiser runs a
+// practice first — same link, same screens, 100 points, nothing counts — and
+// opening the real auction moves every phone across by itself. Every product
+// frame is a real screen of a real practice auction on the local stack
+// (fictional club and first-name-only players), captured by
+// capture-practice.spec.ts. Claims are the product's own words (the practice
+// card and bar) and the site's line "Your auction has one take. Rehearse it
+// tonight — free." Safety: SOCIAL_CONTENT_PLAN.md §1a.
 //
-// Safety (docs/operations/SOCIAL_CONTENT_PLAN.md §1a): no claim that is not on
-// the site, no money ("points, not money"), no gambling words, no religion, no
-// gender roles, no surnames, labelled "Scripted for fun · demo auction".
-//
-// usage (repo root, captures in reels/.work/ghar-ka/):
-//   mise exec -- node docs/brand/social-launch/reels/build-reel-02-ghar-ka-auction.cjs
+// usage (repo root, captures in reels/.work/practice/):
+//   mise exec -- node docs/brand/social-launch/reels/build-reel-03-ek-take.cjs
 
 const fs = require("fs");
 const path = require("path");
@@ -24,10 +23,10 @@ const { makeScore } = require("./score-ghar-ka.cjs");
 const ROOT = path.resolve(__dirname, "../../../..");
 const { chromium } = createRequire(path.join(ROOT, "apps/web/package.json"))("@playwright/test");
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-const CAP = path.join(__dirname, ".work/ghar-ka");
-const WORK = path.join(__dirname, ".work/ghar-ka-build");
-const OUT = path.join(__dirname, "reel-02-ghar-ka-auction.mp4");
-const COVER = path.join(__dirname, "reel-02-ghar-ka-auction-cover.jpg");
+const CAP = path.join(__dirname, ".work/practice");
+const WORK = path.join(__dirname, ".work/practice-build");
+const OUT = path.join(__dirname, "reel-03-ek-take.mp4");
+const COVER = path.join(__dirname, "reel-03-ek-take-cover.jpg");
 const KIT = path.join(ROOT, "docs/brand/kit");
 const STRIKE = path.join(KIT, "motion/da-strike-story-1080x1920.mp4");
 const STING = path.join(KIT, "sound/da-sting.wav");
@@ -71,7 +70,7 @@ const logo = (w) => `<img src="data:image/png;base64,${b64(LOCKUP)}" style="widt
 const frame = (caption, stage, opts = {}) => `<!doctype html><meta charset="utf-8"><style>${CSS}</style>
 <div class="f"><div style="position:absolute;top:64px;left:72px;z-index:2">${logo(330)}</div><div class="cap"><p>${opts.who ? `<span class="who">${opts.who}</span><br>` : ""}${caption}</p></div>
 <div class="stage">${stage}</div>
-<div class="label">Scripted for fun · demo auction · points, not money</div></div>`;
+<div class="label">Demo auction · fictional players · points, not money</div></div>`;
 
 const phone = (name, width, crop) =>
   `<div class="phone" style="width:${width}px${crop ? `;height:${crop}px` : ""}"><img src="${img(name)}"></div>`;
@@ -84,54 +83,22 @@ const tvWith = (name, phones) => `<div style="display:flex;flex-direction:column
     .map((p) => `<div class="phone" style="width:${phones.length > 1 ? 240 : 470}px;height:${phones.length > 1 ? 400 : 700}px;border-radius:28px"><img src="${img(p)}"></div>`)
     .join("")}</div></div>`;
 
+// A card (desktop screenshot) shown large on the frame.
+const card = (name, width = 1000) =>
+  `<div style="width:${width}px;border-radius:28px;overflow:hidden;border:6px solid #2a3344;box-shadow:0 30px 90px rgba(0,0,0,.6);background:#fff"><img src="${img(name)}" style="display:block;width:100%"></div>`;
+// The top of a phone: the PRACTICE bar and the lot, cropped.
+const phoneTop = (name, height) =>
+  `<div class="phone" style="width:640px;height:${height}px"><img src="${img(name)}"></div>`;
+
 // [id, seconds, html, sound]
 const BEATS = [
-  ["b01", 2.2, frame("Match day. <em>Ek remote.</em> Chaar log. 📺", tvWith("tv-00-open", ["phone-00-Papa", "phone-00-Mummy", "phone-00-Beta", "phone-00-Dadi"])), null],
-  [
-    "b02",
-    2.0,
-    frame(
-      "Ladai band. <em>DesiAuction</em> pe auction! 🔨",
-      `<div class="grid">${["Papa", "Mummy", "Beta", "Dadi"]
-        .map((w) => `<div><p class="tag">${w}</p>${phone(`phone-00-${w}`, 470, 640)}</div>`)
-        .join("")}</div>`,
-    ),
-    "gavel",
-  ],
-  ["b03", 1.4, frame("Papa: <em>10!</em>", phone("phone-01-Papa-pick", 560), { who: "PAPA" }), "bid"],
-  ["b04", 1.0, frame("Har bid, <em>TV pe live.</em> 📺", tvWith("tv-01-Papa", ["phone-01-Papa-after"])), null],
-  ["b05", 1.4, frame("Mummy: <em>15!</em>", phone("phone-02-Mummy-pick", 560), { who: "MUMMY" }), "bid"],
-  [
-    "b06",
-    2.0,
-    frame(
-      "Papa aur Beta — <em>ek saath 20!</em> 🤯",
-      `${phone("phone-03-race-Papa", 470)}${phone("phone-03-race-Beta", 470)}`,
-    ),
-    "tie",
-  ],
-  [
-    "b07",
-    2.6,
-    frame(
-      "Jo <em>pehle</em> pahuncha, wahi aage. Beta: 🫠",
-      `<div class="phone" style="width:900px;height:1150px"><img src="${img("phone-03-race-Beta")}" style="margin-top:-640px"></div>`,
-      { who: "BETA" },
-    ),
-    "wah",
-  ],
-  ["b08", 1.4, frame("Mummy: <em>25!</em> 😤", tvWith("tv-04-Mummy", ["phone-04-Mummy-after"]), { who: "MUMMY" }), "bid"],
-  ["b09", 1.8, frame("Dadi ab tak <em>chup</em> thi…", phone("phone-05-Dadi-pick", 560), { who: "DADI" }), "wait"],
-  ["b10", 1.8, frame("Dadi: <em>seedha 45!</em> 💥", tvWith("tv-05-Dadi", ["phone-05-Dadi-after"]), { who: "DADI" }), "dadi"],
-  [
-    "b11",
-    2.6,
-    frame(
-      "<em>SOLD</em> — Dadi. 🏆",
-      `<div class="phone" style="width:760px;height:1280px"><img src="${img("phone-90-Dadi")}"></div>`,
-    ),
-    "sold",
-  ],
+  ["b01", 2.6, frame("Auction night. Poora hall dekh raha hai. Owner ko <em>bid karna nahi aata.</em> 😬", phoneTop("phoneA-lot", 1150)), null],
+  ["b02", 2.4, frame("Isliye pehle: <em>PRACTICE auction.</em> 🎯", card("card-start"), { who: "ORGANISER" }), "gavel"],
+  ["b03", 2.2, frame("Same link. <em>Same screens.</em>", phoneTop("phoneA-ready", 1150), { who: "OWNER" }), null],
+  ["b04", 2.4, frame("100 points. Bid karo, galti karo — <em>kuch count nahi hota.</em>", `${phone("phoneA-outbid", 470)}${phone("phoneB-leading", 470)}`), "bid"],
+  ["b05", 2.0, frame("SOLD bhi <em>practice mein.</em> 🔨", phoneTop("phoneB-sold", 1150)), "bid"],
+  ["b06", 2.2, frame("Organiser ko dikhta hai: <em>kaun ready hai.</em>", card("card-ready", 840), { who: "ORGANISER" }), "wait"],
+  ["b07", 2.8, frame("Asli auction shuru → <em>har phone khud switch.</em> ✅", `${phone("phoneB-handover", 470)}${phone("phoneA-real", 470)}`), "dadi"],
 ];
 
 const END = `<!doctype html><meta charset="utf-8"><style>${CSS}
@@ -144,11 +111,11 @@ h1 em{font-style:normal;color:#E6B24A}
 .u{display:inline-block;margin-top:60px;padding:26px 40px;border-radius:22px;background:#E6B24A;font:600 50px/1 Clash;color:#0B1018}
 </style><div class="e">
 <div style="margin:0 0 70px">${logo(820)}</div>
-<h1>SOLD, without the <em>shouting.</em></h1>
-<p class="s">Live player auctions for your league, in any of 12 sports. Owners bid from their phones, the hall watches the big screen.</p>
-<p class="s" style="color:#E6B24A;margin-top:28px">Free for up to 4 teams &amp; 40 players.</p>
+<h1>Your auction has <em>one take.</em></h1>
+<p class="s" style="color:#F6F9FF;font-size:56px;margin-top:40px">Rehearse it tonight — free.</p>
+<p class="s">Practice auction: same link, same screens, nothing counts. Live player auctions for your league, in any of 12 sports.</p>
 <div><span class="u">desiauction.in</span></div>
-<div class="label">Scripted for fun · demo auction · points, not money</div>
+<div class="label">Demo auction · fictional players · points, not money</div>
 </div>`;
 const END_SECONDS = 4.2; // long enough to read what DesiAuction is
 
@@ -206,7 +173,7 @@ async function main() {
   makeScore({ beats: timeline, footLen, total, out: score });
 
   // 3. Footage + the DA strike (2 s, its own sting) + the end card, joined.
-  const sting = Math.round((timeline.find((b) => b.id === "b11").start + 0.6) * 1000);
+  const sting = Math.round((timeline.find((b) => b.id === "b07").start + 0.6) * 1000);
   ff([
     "-i", silent, "-i", score, "-i", STRIKE, "-i", STING,
     "-filter_complex",
@@ -220,8 +187,8 @@ async function main() {
     "-map", "[v]", "-map", "[a]", "-t", total.toFixed(3), "-c:v", "libx264", "-preset", "slow", "-crf", "18", "-profile:v", "high",
     "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-movflags", "+faststart", OUT,
   ]);
-  // Cover: the SOLD beat.
-  ff(["-i", path.join(WORK, "b11.png"), "-q:v", "3", COVER]);
+  // Cover: the hand-over beat.
+  ff(["-i", path.join(WORK, "b07.png"), "-q:v", "3", COVER]);
   console.log(path.relative(ROOT, OUT), `${total.toFixed(1)} s`);
 }
 
