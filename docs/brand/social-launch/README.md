@@ -171,16 +171,16 @@ its organiser label now reads "Season ready, bina kaagaz").
 - YouTube: title and description unchanged (no time claim), chapters still match.
 
 **Swapped (2026-10-03).** No platform lets a published video file be replaced, so v2 went
-up as new posts. Old posts are hidden where that can be undone; a permanent delete is
-left to the founder.
+up as new posts. v1 is off every network (checked 2026-10-03): YouTube Private, Facebook
+in the recycle bin, deleted on Instagram, X and LinkedIn.
 
 | Network | v2 (live) | v1 |
 |---|---|---|
 | YouTube | https://youtu.be/_8DwpfF0CM4 — channel trailer | Private (restorable) |
-| Instagram | https://www.instagram.com/desiauction/reel/DeB_QHqi-DB/ | **founder:** archive from the app (web has no Archive) — `Dd-7JsvCZLJ` |
-| Facebook | https://www.facebook.com/reel/2469654843443125 | **founder:** delete `facebook.com/reel/897160070146829` |
-| X | https://x.com/thedesiauction/status/2106349854415061309 — pinned | **founder:** delete `status/2105931810979164532` (and its #DesiAuction reply) |
-| LinkedIn | https://www.linkedin.com/feed/update/urn:li:activity:7512117665554010112/ (YouTube card) | **founder:** delete `urn:li:activity:7511686484962344961` |
+| Instagram | https://www.instagram.com/desiauction/reel/DeB_QHqi-DB/ | deleted by the founder |
+| Facebook | https://www.facebook.com/reel/2469654843443125 | moved to the Page's recycle bin (restorable until 2 Nov) |
+| X | https://x.com/thedesiauction/status/2106349854415061309 — pinned | deleted by the founder |
+| LinkedIn | https://www.linkedin.com/feed/update/urn:li:activity:7512117665554010112/ (YouTube card) | deleted by the founder |
 
 Upload files (not in git, 10 MB browser bridge): `film/film-01-16x9-upload-v2.mp4` (HEVC,
 YouTube), `film/film-01-16x9-meta-v2.mp4` (H.264 720p 7 MB — Facebook and X),
