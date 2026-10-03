@@ -36,6 +36,33 @@
   OTP to an **email code** (`/login`, checked 2026-10-02). **VERIFY** one real
   sign-in email arrives before week 1's CTA posts.
 
+### 1a. No controversy — the checklist every post passes (founder, 2026-10-03)
+
+The founder's rule: nothing we post may start a controversy or cause trouble
+later. Every post is checked against this list before approval.
+
+1. **Claims:** only lines already on the site, word for word ("SOLD, without
+   the shouting", "The server checks every bid, not the loudest voice", "Free
+   during beta · always free for up to 4 teams and 40 players"). No unmeasured
+   numbers — e.g. no setup time, no user counts.
+2. **Words never used:** IPL, BCCI, ICC or any team/board name; bet, betting,
+   odds, jackpot, satta, fantasy, all-in, lucky; any competitor's name.
+3. **Never touched:** religion (symbols, songs, festivals as jokes), caste
+   (no surnames), region, language-mocking, politics, gender roles, skin
+   colour, body shape, age-mocking. Elders are celebrated, never the joke.
+4. **People:** adults only on camera; each signs the one-line consent
+   (withdrawable via privacy@desiauction.in); no phone numbers, emails,
+   addresses or locations on screen. Real players only with written consent.
+5. **Real product, labelled:** real screens, no AI imagery; scripted scenes
+   say "Scripted for fun · demo auction"; points auctions say "points, not money".
+6. **Rights:** no broadcast footage, team kits or other brands in frame;
+   music only from Instagram's commercial-use library.
+7. **No contests or prizes** without published T&Cs (and the Tamil Nadu
+   exclusion); "we'll feature some" with permission is not a contest.
+8. **Comments:** reply once, politely, with facts; hide abuse; never argue;
+   complaints go to DM within the hour.
+9. **Approval:** the founder approves every post before it goes out.
+
 ---
 
 ## 2. Content pillars
@@ -84,7 +111,7 @@ Already live: product film (all networks), Reel 01 (POV bidding war), carousel
 
 | Day | Network | Post | Pillar |
 |---|---|---|---|
-| Mon | IG/FB/YT Shorts | **Reel:** "2 minute mein season ready" — real screen capture of creating a season | A |
+| Mon | IG/FB/YT Shorts | **Reel:** "Season ready — ek ek screen" — real screen capture of creating a season. **No duration claim:** setup time has never been measured (see the FAQ note in `marketing.ts`) | A |
 | Tue | IG | **Carousel:** "How auction night works" — the 4 beats (link → bid → big screen → receipts) | A |
 | Wed | All | **Founding 25 call:** "We're picking 25 organisers to run their auction free. We film the night (with your permission)." CTA: desiauction.in/founding-25 (link in bio; `?utm_source=<network>`) | B |
 | Thu | IG/FB/YT Shorts | **Reel:** "Ek link. Seedha WhatsApp pe." — player registration from one link | A |
