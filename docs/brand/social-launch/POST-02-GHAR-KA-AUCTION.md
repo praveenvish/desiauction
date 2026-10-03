@@ -22,6 +22,15 @@ every frame: *Scripted for fun · demo auction · points, not money*.
 
 ---
 
+## Posted (2026-10-03, founder-approved)
+
+| Network | Link | Settings |
+|---|---|---|
+| Instagram Reel | https://www.instagram.com/desiauction/reel/DeBdxUtCIvO/ | Original 9:16, SOLD cover, caption as below, AI label off, comments on, no cross-post |
+| YouTube Short | https://youtu.be/SGphrc61ryU | Public once YouTube finishes processing; not made for kids; no paid promotion; AI use: no |
+
+Not posted (not requested yet): Facebook, Threads, X, the two Stories.
+
 ## Files
 
 | File | Use |
