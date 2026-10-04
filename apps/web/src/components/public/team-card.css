@@ -96,6 +96,9 @@
   padding: var(--space-3) var(--space-4);
   list-style: none;
   align-content: start;
+  /* The rows ask how wide the LIST is, not the window: the same card is 285px
+     in a four-across grid on a laptop and 338px alone on a phone. */
+  container: team-card-players / inline-size;
 }
 
 /* Four columns, always: the pre-signed tag is optional, and with three
@@ -103,9 +106,11 @@
    line — so a squad of pre-signed players drew a ragged two-line list. */
 .team-card-player {
   display: grid;
-  /* A fixed role column: every row's role starts at the same x, badged or
-     not. The badge rides the name cell. */
-  grid-template-columns: 28px minmax(0, 1fr) minmax(0, 7rem);
+  /* The role column is as wide as its word and no wider. It used to reserve
+     7rem whatever it held, which left a 285px card 71px for the name — so a
+     four-across grid on a laptop read "Sharvan…", "Praveen…" (2026-10-04).
+     The roles are end-aligned, so they still share one edge. */
+  grid-template-columns: 32px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2);
@@ -117,11 +122,13 @@
   background: var(--surface-sunken);
 }
 
+/* 32px, the size of the `PlayerImage` it is handed ("sm"). At 28px the circle
+   clipped 4px off the right and bottom of every photo and initial. */
 .team-card-avatar {
   display: grid;
   place-items: center;
-  inline-size: 28px;
-  block-size: 28px;
+  inline-size: 32px;
+  block-size: 32px;
   overflow: hidden;
   border-radius: var(--radius-full);
   background: color-mix(in srgb, var(--team-color) 22%, var(--surface-sunken));
@@ -138,9 +145,6 @@
 
 /* A person's name wraps rather than being cut: "Aniket Saw…" is worse than
    two lines, and a squad list is exactly where people look for their own. */
-/* The badge never takes a line of its own (round-5 review): the name and its
-   badge share one line, and a long name truncates before the badge drops —
-   so every row in a squad keeps one height. */
 .team-card-player-name {
   display: flex;
   /* The Captain/Icon mark drops under the name when the row is narrow, rather
@@ -156,9 +160,7 @@
 
 .team-card-player-text {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .team-card-mark {
@@ -176,12 +178,31 @@
 .team-card-role {
   font-family: inherit;
   font-size: var(--text-sm-size);
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .team-card-number {
   text-align: end;
+}
+
+/* A NARROW CARD STACKS THE ROW. Beside the name, the role takes the width a
+   two-word name and its Captain badge need to share a line; under the name it
+   takes none. Every row is then name + badge, role beneath — one shape down
+   the whole squad instead of a badge that drops on some rows and not others. */
+@container team-card-players (max-width: 380px) {
+  .team-card-player {
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 0 var(--space-3);
+  }
+
+  .team-card-avatar {
+    grid-row: 1 / span 2;
+  }
+
+  .team-card-number {
+    grid-column: 2;
+    text-align: start;
+    white-space: normal;
+  }
 }
 
 .team-card-more,
