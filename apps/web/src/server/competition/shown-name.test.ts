@@ -21,16 +21,25 @@ describe("the shown photo, as a URL", () => {
   });
 
   it("withholds a minor's face on public surfaces, whatever consent says (PRR P0-2)", () => {
-    const row = { photoKey: "k/a.jpg", photoConsentAt: NOW };
+    const row = { photoKey: "k/a.jpg", photoConsentAt: NOW, adultConfirmedAt: null };
     expect(publicPhotoUrl({ ...row, dateOfBirth: "2015-01-01" }, NOW, sign)).toBeNull();
     expect(publicPhotoUrl({ ...row, dateOfBirth: "1995-01-01" }, NOW, sign)).toBe("/media/k/a.jpg");
   });
 
   it("withholds a face of UNKNOWN age on public surfaces (P0-6 — fails closed)", () => {
-    const row = { photoKey: "k/a.jpg", photoConsentAt: NOW };
+    const row = { photoKey: "k/a.jpg", photoConsentAt: NOW, adultConfirmedAt: null };
     expect(publicPhotoUrl({ ...row, dateOfBirth: null }, NOW, sign)).toBeNull();
     expect(publicPhotoUrl({ ...row, dateOfBirth: "not-a-date" }, NOW, sign)).toBeNull();
     // The authenticated desk is unchanged: consent alone decides there.
     expect(consentedPhotoUrl(row, sign)).toBe("/media/k/a.jpg");
+  });
+
+  it("shows a face of unknown age once the club confirmed the player is 18 or older (0105)", () => {
+    const row = { photoKey: "k/a.jpg", photoConsentAt: NOW, dateOfBirth: null };
+    expect(publicPhotoUrl({ ...row, adultConfirmedAt: NOW }, NOW, sign)).toBe("/media/k/a.jpg");
+    // A date of birth that says under 18 wins over the tick.
+    expect(
+      publicPhotoUrl({ ...row, dateOfBirth: "2015-01-01", adultConfirmedAt: NOW }, NOW, sign),
+    ).toBeNull();
   });
 });

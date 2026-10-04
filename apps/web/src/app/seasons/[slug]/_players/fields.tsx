@@ -293,8 +293,9 @@ export function SegmentSetting({
   commit,
   disabled,
   options,
+  hint,
   testId,
-}: Omit<BaseProps, "hint" | "wide"> & {
+}: Omit<BaseProps, "wide"> & {
   options: readonly { value: string; label: string }[];
 }) {
   const [shown, setShown] = useState(value);
@@ -345,6 +346,7 @@ export function SegmentSetting({
           {error}
         </p>
       ) : null}
+      {hint !== undefined && error === null ? <p className="pd-setting-hint">{hint}</p> : null}
     </div>
   );
 }

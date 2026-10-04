@@ -55,6 +55,7 @@ import { personContact, personLabel } from "../../../../lib/person-label";
 import { useHydrated } from "../../../../lib/use-hydrated";
 import {
   advanceCompetitionAction,
+  bulkConfirmAdultAction,
   bulkTriageAction,
   registrationDetailAction,
   selectAllMatchingAction,
@@ -237,7 +238,7 @@ export function RegistrationDashboardPanel({
     rows.some((row) => row.feeAmountPaise !== null);
 
   const [selected, setSelected] = useState<Map<string, Picked>>(new Map());
-  const [bulkBusy, setBulkBusy] = useState<TriageAction | "select" | null>(null);
+  const [bulkBusy, setBulkBusy] = useState<TriageAction | "select" | "adult" | null>(null);
   const [approveAllOpen, setApproveAllOpen] = useState(false);
   const [approvingAll, setApprovingAll] = useState(false);
   const [search, setSearch] = useState(filters.search);
@@ -563,6 +564,41 @@ export function RegistrationDashboardPanel({
     toast({ title: parts.join(" · "), tone: "success" });
     setSelected(new Map());
     setBulkDecline(false);
+    roster.settle();
+  };
+
+  /**
+   * "MARK 18+": the organizer's word that the selected players are adults, so
+   * a photo with no date of birth behind it may show on the public page (0105).
+   * A player whose date of birth says under 18 stays hidden whatever this says.
+   */
+  const confirmAdults = async () => {
+    if (selected.size === 0) {
+      return;
+    }
+    setBulkBusy("adult");
+    const ids = [...selected.keys()];
+    const undoes = rows
+      .filter((row) => selected.has(row.id))
+      .map((row) => roster.apply(row.id, { adultConfirmed: true }));
+    const result = await release(bulkConfirmAdultAction(slug, ids), () => {
+      setBulkBusy(null);
+    });
+    if (!result.ok) {
+      undoes.forEach((undo) => {
+        undo();
+      });
+      toast({ title: result.error, tone: "danger" });
+      return;
+    }
+    toast({
+      title:
+        result.confirmed > 0
+          ? `${String(result.confirmed)} marked 18+ · their photos can show on the public page`
+          : "Already marked 18+",
+      tone: "success",
+    });
+    setSelected(new Map());
     roster.settle();
   };
 
@@ -1423,6 +1459,17 @@ export function RegistrationDashboardPanel({
               disabled={bulkBusy !== null}
             >
               Restore
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => void confirmAdults()}
+              loading={bulkBusy === "adult"}
+              disabled={bulkBusy !== null}
+              title="You confirm these players are 18 or older. Their photos can then show on the public page."
+              data-testid="bulk-adult"
+            >
+              Mark 18+
             </Button>
             <Button
               size="sm"

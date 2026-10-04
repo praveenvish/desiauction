@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { PlayerImage } from "./player-image";
+import { PlayerImage, smallCopyOf } from "./player-image";
 
 describe("PlayerImage", () => {
   it("renders the branded mark when no photo exists — never a silhouette", () => {
@@ -90,5 +90,37 @@ describe("PlayerImage", () => {
     const frame = screen.getByTestId("player-image");
     expect(frame.getAttribute("style")).toBeNull();
     expect(frame.querySelector("img")).toHaveAttribute("width", "160");
+  });
+
+  describe("the 256px small copy", () => {
+    const ID = "01HZX5Q8Y3J0K4M6N7P8R9S0TA";
+    const photo = `https://media.example/org/${ID}/player/${ID}/${ID}.jpg`;
+    const small = `https://media.example/org/${ID}/player/${ID}/${ID}-256.webp`;
+
+    it("is derived only for a stored player photo", () => {
+      expect(smallCopyOf(photo)).toBe(small);
+      expect(smallCopyOf(`/_media/org/${ID}/player/${ID}/${ID}.png`)).toBe(
+        `/_media/org/${ID}/player/${ID}/${ID}-256.webp`,
+      );
+      expect(smallCopyOf(`/_media/org/${ID}/team/${ID}/${ID}.png`)).toBeNull();
+      expect(smallCopyOf("blob:https://app/123")).toBeNull();
+      expect(smallCopyOf("/photo.jpg")).toBeNull();
+    });
+
+    it("a small frame loads the small copy, then the photo, then the mark", () => {
+      render(<PlayerImage name="Anil K" seed="s1" src={photo} size="md" />);
+      const frame = screen.getByTestId("player-image");
+      const img = () => frame.querySelector("img");
+      expect(img()).toHaveAttribute("src", small);
+      fireEvent.error(img() as HTMLImageElement);
+      expect(img()).toHaveAttribute("src", photo);
+      fireEvent.error(img() as HTMLImageElement);
+      expect(frame).toHaveAttribute("data-state", "mark");
+    });
+
+    it("the hero frame keeps the full photo", () => {
+      render(<PlayerImage name="Anil K" seed="s2" src={photo} size="hero" />);
+      expect(screen.getByTestId("player-image").querySelector("img")).toHaveAttribute("src", photo);
+    });
   });
 });

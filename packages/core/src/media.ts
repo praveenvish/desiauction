@@ -127,6 +127,41 @@ export function isValidMediaKey(key: string): boolean {
 }
 
 /**
+ * THE SMALL COPY OF A PLAYER PHOTO.
+ *
+ * A photo is stored up to 2048px, and almost every place draws it at 24–96px:
+ * a list row, a squad card, a lineup. Each of those used to download the whole
+ * picture. So every player photo gets a sibling, `{token}-256.webp`, made by
+ * the server when the photo is attached (and once, by a backfill, for photos
+ * that predate it). 256px covers the largest small frame at 2× density.
+ *
+ * Derived from the photo's own key, so no column records it and nothing has to
+ * keep two keys in step: readers ask for the small copy and fall back to the
+ * photo when it is missing. Player photos only — crests and covers are few.
+ */
+export const THUMB_EDGE = 256;
+
+const THUMB_KEY_RE = /^org\/[0-9A-Za-z]{26}\/player\/[0-9A-Za-z]{26}\/[0-9A-Za-z]{26}-256\.webp$/;
+
+/** The small copy's key for a player photo key, or null for anything else. */
+export function thumbKeyOf(key: string): string | null {
+  if (!isValidMediaKey(key) || !key.includes("/player/")) {
+    return null;
+  }
+  return key.replace(/\.(?:jpg|png|webp)$/, `-${String(THUMB_EDGE)}.webp`);
+}
+
+/**
+ * A key the SERVER may read, write or delete: an uploaded object's key, or the
+ * small copy it derived from one. Same traversal-proof shape as
+ * `isValidMediaKey` (no `.` or `/` inside a segment). A client never names a
+ * small copy — upload and attach still gate on `isValidMediaKey` alone.
+ */
+export function isStoredMediaKey(key: string): boolean {
+  return MEDIA_KEY_RE.test(key) || THUMB_KEY_RE.test(key);
+}
+
+/**
  * True only when `key` is a valid media key AND its embedded org/subject/subjectId
  * segments match the just-authorized target (S2). Binds an attach to what the
  * caller was actually authorized for, so a client cannot attach an arbitrary or

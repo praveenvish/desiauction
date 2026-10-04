@@ -1198,6 +1198,10 @@ export const registrations = pgTable(
     // --- Player profile (M-parity: matches the incumbent's player card) ---
     // ISO yyyy-mm-dd; age is DERIVED at read time, never stored (it rots).
     dateOfBirth: text("date_of_birth"),
+    // The organizer stated this player is 18 or older (0105) — the other way a
+    // face may ride a public surface when there is no date of birth. NULL means
+    // nobody said so. A date of birth still decides on its own when present.
+    adultConfirmedAt: ts("adult_confirmed_at"),
     // Structured playing style (display + set filtering). Freeform-tolerant text
     // validated against enums in packages/core/src/player-profile.ts.
     battingStyle: text("batting_style"),

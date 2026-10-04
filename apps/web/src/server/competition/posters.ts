@@ -407,6 +407,7 @@ async function playerPosterFrom(
           photoKey: shownPhotoKey,
           photoConsentAt: shownPhotoConsentAt,
           dateOfBirth: registrations.dateOfBirth,
+          adultConfirmedAt: registrations.adultConfirmedAt,
           role: registrations.role,
           number: registrations.registrationNumber,
           jerseyNumber: registrations.jerseyNumber,
@@ -509,7 +510,8 @@ async function playerPosterFrom(
        * single byte, so a withheld photo is never fetched at all.
        */
       const photoKey =
-        row.photoConsentAt === null || !mayPublishPhoto(row.dateOfBirth, new Date())
+        row.photoConsentAt === null ||
+        !mayPublishPhoto(row.dateOfBirth, new Date(), row.adultConfirmedAt !== null)
           ? null
           : row.photoKey;
 
@@ -786,6 +788,7 @@ async function squadOf(
       photoKey: shownPhotoKey,
       photoConsentAt: shownPhotoConsentAt,
       dateOfBirth: registrations.dateOfBirth,
+      adultConfirmedAt: registrations.adultConfirmedAt,
       isIcon: registrations.isIcon,
       isCaptain: registrations.isCaptain,
       isRetained: registrations.isRetained,
@@ -813,6 +816,7 @@ async function squadOf(
       photoKey: shownPhotoKey,
       photoConsentAt: shownPhotoConsentAt,
       dateOfBirth: registrations.dateOfBirth,
+      adultConfirmedAt: registrations.adultConfirmedAt,
       price: lots.soldPrice,
       isIcon: registrations.isIcon,
       isCaptain: registrations.isCaptain,
@@ -868,8 +872,10 @@ function posterPhotoKey(row: {
   photoKey: string | null;
   photoConsentAt: Date | null;
   dateOfBirth: string | null;
+  adultConfirmedAt: Date | null;
 }): string | null {
-  return row.photoConsentAt === null || !mayPublishPhoto(row.dateOfBirth, new Date())
+  return row.photoConsentAt === null ||
+    !mayPublishPhoto(row.dateOfBirth, new Date(), row.adultConfirmedAt !== null)
     ? null
     : row.photoKey;
 }
@@ -945,6 +951,7 @@ async function topBuysPosterFrom(
           photoKey: shownPhotoKey,
           photoConsentAt: shownPhotoConsentAt,
           dateOfBirth: registrations.dateOfBirth,
+          adultConfirmedAt: registrations.adultConfirmedAt,
           price: lots.soldPrice,
           teamName: teams.name,
           teamColor: teams.primaryColor,

@@ -29,6 +29,7 @@ import {
 import { and, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 
 import { captainLockRefusal } from "./captain-lock";
+import { confirmAdults } from "./registration-aggregate";
 import { attachPhoneToClubOnly } from "./club-only-phone";
 import { reinstateWithdrawn } from "./registrations";
 import type { CaptainRefusal } from "./roster-lock";
@@ -502,6 +503,13 @@ export async function commitRegistrationImport(
    * changed role or band aborts it with `RosterFieldImportRefused`.
    */
   lockedAuctionId: string | null = null,
+  /**
+   * The organizer ticked "everyone in this sheet is 18 or older" (0105): every
+   * player the file names is confirmed, at this instant, in the same
+   * transaction. Null — the default, and an unticked box — confirms nobody and
+   * clears nobody.
+   */
+  adultConfirmedAt: Date | null = null,
 ): Promise<ImportResult> {
   if (rows.length === 0) {
     return { imported: 0, updated: 0, unchanged: 0, reinstated: 0, named: 0 };
@@ -690,6 +698,8 @@ export async function commitRegistrationImport(
     let updated = 0;
     let unchanged = 0;
     let reinstated = 0;
+    /** Every registration the file named, whatever happened to it. */
+    const inFile: string[] = [];
     for (const row of rows) {
       let personId = personFor(row);
       if (personId === undefined) {
@@ -717,6 +727,9 @@ export async function commitRegistrationImport(
 
       // Already here, and the file agrees with every column it carries.
       if (plan?.kind === "unchanged") {
+        if (record !== undefined) {
+          inFile.push(record.id);
+        }
         unchanged++;
         continue;
       }
@@ -761,6 +774,7 @@ export async function commitRegistrationImport(
           }
           await tx.update(registrations).set(values).where(eq(registrations.id, record.id));
         }
+        inFile.push(record.id);
         updated++;
         await tx.insert(auditLog).values({
           id: newId(),
@@ -846,6 +860,7 @@ export async function commitRegistrationImport(
           throw new CaptainImportRefused({ kind: "not_in_squad", name: labelOf(row) });
         }
         imported++;
+        inFile.push(id);
         if (row.phone !== null && namelessAccounts.has(row.phone) && row.name !== "") {
           named++;
         }
@@ -890,9 +905,13 @@ export async function commitRegistrationImport(
       });
       if (restored === null) {
         // Live registration the plan did not mark changed — nothing to do.
+        if (record !== undefined) {
+          inFile.push(record.id);
+        }
         unchanged++;
         continue;
       }
+      inFile.push(restored.id);
       reinstated++;
       // The rejoin of a nameless account takes the file's name too — for this
       // season, and only where the entry has none of its own yet.
@@ -915,6 +934,10 @@ export async function commitRegistrationImport(
         // application appearing from nowhere (the DA-27 reason, on this path).
         meta: { source: "csv_import", reinstated: "true" },
       });
+    }
+
+    if (adultConfirmedAt !== null) {
+      await confirmAdults(tx, orgId, competitionId, inFile, actorId, adultConfirmedAt);
     }
 
     await tx.insert(auditLog).values({
