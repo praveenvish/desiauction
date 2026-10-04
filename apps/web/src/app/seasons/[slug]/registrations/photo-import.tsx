@@ -15,7 +15,11 @@ import {
 } from "../../../../lib/google-drive";
 import { expandPhotoFiles } from "../../../../lib/photo-files";
 import { shrinkImage } from "../../../../lib/shrink-image";
-import { attachMedia, requestMediaUpload } from "../../../../server/media/actions";
+import {
+  attachMedia,
+  removePlayerPhoto,
+  requestMediaUpload,
+} from "../../../../server/media/actions";
 import {
   drivePickerConfigAction,
   photoTargetsAction,
@@ -121,6 +125,8 @@ export function PhotoImportPanel({
    */
   const [roster, setRoster] = useState<{ missing: number; withLinks: number } | null>(null);
   const [driveStep, setDriveStep] = useState<string | null>(null);
+  /** The row whose uploaded photo is being taken off its player. */
+  const [removing, setRemoving] = useState<number | null>(null);
   useEffect(() => {
     let live = true;
     void Promise.all([drivePickerConfigAction(slug), photoTargetsAction(slug)]).then(
@@ -325,6 +331,56 @@ export function PhotoImportPanel({
     }
   };
 
+  /**
+   * A photo the organizer does not want, taken out of the batch before
+   * anything is uploaded — the wrong face, a blurry shot, a payment
+   * screenshot. Nothing was saved, so nothing needs undoing.
+   */
+  const dropEntry = (index: number) => {
+    const entry = entries[index];
+    if (entry === undefined) {
+      return;
+    }
+    URL.revokeObjectURL(entry.preview);
+    previews.current = previews.current.filter((url) => url !== entry.preview);
+    setEntries((prev) => prev.filter((_, j) => j !== index));
+  };
+
+  /**
+   * An UPLOADED photo that turned out wrong, taken off its player from the same
+   * list — the player sheet's "Remove photo", without hunting for the player.
+   * They are then back on the "No photo" list.
+   */
+  const removeUploaded = async (index: number) => {
+    const entry = entries[index];
+    const target = entry === undefined ? null : targetOf(entry);
+    if (entry === undefined || target === null) {
+      return;
+    }
+    setRemoving(index);
+    const result = await release(
+      removePlayerPhoto({ slug, registrationId: target.registrationId }),
+      () => {
+        setRemoving(null);
+      },
+    );
+    if (!result.ok) {
+      toast({ title: result.error, tone: "danger" });
+      return;
+    }
+    URL.revokeObjectURL(entry.preview);
+    previews.current = previews.current.filter((url) => url !== entry.preview);
+    setEntries((prev) => prev.filter((_, j) => j !== index));
+    toast({ title: `Photo removed from ${target.name ?? target.number}`, tone: "success" });
+    router.refresh();
+  };
+
+  /** The organizer has checked the uploaded faces: close the step. */
+  const finish = () => {
+    reset();
+    onDone();
+  };
+
   /** The organizer places a file by hand — or takes that answer back. */
   const assign = (index: number, registrationId: string) => {
     setEntries((prev) =>
@@ -406,12 +462,10 @@ export function PhotoImportPanel({
       tone: failed === 0 ? "success" : "danger",
     });
     router.refresh();
-    if (failed === 0 && done > 0) {
-      // Clear before closing: the panel stays mounted inside the dialog, so a
-      // kept batch would greet the next open with the last run's table.
-      reset();
-      onDone();
-    }
+    // The list STAYS after an upload. It used to close the step the moment
+    // every photo landed, so a wrong face was only found later, player by
+    // player. Now the organizer checks the uploaded faces here, removes any
+    // that is wrong, and presses Done (`finish`).
   };
 
   // The auto-start (see the prop): once, and only when the Drive option is
@@ -439,6 +493,7 @@ export function PhotoImportPanel({
   // Stable during the run (blocked never changes), unlike `ready`, which drains.
   const attempted = entries.length - blocked;
   const finished = entries.length > 0 && entries.every((entry) => entry.status !== "ready");
+  const uploaded = entries.filter((entry) => entry.status === "done").length;
   /* A player takes at most one photo per batch — the rule `matchPhotoFiles`
      already keeps — so the picker only offers players nobody has claimed. */
   const claimed = new Set(
@@ -582,6 +637,7 @@ export function PhotoImportPanel({
                   <th>Photo</th>
                   <th>Player</th>
                   <th>Status</th>
+                  <th aria-label="Remove" />
                 </tr>
               </thead>
               <tbody>
@@ -589,63 +645,79 @@ export function PhotoImportPanel({
                   const target = targetOf(entry);
                   return (
                     <tr key={index}>
-                      <td data-label="Photo" className="photo-match-file">
-                        <span className="photo-match-thumb-row">
-                          {/* A blob: URL of the organizer's own file — nothing
-                              for next/image to optimise. */}
-                          <img src={entry.preview} alt="" className="photo-match-thumb" />
-                          <span>{entry.file.name}</span>
-                        </span>
+                      <td data-label="Photo" className="photo-match-photo">
+                        {/* A blob: URL of the organizer's own file — nothing
+                            for next/image to optimise. */}
+                        <img src={entry.preview} alt="" className="photo-match-thumb" />
                       </td>
-                      <td data-label="Player">
-                        {entry.viaDrive === true && entry.manual !== undefined ? (
-                          <>
-                            {entry.manual.name ?? "Unnamed"}{" "}
-                            <span className="registration-phone">{entry.manual.number}</span>{" "}
-                            <Badge tone="success">by Drive link</Badge>
-                            {entry.manual.hasPhoto ? (
-                              <Badge tone="warning">replaces current photo</Badge>
-                            ) : null}
-                          </>
-                        ) : entry.match.ok && entry.manual === undefined ? (
-                          <>
-                            {entry.match.target.name ?? "Unnamed"}{" "}
-                            <span className="registration-phone">{entry.match.target.number}</span>{" "}
-                            <Badge tone="neutral">{RULE_LABEL[entry.match.rule]}</Badge>
-                            {entry.match.target.hasPhoto ? (
-                              <Badge tone="warning">replaces current photo</Badge>
-                            ) : null}
-                          </>
-                        ) : entry.detail === undefined || entry.manual !== undefined ? (
-                          <select
-                            className="mapping-select"
-                            aria-label={`Player for ${entry.file.name}`}
-                            data-testid={`photo-assign-${String(index)}`}
-                            value={entry.manual?.registrationId ?? ""}
-                            disabled={uploading || entry.status === "done"}
-                            onChange={(event) => {
-                              assign(index, event.target.value);
-                            }}
-                          >
-                            <option value="">Choose the player…</option>
-                            {targets
-                              .filter(
-                                (option) =>
-                                  option.registrationId === target?.registrationId ||
-                                  !claimed.has(option.registrationId),
-                              )
-                              .map((option) => (
-                                <option key={option.registrationId} value={option.registrationId}>
-                                  {option.name ?? "Unnamed"} · {option.number}
-                                  {option.hasPhoto ? " (has a photo)" : ""}
-                                </option>
-                              ))}
-                          </select>
-                        ) : (
-                          <span className="photo-match-reason">
-                            {entry.match.ok ? entry.match.target.name : entry.match.reason}
-                          </span>
-                        )}
+                      <td data-label="Player" className="photo-match-player">
+                        {/* One block, so on a phone (where each cell is a
+                            labelled flex row) the name, its badges and the
+                            file name stack instead of spreading sideways. */}
+                        <div>
+                          {entry.viaDrive === true && entry.manual !== undefined ? (
+                            <>
+                              {entry.manual.name ?? "Unnamed"}{" "}
+                              <span className="registration-phone">{entry.manual.number}</span>{" "}
+                              <Badge tone="success">by Drive link</Badge>
+                              {entry.manual.hasPhoto ? (
+                                <Badge tone="warning">replaces current photo</Badge>
+                              ) : null}
+                            </>
+                          ) : entry.match.ok && entry.manual === undefined ? (
+                            <>
+                              {entry.match.target.name ?? "Unnamed"}{" "}
+                              <span className="registration-phone">
+                                {entry.match.target.number}
+                              </span>{" "}
+                              <Badge tone="neutral">{RULE_LABEL[entry.match.rule]}</Badge>
+                              {entry.match.target.hasPhoto ? (
+                                <Badge tone="warning">replaces current photo</Badge>
+                              ) : null}
+                            </>
+                          ) : entry.detail === undefined || entry.manual !== undefined ? (
+                            <select
+                              className="mapping-select"
+                              aria-label={`Player for ${entry.file.name}`}
+                              data-testid={`photo-assign-${String(index)}`}
+                              value={entry.manual?.registrationId ?? ""}
+                              disabled={uploading || entry.status === "done"}
+                              onChange={(event) => {
+                                assign(index, event.target.value);
+                              }}
+                            >
+                              <option value="">Choose the player…</option>
+                              {targets
+                                .filter(
+                                  (option) =>
+                                    option.registrationId === target?.registrationId ||
+                                    !claimed.has(option.registrationId),
+                                )
+                                .map((option) => (
+                                  <option key={option.registrationId} value={option.registrationId}>
+                                    {option.name ?? "Unnamed"} · {option.number}
+                                    {option.hasPhoto ? " (has a photo)" : ""}
+                                  </option>
+                                ))}
+                            </select>
+                          ) : (
+                            <span className="photo-match-reason">
+                              {entry.match.ok ? entry.match.target.name : entry.match.reason}
+                            </span>
+                          )}
+                          {/* The file's own name, for a file from the
+                            organizer's computer only: a Drive upload is named
+                            by Google, often after the uploader's account, and
+                            tells the organizer nothing. One line, cut with an
+                            ellipsis — a camera name has no spaces to wrap at,
+                            and letting it break anywhere is what stacked it
+                            one letter per line. */}
+                          {entry.viaDrive === true ? null : (
+                            <span className="photo-match-filename" title={entry.file.name}>
+                              {entry.file.name}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td data-label="Status">
                         {entry.status === "ready" ? (
@@ -660,6 +732,35 @@ export function PhotoImportPanel({
                           <Badge tone="danger">{entry.detail}</Badge>
                         ) : (
                           <Badge tone="neutral">pick a player</Badge>
+                        )}
+                      </td>
+                      <td className="photo-match-action">
+                        {entry.status === "done" ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            loading={removing === index}
+                            disabled={uploading || removing !== null}
+                            onClick={() => void removeUploaded(index)}
+                            data-testid={`photo-remove-uploaded-${String(index)}`}
+                          >
+                            Remove photo
+                          </Button>
+                        ) : entry.status === "uploading" ? null : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={uploading}
+                            onClick={() => {
+                              dropEntry(index);
+                            }}
+                            aria-label={`Remove this photo${
+                              target === null ? "" : ` for ${target.name ?? target.number}`
+                            }`}
+                            data-testid={`photo-remove-${String(index)}`}
+                          >
+                            Remove
+                          </Button>
                         )}
                       </td>
                     </tr>
@@ -683,6 +784,16 @@ export function PhotoImportPanel({
                     ? `Upload ${String(ready)} photo${ready === 1 ? "" : "s"} (${String(blocked)} skipped)`
                     : `Upload ${String(ready)} photo${ready === 1 ? "" : "s"}`}
             </Button>
+          ) : uploaded > 0 ? (
+            <div className="io-row photo-review-done" data-testid="photo-review-done">
+              <p className="dash-hint">
+                Check each photo. If one is wrong, press <strong>Remove photo</strong> — that player
+                goes back to the &ldquo;No photo&rdquo; list.
+              </p>
+              <Button onClick={finish} data-testid="photo-done">
+                Done
+              </Button>
+            </div>
           ) : null}
         </>
       ) : null}
