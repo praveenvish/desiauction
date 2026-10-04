@@ -1,4 +1,4 @@
-import { initialsOf as lettersOf } from "@desiauction/core";
+import { initialsOf as lettersOf } from "@desiauction/core/initials";
 import { formatCount } from "../../lib/plural";
 
 /**
