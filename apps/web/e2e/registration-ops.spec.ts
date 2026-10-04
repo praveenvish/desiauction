@@ -324,8 +324,11 @@ test("an organizer adds one player by hand, then imports their photo by filename
   await expect(page.getByTestId("photo-match-table")).toContainText("Hand Added Player");
   await expect(page.getByTestId("photo-match-table")).toContainText("by reg. number");
   await page.getByTestId("photo-upload-all").click();
-  // A clean batch closes the dialog itself, and the row swaps initials for the
-  // uploaded image — which only renders once consent was recorded (DPDP §5).
+  // The list stays for a last look at the faces, with a Remove on each; Done
+  // closes it, and the row swaps initials for the uploaded image — which only
+  // renders once consent was recorded (DPDP §5).
+  await expect(page.getByTestId("photo-remove-uploaded-0")).toBeVisible({ timeout: 20_000 });
+  await page.getByTestId("photo-done").click();
   await expect(page.getByTestId("photo-match-table")).toBeHidden({ timeout: 20_000 });
   await expect(page.getByTestId("reg-table").locator("img").first()).toBeVisible();
 });

@@ -186,6 +186,8 @@ test("a Form's Google Sheet syncs players, and their photos follow in the same s
   ).toBe(1);
   await dialog.getByTestId("photo-upload-all").click();
   await expect(page.getByText("2 photos uploaded")).toBeVisible(COLD);
+  // The list stays so the faces can be checked; Done closes the step.
+  await dialog.getByTestId("photo-done").click();
 
   // --- A week later: one more registration arrives in the sheet. -----------
   rows = 3;
@@ -202,6 +204,7 @@ test("a Form's Google Sheet syncs players, and their photos follow in the same s
   await expect(dialog.getByTestId("photo-match-table")).toContainText("Drive Player 3");
   await dialog.getByTestId("photo-upload-all").click();
   await expect(page.getByText("1 photo uploaded")).toBeVisible(COLD);
+  await dialog.getByTestId("photo-done").click();
   await expect(page.getByTestId("stat-total")).toContainText("3");
 });
 
@@ -257,6 +260,15 @@ test("a downloaded Form file finds its photo question by its Drive links and con
   await expect(dialog.getByTestId("photo-match-table")).toBeVisible(COLD);
   await expect(dialog.getByTestId("photo-match-table").getByText("by Drive link")).toHaveCount(2);
   await expect(dialog.getByTestId("photo-match-table")).toContainText("File Player 1");
+  // A photo that is not wanted comes out of the batch before anything uploads.
+  await expect(dialog.getByTestId("photo-match-table").locator("tbody tr")).toHaveCount(2);
+  await dialog.getByTestId("photo-remove-1").click();
+  await expect(dialog.getByTestId("photo-match-table").locator("tbody tr")).toHaveCount(1);
   await dialog.getByTestId("photo-upload-all").click();
-  await expect(page.getByText("2 photos uploaded")).toBeVisible(COLD);
+  await expect(page.getByText("1 photo uploaded")).toBeVisible(COLD);
+  // And an uploaded one that turns out wrong comes off its player from the
+  // same list — the player is back on the "No photo" list.
+  await dialog.getByTestId("photo-remove-uploaded-0").click();
+  await expect(page.getByText(/^Photo removed from /)).toBeVisible(COLD);
+  await expect(dialog.getByTestId("photo-match-table")).toBeHidden();
 });

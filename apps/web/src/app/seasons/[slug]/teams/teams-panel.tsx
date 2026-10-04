@@ -50,7 +50,7 @@ import { ExportDialog } from "../_players/export-dialog";
 import { BoughtByHand, PublishByHand } from "./hand-entry";
 import { RosterSheetHost, SquadPreSign } from "./squad-desk";
 import { TeamLogoUploader } from "./team-logo-uploader";
-import { captainOf, preSigned, roleMix, setupSteps, type RoleShare } from "./teams-model";
+import { captainOf, iconsOf, preSigned, roleMix, setupSteps, type RoleShare } from "./teams-model";
 
 /**
  * DA-36: ONE monogram algorithm for a team, everywhere.
@@ -366,14 +366,20 @@ function TeamGridCard({
   const money = useMoney();
   const roster = team.roster;
   const captain = roster === undefined ? null : captainOf(roster);
+  const icons = roster === undefined ? [] : iconsOf(roster);
   const auctionExists = view.rulesSource !== null;
   const started = view.rulesSource?.locked ?? false;
   const full =
     team.squadMax !== undefined && team.squadMax !== null && team.squadFilled >= team.squadMax;
-  const steps = setupSteps(team, captain, auctionExists, view.viewer.canManageTeams);
-  // What can be done now: the coach is optional, and the owner waits for the auction.
+  const steps = setupSteps(team, captain, icons, auctionExists, view.viewer.canManageTeams);
+  // What can be done now: the coach and icons are optional, and the owner
+  // waits for the auction.
   const stillToSet = steps.filter(
-    (step) => !step.done && step.key !== "coach" && (step.key !== "owner" || auctionExists),
+    (step) =>
+      !step.done &&
+      step.key !== "coach" &&
+      step.key !== "icon" &&
+      (step.key !== "owner" || auctionExists),
   );
   const href = `/seasons/${slug}/teams?team=${team.id}`;
   return (
@@ -476,6 +482,9 @@ function TeamGridCard({
                     <span className="tm-quiet">No captain named</span>
                   )}
                 </span>
+                {icons.length > 0 ? (
+                  <span>Icon · {icons.map((icon) => icon.name ?? "Unnamed").join(", ")}</span>
+                ) : null}
                 <span className={team.coachName === null ? "tm-quiet" : undefined}>
                   {team.coachName !== null ? `Coach · ${team.coachName}` : "No coach named"}
                 </span>
