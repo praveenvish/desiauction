@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./sport-labels": "./src/sports/labels.ts"
+    "./sport-labels": "./src/sports/labels.ts",
+    "./initials": "./src/initials.ts"
   },
   "scripts": {
     "lint": "eslint src --max-warnings 0",

@@ -78,7 +78,7 @@ test("photos carry explicit dimensions — zero layout shift by construction", a
 });
 
 test("marks are named for assistive tech; Devanagari initials render", async ({ page }) => {
-  await expect(page.locator("svg[aria-label='रोहित शर्मा'] text").first()).toHaveText("रोश");
+  await expect(page.locator("svg[aria-label='रोहित शर्मा'] text").first()).toHaveText("रश");
   await expect(
     page.locator("svg[aria-label='Yashasvi Bhupendra Kumar Jaiswal'] text").first(),
   ).toHaveText("YJ");

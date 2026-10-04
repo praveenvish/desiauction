@@ -1,3 +1,4 @@
+import { initialsOf as lettersOf } from "@desiauction/core/initials";
 import { formatCount } from "../../lib/plural";
 
 /**
@@ -197,12 +198,5 @@ export function needsYou<T extends StageInput & { startsOn: string | null }>(
 
 /** "TPL 2026" → "T2"; "Demo Premier League" → "DP" — a crest with no logo. */
 export function initialsOf(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return "?";
-  if (words.length === 1) return (words[0] ?? "?").slice(0, 2).toUpperCase();
-  return words
-    .slice(0, 2)
-    .map((word) => word.charAt(0))
-    .join("")
-    .toUpperCase();
+  return lettersOf(name, { words: "first-two", singleWord: 2 }) || "?";
 }

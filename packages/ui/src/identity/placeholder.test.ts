@@ -35,10 +35,11 @@ describe("initialsFor", () => {
     expect(initialsFor("Jadeja")).toEqual({ initials: "J", script: "latin" });
   });
 
-  it("segments Devanagari graphemes correctly (no broken matras)", () => {
+  it("takes a Devanagari word's base letter, never a vowel sign", () => {
     const result = initialsFor("रोहित शर्मा");
     expect(result.script).toBe("devanagari");
-    expect(result.initials).toBe("रोश");
+    expect(result.initials).toBe("रश");
+    expect(initialsFor("कमलेश").initials).toBe("क");
   });
 
   it("returns null initials for empty or whitespace names", () => {

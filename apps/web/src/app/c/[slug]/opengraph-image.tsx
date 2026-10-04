@@ -1,6 +1,7 @@
+import { posterFonts } from "../../seasons/[slug]/posters/poster-fonts";
+import { imageResponse } from "../../../server/image-text/image-response";
 import { buildCompetitionShareCard } from "@desiauction/core";
 import { initialsFor } from "@desiauction/ui";
-import { ImageResponse } from "next/og";
 
 import { publicCompetitionView, publicShowcase } from "../../../server/competition/public";
 import { formatDateRange } from "../format";
@@ -33,7 +34,7 @@ export default async function OpengraphImage({ params }: { params: Promise<{ slu
   const { slug } = await params;
   const view = await publicCompetitionView(slug);
   if (view === null) {
-    return new ImageResponse(renderShareFallback(), { ...size });
+    return await imageResponse(renderShareFallback(), { ...size });
   }
   const pool = await publicShowcase(slug);
   const model = buildCompetitionShareCard({
@@ -50,5 +51,10 @@ export default async function OpengraphImage({ params }: { params: Promise<{ slu
     auctionStatus: view.auctionStatus,
   });
   const { initials } = initialsFor(view.name);
-  return new ImageResponse(renderShareCard(model, initials ?? "DA"), { ...size });
+  // The poster faces, always: a club name in Hindi and one in English must
+  // come out in the same type, and Satori's default draws Devanagari as boxes.
+  return await imageResponse(renderShareCard(model, initials ?? "DA"), {
+    ...size,
+    fonts: await posterFonts(),
+  });
 }

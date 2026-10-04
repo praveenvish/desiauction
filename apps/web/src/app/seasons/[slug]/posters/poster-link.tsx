@@ -4,7 +4,7 @@ import { mix, withAlpha } from "./poster-color";
 import { Backlight, Coin, Number3D, Portrait, depthFor, metalText } from "./poster-depth";
 import { DISPLAY, FIGURES, SERIF } from "./poster-fonts";
 import { BrandLockup, contextFor, vis, type PosterRenderOptions } from "./poster-kit";
-import { CAPS, ITALIC, ResultPanel, fit, type PanelMetrics } from "./poster-player";
+import { CAPS, ITALIC, ResultPanel, displayLine, fit, type PanelMetrics } from "./poster-player";
 
 /**
  * THE LINK CARD — the player poster, laid landscape for a link preview.
@@ -54,7 +54,11 @@ export function renderPlayerLinkCard(
   const depth = depthFor(ctx.skin);
   const { width, height } = LINK_CARD_SIZE;
   const column = { left: 560, width: width - 560 - 60 };
-  const lastSize = fit(model.lastName.toUpperCase(), column.width, CAPS, 128, 64);
+  const last = displayLine(
+    model.lastName,
+    fit(model.lastName.toUpperCase(), column.width, CAPS, 128, 64),
+  );
+  const lastSize = last.fontSize;
   const firstSize =
     model.firstName === null ? 0 : fit(model.firstName, column.width, ITALIC, 64, 36);
   // The panel sits on the foot of the card; its top is measured from there.
@@ -186,6 +190,7 @@ export function renderPlayerLinkCard(
             fontWeight: 800,
             fontSize: lastSize,
             lineHeight: 0.86,
+            ...(last.marginTop === undefined ? {} : { marginTop: last.marginTop }),
             textShadow: "0 14px 40px rgba(0,0,0,0.5)",
           }}
         >
@@ -258,7 +263,11 @@ export function renderTeamLinkCard(
   const { width, height } = LINK_CARD_SIZE;
   const teamColour = card.teamColor ?? palette.accent;
   const nameRoom = width - 60 - 300;
-  const nameSize = fit(card.teamName.toUpperCase(), nameRoom, CAPS, 118, 60);
+  const name = displayLine(
+    card.teamName,
+    fit(card.teamName.toUpperCase(), nameRoom, CAPS, 118, 60),
+  );
+  const nameSize = name.fontSize;
   const faces = card.faces.slice(0, 7);
   const cell = (label: string, value: string, metal: boolean, sub: string | null = null) => (
     <div
@@ -393,6 +402,7 @@ export function renderTeamLinkCard(
               fontWeight: 800,
               fontSize: nameSize,
               lineHeight: 0.9,
+              ...(name.marginTop === undefined ? {} : { marginTop: name.marginTop }),
               textShadow: "0 14px 40px rgba(0,0,0,0.5)",
             }}
           >

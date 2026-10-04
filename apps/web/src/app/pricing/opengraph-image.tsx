@@ -1,4 +1,4 @@
-import { ImageResponse } from "next/og";
+import { imageResponse } from "../../server/image-text/image-response";
 
 import { PRICING } from "../../content/marketing";
 import { SHARE_IMAGE_SIZE, renderPricingCard } from "../c/[slug]/share-image-card";
@@ -24,8 +24,8 @@ export const alt = "DesiAuction pricing — one pass per tournament";
 export const size = SHARE_IMAGE_SIZE;
 export const contentType = "image/png";
 
-export default function OpengraphImage() {
-  return new ImageResponse(
+export default async function OpengraphImage() {
+  return await imageResponse(
     renderPricingCard({
       chip: "Public beta · everything free",
       title: PRICING.h1,
