@@ -157,8 +157,17 @@ interface Filters {
   fee: string;
   team: string;
   role: string;
+  /** "photo" | "phone" | "role" — players still missing that detail ("" for all). */
+  missing: string;
   sort: string;
 }
+
+/** The "fix it later" list's three questions, as the filter offers them. */
+const MISSING_LABEL: Record<string, string> = {
+  photo: "No photo",
+  phone: "No phone",
+  role: "No role",
+};
 
 export function RegistrationDashboardPanel({
   slug,
@@ -386,6 +395,7 @@ export function RegistrationDashboardPanel({
         fee: filters.fee,
         team: filters.team,
         role: filters.role,
+        missing: filters.missing,
         sort: filters.sort === "recent" ? "" : filters.sort,
         ...patch,
       };
@@ -451,6 +461,7 @@ export function RegistrationDashboardPanel({
     filters.fee !== "" ||
     filters.team !== "" ||
     filters.role !== "" ||
+    filters.missing !== "" ||
     filters.sort !== "recent";
 
   /* --- Selection & bulk ----------------------------------------------- */
@@ -480,6 +491,7 @@ export function RegistrationDashboardPanel({
         ...(filters.fee !== "" ? { fee: filters.fee } : {}),
         ...(filters.team !== "" ? { teamId: filters.team } : {}),
         ...(filters.role !== "" ? { role: filters.role } : {}),
+        ...(filters.missing !== "" ? { missing: filters.missing } : {}),
       }),
       () => {
         setBulkBusy(null);
@@ -1033,6 +1045,16 @@ export function RegistrationDashboardPanel({
                 Role: {labelOf(desk.roles, filters.role)}
               </ToolbarChip>
             ) : null}
+            {filters.missing !== "" ? (
+              <ToolbarChip
+                removeLabel="Remove missing-details filter"
+                onRemove={() => {
+                  changeFilter({ missing: "" });
+                }}
+              >
+                {MISSING_LABEL[filters.missing] ?? filters.missing}
+              </ToolbarChip>
+            ) : null}
             {filters.team !== "" ? (
               <ToolbarChip
                 removeLabel="Remove team filter"
@@ -1060,7 +1082,15 @@ export function RegistrationDashboardPanel({
                 data-testid="filters-reset"
                 onClick={() => {
                   setSearch("");
-                  changeFilter({ q: "", status: "", fee: "", team: "", role: "", sort: "" });
+                  changeFilter({
+                    q: "",
+                    status: "",
+                    fee: "",
+                    team: "",
+                    role: "",
+                    missing: "",
+                    sort: "",
+                  });
                 }}
               >
                 Clear all
@@ -1074,8 +1104,26 @@ export function RegistrationDashboardPanel({
             </span>
             <FilterMenu
               testId="filters-menu"
-              activeCount={[filters.role, filters.team, filters.fee].filter((v) => v !== "").length}
+              activeCount={
+                [filters.role, filters.team, filters.fee, filters.missing].filter((v) => v !== "")
+                  .length
+              }
             >
+              {/* The "fix it later" list: after a name-only import, the players
+                  still waiting for a photo, a phone or a role — each row opens
+                  the sheet where that detail is added. */}
+              <FilterSelect
+                label="Missing"
+                visibleLabel
+                value={filters.missing}
+                onChange={(value) => {
+                  changeFilter({ missing: value });
+                }}
+                options={[
+                  { value: "", label: "Anything" },
+                  ...Object.entries(MISSING_LABEL).map(([value, label]) => ({ value, label })),
+                ]}
+              />
               {desk.roles.length > 0 ? (
                 <FilterSelect
                   label="Role"
@@ -1464,6 +1512,7 @@ export function RegistrationDashboardPanel({
                 ...(filters.fee !== "" ? { fee: filters.fee } : {}),
                 ...(filters.team !== "" ? { teamId: filters.team } : {}),
                 ...(filters.role !== "" ? { role: filters.role } : {}),
+                ...(filters.missing !== "" ? { missing: filters.missing } : {}),
               },
             }
           : {})}

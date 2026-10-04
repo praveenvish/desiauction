@@ -7,6 +7,7 @@ import {
   withDetectedPhoto,
   type ColumnMapping,
   type DateOrder,
+  type PlaceholderPhone,
   type UnplacedValue,
   type ValueMaps,
 } from "@desiauction/core";
@@ -40,6 +41,7 @@ import {
 import { ColumnMapper, MappingSummary, mappingNeedsReview } from "./column-mapper";
 import { CsvDrop } from "./csv-drop";
 import { ImportErrors } from "./import-errors";
+import { ImportNotices } from "./import-notices";
 import { PhotoImportPanel } from "./photo-import";
 import { ValueMapper } from "./value-mapper";
 
@@ -84,6 +86,10 @@ export function ImportDialog({
   const [fileWins, setFileWins] = useState(false);
   /* Off by default: a transaction ID is a claim until the desk checks it. */
   const [paidWhenReferenced, setPaidWhenReferenced] = useState(false);
+  /** Flagged numbers the organizer ticked as real (E.164) — see ImportNotices. */
+  const [realPhones, setRealPhones] = useState<string[]>([]);
+  /** Every number flagged as made up since this file was read, by row. */
+  const [flagged, setFlagged] = useState<PlaceholderPhone[]>([]);
   const [usingSaved, setUsingSaved] = useState(false);
   /*
    * STEPPING ASIDE FOR GOOGLE'S PICKER.
@@ -179,6 +185,9 @@ export function ImportDialog({
     // next file would rewrite values nobody looked at.
     setValueMaps({});
     setUnplaced([]);
+    // Nor its "that number is real" answers.
+    setRealPhones([]);
+    setFlagged([]);
   };
 
   /**
@@ -337,6 +346,7 @@ export function ImportDialog({
     dateOrder,
     policy: fileWins ? "file-wins" : "fill-blanks",
     paidWhenReferenced,
+    realPhones,
   });
 
   /**
@@ -375,6 +385,7 @@ export function ImportDialog({
         dateOrder,
         policy: fileWins ? "file-wins" : "fill-blanks",
         paidWhenReferenced,
+        realPhones,
       }).then((result) => {
         if (seq !== previewSeq.current) {
           return;
@@ -386,12 +397,31 @@ export function ImportDialog({
         // only by a NEWER list, so it shrinks as the organizer answers it
         // rather than vanishing halfway through a column of five.
         setUnplaced(result.unplaced);
+        // Grows, never shrinks: a ticked number leaves `placeholders` but must
+        // stay on the list it was ticked in.
+        setFlagged((known) => {
+          const seen = new Set(known.map((entry) => `${String(entry.line)}:${entry.phone}`));
+          const added = (result.placeholders ?? []).filter(
+            (entry) => !seen.has(`${String(entry.line)}:${entry.phone}`),
+          );
+          return added.length === 0 ? known : [...known, ...added].sort((a, b) => a.line - b.line);
+        });
       });
     }, 150);
     return () => {
       clearTimeout(timer);
     };
-  }, [slug, inspection, mapping, valueMaps, dateOrder, fileWins, paidWhenReferenced, previewTick]);
+  }, [
+    slug,
+    inspection,
+    mapping,
+    valueMaps,
+    dateOrder,
+    fileWins,
+    paidWhenReferenced,
+    realPhones,
+    previewTick,
+  ]);
 
   /**
    * ONE BUTTON FOR PASTED TEXT, AND THE MAPPING IS ALWAYS ON SCREEN BEFORE THE
@@ -791,6 +821,14 @@ export function ImportDialog({
                         ? ` · ${String(preview.errors.length)} need${preview.errors.length === 1 ? "s" : ""} fixing`
                         : ""}
                     </p>
+                    <ImportNotices
+                      placeholders={preview.placeholders ?? []}
+                      flagged={flagged}
+                      withoutPhone={preview.withoutPhone ?? 0}
+                      withoutRole={preview.withoutRole ?? 0}
+                      realPhones={realPhones}
+                      onRealPhones={setRealPhones}
+                    />
                     {/* PHOTOS, SAID OUT LOUD. The photo column used to be one
                           name in a grey "Not imported" list, and nothing said
                           that leaving it there switched the Drive photo step

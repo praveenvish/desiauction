@@ -944,6 +944,18 @@ body:has(.pd-sheet) {
   color: var(--danger-strong);
 }
 
+/* "Add phone" for a club-only player: the box and its button on one line. */
+.pd-add-phone {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.pd-add-phone .pd-input {
+  flex: 1;
+  min-width: 0;
+}
+
 .pd-readonly {
   margin: 0;
   min-height: 36px;

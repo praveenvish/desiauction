@@ -2,6 +2,7 @@
 
 import {
   IMPORT_FIELD_LABELS,
+  RECOMMENDED_IMPORT_FIELDS,
   REQUIRED_IMPORT_FIELDS,
   type ColumnMapping,
   type ImportFieldOption,
@@ -76,6 +77,8 @@ export function ColumnMapper({
   };
 
   const missing = REQUIRED_IMPORT_FIELDS.filter((field) => mapping[field] === undefined);
+  // Not required — a list of names imports — but never left unsaid.
+  const unmatched = RECOMMENDED_IMPORT_FIELDS.filter((field) => mapping[field] === undefined);
 
   return (
     <div className="io-panel" data-testid="column-mapper">
@@ -87,6 +90,17 @@ export function ColumnMapper({
       {missing.length > 0 ? (
         <p role="alert" className="reg-warning" data-testid="mapping-missing">
           Still needed: {missing.map((field) => fieldLabel(field, fields)).join(", ")}.
+        </p>
+      ) : null}
+
+      {missing.length === 0 && unmatched.length > 0 ? (
+        <p className="dash-hint" data-testid="mapping-optional-missing">
+          No {unmatched.map((field) => fieldLabel(field, fields).toLowerCase()).join(" or ")} column
+          picked.{" "}
+          {unmatched.includes("phone") ? "Players will be added without a phone number. " : ""}
+          {unmatched.includes("role") ? "Set each player's role before the auction. " : ""}
+          If your file has {unmatched.length === 1 ? "this column" : "these columns"}, pick{" "}
+          {unmatched.length === 1 ? "it" : "them"} below.
         </p>
       ) : null}
 
@@ -164,6 +178,9 @@ export function ColumnMapper({
 export function mappingNeedsReview(inspection: ImportInspection, mapping: ColumnMapping): boolean {
   return (
     REQUIRED_IMPORT_FIELDS.some((field) => mapping[field] === undefined) ||
+    // A file with no phone or role column imports, but the table is where the
+    // organizer can point a column the guess missed at it — so it stays open.
+    RECOMMENDED_IMPORT_FIELDS.some((field) => mapping[field] === undefined) ||
     (inspection.detected?.conflicts.length ?? 0) > 0
   );
 }

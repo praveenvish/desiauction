@@ -100,14 +100,14 @@ describe("parseRegistrationCsv — validate before writing, reject partial corru
   const HEADER = "name,phone,role,base_price_band";
 
   it("parses a clean file into normalized rows", () => {
-    const csv = `${HEADER}\nRohit Sharma,9876543210,batter,A\nJasprit Bumrah,+91 98765 43211,bowler,`;
+    const csv = `${HEADER}\nRohit Sharma,9876543201,batter,A\nJasprit Bumrah,+91 98765 43211,bowler,`;
     const result = parseRegistrationCsv(csv);
     expect(result.errors).toEqual([]);
     expect(result.rows).toEqual([
       {
         line: 2,
         name: "Rohit Sharma",
-        phone: "+919876543210",
+        phone: "+919876543201",
         role: "batter",
         basePriceBand: "A",
         // DA-28: optional profile columns, absent from this file.
@@ -166,7 +166,7 @@ describe("parseRegistrationCsv — validate before writing, reject partial corru
   it("DA-28: optional profile columns ride along when the file supplies them", () => {
     const csv =
       "name,phone,role,base_price_band,date_of_birth,batting_style,bowling_style\n" +
-      "Rohit Sharma,9876543210,batter,A,1995-08-15,right_hand_opener,off_break";
+      "Rohit Sharma,9876543201,batter,A,1995-08-15,right_hand_opener,off_break";
     const [row] = parseRegistrationCsv(csv).rows;
     expect(row).toMatchObject({
       dateOfBirth: "1995-08-15",
@@ -176,7 +176,7 @@ describe("parseRegistrationCsv — validate before writing, reject partial corru
   });
 
   it("DA-14: an unknown base price band is a line error, not a silent default", () => {
-    const csv = `${HEADER}\nRohit Sharma,9876543210,batter,Z\nOk Player,9876543211,bowler,B`;
+    const csv = `${HEADER}\nRohit Sharma,9876543201,batter,Z\nOk Player,9876543211,bowler,B`;
     // Without the known bands the parser cannot judge, so it stays permissive.
     expect(parseRegistrationCsv(csv).errors).toEqual([]);
     // Given them, a typo stops being a silent reprice to the default band.
@@ -193,12 +193,12 @@ describe("parseRegistrationCsv — validate before writing, reject partial corru
     expect(checked.rows.map((row) => row.line)).toEqual([3]);
     // Case is not the point of failure.
     expect(
-      parseRegistrationCsv(`${HEADER}\nRohit Sharma,9876543210,batter,a`, ["A"]).errors,
+      parseRegistrationCsv(`${HEADER}\nRohit Sharma,9876543201,batter,a`, ["A"]).errors,
     ).toEqual([]);
   });
 
   it("reports per-row errors and yields NO rows to import when any row is bad", () => {
-    const csv = `${HEADER}\nOk Player,9876543210,batter,\nX,not-a-phone,striker,\n`;
+    const csv = `${HEADER}\nOk Player,9876543201,batter,\nX,not-a-phone,striker,\n`;
     const result = parseRegistrationCsv(csv);
     // Row 3 has a short name, bad phone, and bad role — all reported on one line.
     expect(result.errors).toHaveLength(1);
@@ -209,20 +209,60 @@ describe("parseRegistrationCsv — validate before writing, reject partial corru
   });
 
   it("flags duplicate phones within the file", () => {
-    const csv = `${HEADER}\nA One,9876543210,batter,\nA Two,98765 43210,bowler,`;
+    const csv = `${HEADER}\nA One,9876543201,batter,\nA Two,98765 43201,bowler,`;
     const result = parseRegistrationCsv(csv);
     expect(result.errors).toHaveLength(1);
     expect(result.errors[0]?.message).toMatch(/duplicate phone/);
   });
 
   it("refuses a file missing required columns", () => {
-    const result = parseRegistrationCsv("name,role\nRohit,batter");
+    const result = parseRegistrationCsv("phone,role\n9812345670,batter");
     expect(result.rows).toEqual([]);
-    expect(result.errors[0]?.message).toMatch(/phone/);
+    expect(result.errors[0]?.message).toMatch(/name/);
+  });
+
+  it("imports a name with no phone and no role as a club-only player", () => {
+    const result = parseRegistrationCsv("name,phone,role\nRohit Sharma,,\nअरविंद बिश्नोई,,");
+    expect(result.errors).toEqual([]);
+    expect(result.rows.map((row) => [row.name, row.phone, row.role])).toEqual([
+      ["Rohit Sharma", null, ""],
+      ["अरविंद बिश्नोई", null, ""],
+    ]);
+  });
+
+  it("imports a file with no phone column at all", () => {
+    const result = parseRegistrationCsv("name\nRohit Sharma");
+    expect(result.errors).toEqual([]);
+    expect(result.rows[0]?.phone).toBeNull();
+  });
+
+  it("still refuses a role it cannot read", () => {
+    const result = parseRegistrationCsv("name,phone,role\nRohit Sharma,,wicket-taker");
+    expect(result.rows).toEqual([]);
+    expect(result.errors[0]?.message).toMatch(/invalid cricket role/);
+  });
+
+  /*
+   * Without a phone the NAME is how a later file finds this player again, so two
+   * phoneless rows with one name are a question for the organizer — not two
+   * players nobody could ever tell apart.
+   */
+  it("refuses two phoneless rows with the same name", () => {
+    const result = parseRegistrationCsv("name,phone\nRavi Bishnoi,\nravi  bishnoi,");
+    expect(result.rows).toHaveLength(1);
+    expect(result.errors[0]?.message).toMatch(/two players named "ravi {2}bishnoi" with no phone/);
+    expect(result.errors[0]?.fields).toEqual(["name"]);
+  });
+
+  it("allows one name twice when each has its own phone", () => {
+    const result = parseRegistrationCsv(
+      "name,phone\nRavi Bishnoi,9812345670\nRavi Bishnoi,9823456781",
+    );
+    expect(result.errors).toEqual([]);
   });
 
   it("handles quoted fields with commas and doubled quotes", () => {
-    const csv = `${HEADER}\n"Sharma, Rohit",9876543210,batter,"band ""A"""`;
+    const csv = `${HEADER}\n"Sharma, Rohit",9876543201,batter,"band ""A"""`;
     const result = parseRegistrationCsv(csv);
     expect(result.errors).toEqual([]);
     expect(result.rows[0]?.name).toBe("Sharma, Rohit");
@@ -251,7 +291,7 @@ describe("CSV import — playing styles are parsed, not silently dropped", () =>
 
   it("accepts the label a person actually sees on screen", () => {
     const result = parseRegistrationCsv(
-      `${header}\nAsha Rao,9876543210,batter,A,Right Hand Opener,Off-Break\n`,
+      `${header}\nAsha Rao,9876543201,batter,A,Right Hand Opener,Off-Break\n`,
     );
     expect(result.errors).toEqual([]);
     expect(result.rows[0]?.battingStyle).toBe("right_hand_opener");
@@ -326,7 +366,7 @@ describe("parseRegistrationCsv — values as a person writes them", () => {
   it("accepts the role spellings a form produces, and stores the canonical token", () => {
     const csv = [
       HEADER,
-      "Rohit Sharma,9876543210,All Rounder,",
+      "Rohit Sharma,9876543201,All Rounder,",
       "Jasprit Bumrah,9876543211,Fast Bowler,",
       "Rishabh Pant,9876543212,Wicket Keeper Batsman,",
       "Shubman Gill,9876543213,Batsman,",
@@ -342,19 +382,19 @@ describe("parseRegistrationCsv — values as a person writes them", () => {
   });
 
   it("reads a dd/mm/yyyy birthday into the ISO the store and deriveAge require", () => {
-    const csv = `${HEADER}\nRohit Sharma,9876543210,batter,15/03/1998`;
+    const csv = `${HEADER}\nRohit Sharma,9876543201,batter,15/03/1998`;
     const result = parseRegistrationCsv(csv, undefined, { now });
     expect(result.errors).toEqual([]);
     expect(result.rows[0]?.dateOfBirth).toBe("1998-03-15");
   });
 
   it("reads the timestamp shape a Form export writes into a date cell", () => {
-    const csv = `${HEADER}\nRohit Sharma,9876543210,batter,15/03/1998 14:32:11`;
+    const csv = `${HEADER}\nRohit Sharma,9876543201,batter,15/03/1998 14:32:11`;
     expect(parseRegistrationCsv(csv, undefined, { now }).rows[0]?.dateOfBirth).toBe("1998-03-15");
   });
 
   it("honours the caller's date order for a genuinely ambiguous value", () => {
-    const csv = `${HEADER}\nRohit Sharma,9876543210,batter,03/04/1998`;
+    const csv = `${HEADER}\nRohit Sharma,9876543201,batter,03/04/1998`;
     expect(
       parseRegistrationCsv(csv, undefined, { now, dateOrder: "mdy" }).rows[0]?.dateOfBirth,
     ).toBe("1998-03-04");
@@ -369,24 +409,24 @@ describe("parseRegistrationCsv — values as a person writes them", () => {
    * every screen for the rest of the season.
    */
   it("reports an unreadable birthday instead of storing it", () => {
-    const csv = `${HEADER}\nRohit Sharma,9876543210,batter,not a date`;
+    const csv = `${HEADER}\nRohit Sharma,9876543201,batter,not a date`;
     const result = parseRegistrationCsv(csv, undefined, { now });
     expect(result.rows).toEqual([]);
     expect(result.errors[0]?.message).toMatch(/date of birth/i);
   });
 
   it("refuses a two-digit year rather than picking a century", () => {
-    const csv = `${HEADER}\nRohit Sharma,9876543210,batter,15/03/98`;
+    const csv = `${HEADER}\nRohit Sharma,9876543201,batter,15/03/98`;
     expect(parseRegistrationCsv(csv, undefined, { now }).errors).toHaveLength(1);
   });
 
   it("refuses a birthday in the future when given a clock", () => {
-    const csv = `${HEADER}\nRohit Sharma,9876543210,batter,15/03/2030`;
+    const csv = `${HEADER}\nRohit Sharma,9876543201,batter,15/03/2030`;
     expect(parseRegistrationCsv(csv, undefined, { now }).errors[0]?.message).toMatch(/future/i);
   });
 
   it("still refuses a role it cannot place, naming the value", () => {
-    const csv = `${HEADER}\nRohit Sharma,9876543210,Team Manager,`;
+    const csv = `${HEADER}\nRohit Sharma,9876543201,Team Manager,`;
     const result = parseRegistrationCsv(csv, undefined, { now });
     expect(result.rows).toEqual([]);
     expect(result.errors[0]?.message).toMatch(/team manager/i);

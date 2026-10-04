@@ -73,7 +73,15 @@ export const IMPORT_FIELDS = [
 export type ImportField = (typeof IMPORT_FIELDS)[number];
 
 /** The three without which a registration cannot exist. */
-export const REQUIRED_IMPORT_FIELDS: readonly ImportField[] = ["name", "phone", "role"];
+/**
+ * Only the name. A list of names is a roster; the phone and the role can come
+ * later, and the screen says what a file without them will do
+ * (`RECOMMENDED_IMPORT_FIELDS`) instead of refusing it.
+ */
+export const REQUIRED_IMPORT_FIELDS: readonly ImportField[] = ["name"];
+
+/** Not required, but a file without them is said out loud before it imports. */
+export const RECOMMENDED_IMPORT_FIELDS: readonly ImportField[] = ["phone", "role"];
 
 /** What each column is called on screen. */
 export const IMPORT_FIELD_LABELS: Record<ImportField, string> = {
@@ -159,13 +167,18 @@ export function importFieldLabel(field: MappableField, pack: SportPack = DEFAULT
  * describe the QUESTION, not the field.
  */
 export function normalizeHeader(header: string): string {
-  return header
-    .toLowerCase()
-    .replace(/\([^)]*\)/g, " ") // "(required)", "(optional)", "(as per ID)"
-    .replace(/\[[^\]]*\]/g, " ")
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .trim()
-    .replace(/\s+/g, " ");
+  return (
+    header
+      .normalize("NFC")
+      .toLowerCase()
+      .replace(/\([^)]*\)/g, " ") // "(required)", "(optional)", "(as per ID)"
+      .replace(/\[[^\]]*\]/g, " ")
+      // \p{M} kept: a Devanagari vowel sign is a MARK, not a letter, and dropping
+      // it turned "मोबाइल नंबर" into "म ब इल न बर" — no Hindi header ever matched.
+      .replace(/[^\p{L}\p{M}\p{N}]+/gu, " ")
+      .trim()
+      .replace(/\s+/g, " ")
+  );
 }
 
 /**
@@ -179,6 +192,10 @@ export function normalizeHeader(header: string): string {
 const HEADER_ALIASES: Record<ImportField, readonly string[]> = {
   name: [
     "name",
+    "नाम",
+    "खिलाड़ी का नाम",
+    "खिलाड़ी नाम",
+    "खिलाड़ी",
     "player name",
     "full name",
     "players name",
@@ -195,6 +212,12 @@ const HEADER_ALIASES: Record<ImportField, readonly string[]> = {
   ],
   phone: [
     "phone",
+    "मोबाइल नंबर",
+    "मोबाइल",
+    "मोबाइल न",
+    "फोन नंबर",
+    "फ़ोन नंबर",
+    "व्हाट्सएप नंबर",
     "mobile",
     "mobile number",
     "mobile no",
@@ -213,6 +236,8 @@ const HEADER_ALIASES: Record<ImportField, readonly string[]> = {
   ],
   role: [
     "role",
+    "भूमिका",
+    "रोल",
     "playing role",
     "player role",
     "which role do you play",
@@ -248,6 +273,8 @@ const HEADER_ALIASES: Record<ImportField, readonly string[]> = {
   ],
   date_of_birth: [
     "date of birth",
+    "जन्म तिथि",
+    "जन्मतिथि",
     "dob",
     "birth date",
     "birthdate",
@@ -256,6 +283,9 @@ const HEADER_ALIASES: Record<ImportField, readonly string[]> = {
   ],
   batting_style: [
     "batting style",
+    "बल्लेबाजी स्टाइल",
+    "बल्लेबाजी",
+    "बैटिंग स्टाइल",
     "batting",
     "bats",
     "batting hand",
@@ -265,6 +295,9 @@ const HEADER_ALIASES: Record<ImportField, readonly string[]> = {
   ],
   bowling_style: [
     "bowling style",
+    "गेंदबाजी स्टाइल",
+    "गेंदबाजी",
+    "बॉलिंग स्टाइल",
     "bowling",
     "bowls",
     "bowling type",
@@ -310,7 +343,15 @@ const HEADER_ALIASES: Record<ImportField, readonly string[]> = {
     "upi ref no",
   ],
   note: ["note", "notes", "remark", "remarks", "comment", "comments", "organizer note"],
-  father_name: ["father name", "fathers name", "father s name", "guardian name", "parent name"],
+  father_name: [
+    "father name",
+    "fathers name",
+    "father s name",
+    "guardian name",
+    "parent name",
+    "पिता का नाम",
+    "पिता",
+  ],
   jersey_name: [
     "jersey name",
     "name on jersey",
@@ -339,7 +380,16 @@ const HEADER_ALIASES: Record<ImportField, readonly string[]> = {
     "size of t shirt",
   ],
   trouser_size: ["trouser size", "trousers size", "pant size", "pants size", "lower size"],
-  team: ["team", "team name", "squad", "franchise", "club", "team allotted", "allotted team"],
+  team: [
+    "team",
+    "team name",
+    "squad",
+    "franchise",
+    "club",
+    "team allotted",
+    "allotted team",
+    "टीम",
+  ],
   /*
    * "marquee" is an alias for icon because that is the word the tournament
    * itself uses on the poster; "pre signed" and "direct entry" are what a
@@ -374,6 +424,9 @@ const HEADER_ALIASES: Record<ImportField, readonly string[]> = {
   ],
   photo_link: [
     "photo",
+    "फोटो",
+    "फ़ोटो",
+    "तस्वीर",
     "photo link",
     "player photo",
     "your photo",
@@ -425,6 +478,10 @@ const KNOWN_NOISE: readonly string[] = [
   "s no",
   "serial no",
   "row",
+  "registration row",
+  "क्रमांक",
+  "क्र सं",
+  "क्रम संख्या",
 ];
 
 /**

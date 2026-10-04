@@ -256,9 +256,13 @@ export function registrationNumber(id: string): string {
   return `R${id.slice(-6).toUpperCase()}`;
 }
 
-/** Normalized grouping key for deterministic duplicate-name detection (doc 42). */
+/**
+ * Normalized grouping key for deterministic duplicate-name detection (doc 42).
+ * NFC because a Hindi name typed on two phones can arrive as two different
+ * byte sequences for the same letters (ड़ composed or not).
+ */
 export function nameKey(name: string | null): string {
-  return (name ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+  return (name ?? "").normalize("NFC").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 // --- Naming (shared with the orgs slug discipline) ----------------------------
