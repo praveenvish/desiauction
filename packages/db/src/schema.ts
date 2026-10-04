@@ -1213,6 +1213,13 @@ export const registrations = pgTable(
     trouserSize: text("trouser_size"),
     basePriceBand: text("base_price_band"),
     /**
+     * Price from an auction held OUTSIDE the app (0105), ×100 like every price.
+     * The organiser types it while placing the player on a team by hand; NULL
+     * means no price was given. Publishing the results copies it onto the
+     * player's lot — after that the lot is the price, as for a live auction.
+     */
+    offlinePrice: bigint("offline_price", { mode: "number" }),
+    /**
      * Sport-specific player detail (0047), keyed by the pack's attribute keys.
      *
      * Cricket's `batting_style`/`bowling_style` keep their own columns above —
@@ -1581,6 +1588,12 @@ export const auctions = pgTable(
     kind: text("kind", { enum: ["real", "practice"] })
       .notNull()
       .default("real"),
+    /*
+     * The auction was held outside the app and its results typed in (0105):
+     * created already completed, with no bids. Readers that show the room
+     * itself (bidding history, the live board) have nothing to show for it.
+     */
+    enteredByHand: boolean("entered_by_hand").notNull().default(false),
     createdBy: char("created_by", { length: 26 })
       .notNull()
       .references(() => people.id, { onDelete: "restrict" }),

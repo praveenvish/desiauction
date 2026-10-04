@@ -37,6 +37,7 @@ import {
   type Db,
 } from "@desiauction/db";
 import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
 import { env } from "../../env";
 import { currentSession } from "../auth/actions";
@@ -456,7 +457,30 @@ async function playerPosterFrom(
       // A lot the room SOLD outranks every mark: a captain named after the
       // night was bought, and the poster is about the sale.
       const preSigned = lot?.status !== "sold" && isPreSigned(row);
-      const teamId = preSigned ? row.preSignedTeamId : (lot?.buyerTeamId ?? null);
+
+      // With no lot yet, whether the player is still IN an auction depends on
+      // the season's auction: one that has finished without them is not a pool.
+      const seasonAuction =
+        lot === undefined
+          ? ((
+              await db
+                .select({ status: auctions.status, enteredByHand: auctions.enteredByHand })
+                .from(auctions)
+                .where(
+                  and(
+                    eq(auctions.competitionId, gated.competition.id),
+                    ne(auctions.status, "abandoned"),
+                    isRealAuction(),
+                  ),
+                )
+                .limit(1)
+            )[0] ?? null)
+          : null;
+      // Results entered by hand (0105): placed on a team with no price typed,
+      // so no lot — but bought all the same.
+      const placedByHand =
+        !preSigned && seasonAuction?.enteredByHand === true && row.preSignedTeamId !== null;
+      const teamId = preSigned || placedByHand ? row.preSignedTeamId : (lot?.buyerTeamId ?? null);
       const team =
         teamId === null
           ? undefined
@@ -472,25 +496,13 @@ async function playerPosterFrom(
                 .limit(1)
             )[0];
 
-      // With no lot yet, whether the player is still IN an auction depends on
-      // the season's auction: one that has finished without them is not a pool.
-      const auctionStatus =
-        lot === undefined
-          ? ((
-              await db
-                .select({ status: auctions.status })
-                .from(auctions)
-                .where(
-                  and(
-                    eq(auctions.competitionId, gated.competition.id),
-                    ne(auctions.status, "abandoned"),
-                    isRealAuction(),
-                  ),
-                )
-                .limit(1)
-            )[0]?.status ?? null)
-          : null;
-      const outcome = outcomeOf(preSigned ? preSignedKind(row) : null, lot?.status, auctionStatus);
+      const outcome = placedByHand
+        ? ("sold" as const)
+        : outcomeOf(
+            preSigned ? preSignedKind(row) : null,
+            lot?.status,
+            seasonAuction?.status ?? null,
+          );
       if (outcome === null || row.playerName === null) {
         return null;
       }
@@ -663,7 +675,7 @@ async function teamPosterFrom(
       if (auction === null) {
         return null;
       }
-      const squad = await squadOf(db, gated.competition.id, auction.id, teamId);
+      const squad = await squadOf(db, gated.competition.id, auction, teamId);
 
       await recordPosterGenerated(db, gated, {
         action: "team.poster_generated",
@@ -748,9 +760,9 @@ const SEASON_FACE_PX = 160;
 async function liveAuction(
   db: Db,
   competitionId: string,
-): Promise<{ id: string; config: unknown } | null> {
+): Promise<{ id: string; config: unknown; enteredByHand: boolean } | null> {
   const [auction] = await db
-    .select({ id: auctions.id, config: auctions.config })
+    .select({ id: auctions.id, config: auctions.config, enteredByHand: auctions.enteredByHand })
     .from(auctions)
     .where(
       and(
@@ -771,13 +783,18 @@ async function liveAuction(
  * would leave the two best-known names in the franchise off the image the owner
  * posts. Shared by the squad poster, the reveal and the season sheet so the
  * three can never disagree about who is in a team.
+ *
+ * RESULTS ENTERED BY HAND (0105): a player placed on the team with no price
+ * typed has no lot either — so for such an auction every member without a
+ * sold lot is read here, pre-signed or not, and shown at no price.
  */
 async function squadOf(
   db: Db,
   competitionId: string,
-  auctionId: string,
+  auction: { id: string; enteredByHand: boolean },
   teamId: string,
 ): Promise<{ members: SquadRow[]; spentPaise: number }> {
+  const auctionId = auction.id;
   const preSigned = await db
     .select({
       registrationId: registrations.id,
@@ -797,7 +814,7 @@ async function squadOf(
         eq(registrations.competitionId, competitionId),
         eq(registrations.teamId, teamId),
         eq(registrations.status, "approved"),
-        preSignedSql,
+        auction.enteredByHand ? sql`true` : preSignedSql,
         // A captain named after the night was bought — the `bought` list below
         // carries them with their price.
         sql`not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.auctionId} = ${auctionId} and ${lots.status} = 'sold')`,
@@ -825,14 +842,16 @@ async function squadOf(
     .where(and(eq(lots.auctionId, auctionId), eq(lots.status, "sold"), eq(paddles.teamId, teamId)))
     .orderBy(desc(lots.soldPrice));
 
+  const asSigned = (row: (typeof preSigned)[number]): SquadRow => ({
+    name: row.name ?? UNNAMED,
+    role: row.role ?? "",
+    pricePaise: null,
+    // Only a hand-entered auction reads an unmarked player here.
+    marks: isPreSigned(row) ? marksOf(row) : [],
+    photoKey: posterPhotoKey(row),
+  });
   const members: SquadRow[] = [
-    ...preSigned.map((row): SquadRow => ({
-      name: row.name ?? UNNAMED,
-      role: row.role ?? "",
-      pricePaise: null,
-      marks: marksOf(row),
-      photoKey: posterPhotoKey(row),
-    })),
+    ...preSigned.filter((row) => isPreSigned(row)).map(asSigned),
     ...bought
       // A pre-signed player is excluded from the pool, so this should never
       // fire — but a duplicate would put somebody on their own squad sheet
@@ -848,6 +867,8 @@ async function squadOf(
         marks: row.isCaptain ? ["captain"] : [],
         photoKey: posterPhotoKey(row),
       })),
+    // Placed by hand at no price: after everyone with one, as the cheapest.
+    ...preSigned.filter((row) => !isPreSigned(row)).map(asSigned),
   ];
   return {
     members,
@@ -1063,7 +1084,7 @@ async function seasonPosterFrom(
         return null;
       }
       const squads = await Promise.all(
-        franchises.map((team) => squadOf(db, gated.competition.id, auction.id, team.id)),
+        franchises.map((team) => squadOf(db, gated.competition.id, auction, team.id)),
       );
 
       await recordPosterGenerated(db, gated, {
@@ -1295,6 +1316,9 @@ export async function posterPickerFor(
   return "ok" in gated ? gated : pickerFrom(gated);
 }
 
+/** `teams` again, joined through `registrations.team_id` rather than the buyer's paddle. */
+const rosterTeam = alias(teams, "roster_team");
+
 async function pickerFrom(gated: Gate): Promise<PosterPicker> {
   return withTenantDb(
     dbHandle,
@@ -1345,9 +1369,13 @@ async function pickerFrom(gated: Gate): Promise<PosterPicker> {
                 number: registrations.registrationNumber,
                 soldPrice: lots.soldPrice,
                 teamName: teams.name,
+                rosterTeamName: rosterTeam.name,
               })
               .from(registrations)
               .innerJoin(people, eq(people.id, registrations.personId))
+              // The squad they are on without a sale — pre-signed, or placed by
+              // hand at no price (0105).
+              .leftJoin(rosterTeam, eq(rosterTeam.id, registrations.teamId))
               .leftJoin(
                 lots,
                 liveAuctionId === null
@@ -1420,7 +1448,9 @@ async function pickerFrom(gated: Gate): Promise<PosterPicker> {
         players: playerRows.map((row) => {
           const label = row.name ?? "Unnamed";
           const verdict =
-            row.teamName !== null && row.soldPrice !== null ? row.teamName : "not sold";
+            row.teamName !== null && row.soldPrice !== null
+              ? row.teamName
+              : (row.rosterTeamName ?? "not sold");
           // The registration code means nothing in a picker — it only tells
           // two players of the same name apart, so only they carry it.
           return {

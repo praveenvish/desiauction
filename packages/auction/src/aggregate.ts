@@ -91,6 +91,8 @@ export interface AuctionRecord {
    * go out.
    */
   kind: AuctionKind;
+  /** Results typed in after an auction held outside the app (0105). */
+  enteredByHand?: boolean;
 }
 
 export type AuctionKind = "real" | "practice";
@@ -292,6 +294,221 @@ function isUniqueViolation(error: unknown, constraint: string): boolean {
     record.constraint_name === constraint ||
     (typeof record.message === "string" && record.message.includes(constraint))
   );
+}
+
+// --- Results entered by hand (0105) -------------------------------------------------
+
+export type PublishByHandResult =
+  | { ok: true; auctionId: string; sold: number; unsold: number }
+  | { ok: false; reason: "invalid_config" | "auction_exists" | "nobody_placed" };
+
+/**
+ * AN AUCTION HELD OUTSIDE THE APP, WRITTEN DOWN AFTERWARDS.
+ *
+ * The organiser has already placed each player on a team from the Teams tab
+ * (`registrations.team_id`, with `offline_price` when there was a price).
+ * Publishing turns that into the same rows a night in the app leaves behind —
+ * a REAL auction, already completed — so posters, team cards, the public pages
+ * and the roster lock all read it without knowing the difference:
+ *
+ * - a placed player WITH a price gets a sold lot, bought by that team's paddle;
+ * - a placed player without one has no lot: they are on the team (team_id) at
+ *   no price, which the poster reads through `enteredByHand`;
+ * - every other approved, non-pre-signed player gets an unsold lot;
+ * - pre-signed players (icon, captain, retained) are untouched, as always.
+ *
+ * Paddles exist only so a sale has a buyer. Nobody held them, so they are
+ * issued to the organiser and released in the same breath: a released paddle
+ * makes nobody a team's owner.
+ *
+ * ONE transaction. The unique index on the season's real auction (0029) turns a
+ * double press, or a race with "Create the auction", into one winner.
+ */
+export async function publishResultsByHand(
+  db: Db,
+  competition: CompetitionRef,
+  actorId: string,
+  config: AuctionConfig,
+): Promise<PublishByHandResult> {
+  if (!validateAuctionConfig(config).ok) {
+    return { ok: false, reason: "invalid_config" };
+  }
+  const auctionId = newId();
+  const correlationId = newId();
+  const atMs = serverNowMs();
+  const name = `${competition.name} Auction`;
+  try {
+    return await db.transaction(async (tx): Promise<PublishByHandResult> => {
+      const [existing] = await tx
+        .select({ id: auctions.id })
+        .from(auctions)
+        .where(
+          and(
+            eq(auctions.competitionId, competition.id),
+            eq(auctions.kind, "real"),
+            ne(auctions.status, "abandoned"),
+          ),
+        )
+        .limit(1);
+      if (existing !== undefined) {
+        return { ok: false, reason: "auction_exists" };
+      }
+      const players = await tx
+        .select({
+          id: registrations.id,
+          teamId: registrations.teamId,
+          price: registrations.offlinePrice,
+          band: registrations.basePriceBand,
+          preSigned: preSignedSql,
+        })
+        .from(registrations)
+        .where(
+          and(
+            eq(registrations.competitionId, competition.id),
+            eq(registrations.status, "approved"),
+          ),
+        )
+        .orderBy(asc(registrations.registrationNumber), asc(registrations.id));
+      const pool = players.filter((player) => !player.preSigned);
+      if (!pool.some((player) => player.teamId !== null)) {
+        return { ok: false, reason: "nobody_placed" };
+      }
+      const sold = pool.filter(
+        (player): player is typeof player & { teamId: string; price: number } =>
+          player.teamId !== null && player.price !== null,
+      );
+      const unsold = pool.filter((player) => player.teamId === null);
+      const lotted = [...sold, ...unsold];
+
+      const events: { type: string; payload: Record<string, unknown>; subject: string }[] = [];
+      const emit = (type: string, payload: Record<string, unknown>, subject: string) => {
+        events.push({ type, payload, subject });
+      };
+
+      await tx.insert(auctions).values({
+        id: auctionId,
+        orgId: competition.orgId,
+        competitionId: competition.id,
+        name,
+        status: "completed",
+        config,
+        enteredByHand: true,
+        createdBy: actorId,
+      });
+      emit(
+        "AuctionCreated",
+        { competitionId: competition.id, lotCount: lotted.length, name, byHand: true },
+        auctionId,
+      );
+
+      const buyers = [...new Set(sold.map((player) => player.teamId))];
+      const paddleOf = new Map<string, string>();
+      if (buyers.length > 0) {
+        const rows = buyers.map((teamId, index) => ({
+          id: newId(),
+          orgId: competition.orgId,
+          auctionId,
+          teamId,
+          personId: actorId,
+          paddleNumber: paddleNumber(index + 1),
+          issuedAt: new Date(atMs),
+          releasedAt: new Date(atMs),
+        }));
+        await tx.insert(paddles).values(rows);
+        for (const row of rows) {
+          paddleOf.set(row.teamId, row.id);
+          emit(
+            "PaddleIssued",
+            {
+              paddleId: row.id,
+              teamId: row.teamId,
+              personId: actorId,
+              paddleNumber: row.paddleNumber,
+            },
+            row.id,
+          );
+        }
+      }
+
+      const lotRows = lotted.map((player, index) => {
+        const buyer = player.teamId === null ? undefined : paddleOf.get(player.teamId);
+        const isSold = buyer !== undefined && player.price !== null;
+        return {
+          id: newId(),
+          orgId: competition.orgId,
+          auctionId,
+          registrationId: player.id,
+          lotNumber: lotNumber(index + 1),
+          seq: index + 1,
+          basePrice: basePriceFor(config, player.band),
+          status: isSold ? ("sold" as const) : ("unsold" as const),
+          soldToPaddleId: isSold ? buyer : null,
+          soldPrice: isSold ? player.price : null,
+        };
+      });
+      for (let i = 0; i < lotRows.length; i += 500) {
+        await tx.insert(lots).values(lotRows.slice(i, i + 500));
+      }
+      for (const lot of lotRows) {
+        emit(
+          "LotPrepared",
+          {
+            lotId: lot.id,
+            registrationId: lot.registrationId,
+            lotNumber: lot.lotNumber,
+            basePrice: lot.basePrice,
+          },
+          lot.id,
+        );
+      }
+      for (const lot of lotRows) {
+        emit(
+          lot.status === "sold" ? "LotSold" : "LotUnsold",
+          lot.status === "sold"
+            ? { lotId: lot.id, paddleId: lot.soldToPaddleId, amount: lot.soldPrice }
+            : { lotId: lot.id },
+          lot.id,
+        );
+      }
+      for (const [teamId, paddleId] of paddleOf) {
+        emit("PaddleReleased", { paddleId, teamId }, paddleId);
+      }
+      emit("AuctionClosed", { from: "scheduled", byHand: true }, auctionId);
+
+      // The same rows `appendEvent` writes, numbered here in one pass: the
+      // auction is new inside this transaction, so its order starts at 1.
+      const eventRows = events.map((event, index) => ({
+        id: newId(),
+        orgId: competition.orgId,
+        auctionId,
+        seq: index + 1,
+        type: event.type,
+        atMs,
+        actor: actorId,
+        correlationId,
+        payload: event.payload,
+      }));
+      const auditRows = events.map((event, index) => ({
+        id: newId(),
+        actor: actorId,
+        action: `auction.${event.type}`,
+        scopeType: "org" as const,
+        scopeId: competition.orgId,
+        subject: event.subject,
+        meta: { source: "web", correlationId, eventSeq: String(index + 1), byHand: "true" },
+      }));
+      for (let i = 0; i < eventRows.length; i += 500) {
+        await tx.insert(auctionEvents).values(eventRows.slice(i, i + 500));
+        await tx.insert(auditLog).values(auditRows.slice(i, i + 500));
+      }
+      return { ok: true, auctionId, sold: sold.length, unsold: unsold.length };
+    });
+  } catch (error) {
+    if (isUniqueViolation(error, "auctions_competition_active_uq")) {
+      return { ok: false, reason: "auction_exists" };
+    }
+    throw error;
+  }
 }
 
 // --- Paddles (immutable identity — issued once, never reused, never mutated) ----

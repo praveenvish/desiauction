@@ -2,7 +2,16 @@
 
 import { Button, PlayerImage, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type RefObject,
+} from "react";
 
 import {
   markRegistrationAction,
@@ -69,7 +78,6 @@ export function SquadPreSign({
   const router = useRouter();
   const toast = useToast();
   const [refreshing, startRefresh] = useTransition();
-  const [candidates, setCandidates] = useState<SquadCandidate[] | null>(null);
   // Optimistic slot contents, keyed by registration id, until the page catches up.
   const [pending, setPending] = useState<
     Record<string, Partial<Record<Slot, boolean>> & { name?: string }>
@@ -80,17 +88,7 @@ export function SquadPreSign({
     setPending({});
   }
 
-  useEffect(() => {
-    let live = true;
-    void squadCandidatesAction(slug).then((list) => {
-      if (live) {
-        setCandidates(list);
-      }
-    });
-    return () => {
-      live = false;
-    };
-  }, [slug, roster]);
+  const candidates = useSquadCandidates(slug, roster);
 
   const members = useMemo(() => {
     const byId = new Map<
@@ -279,11 +277,65 @@ function stripTeam(value: object): Partial<Record<Slot, boolean>> {
 }
 
 /**
+ * The season's approved players, fetched ONCE per roster state and shared by
+ * every search box on the team page — the pre-sign slots and "Bought in
+ * auction" ask the same question, so they get the same answer from one trip.
+ */
+const candidateCache = new Map<string, Promise<SquadCandidate[]>>();
+
+export function useSquadCandidates(
+  slug: string,
+  roster: readonly Pick<TeamRosterRow, "registrationId" | "isCaptain" | "isIcon" | "isRetained">[],
+): SquadCandidate[] | null {
+  const [candidates, setCandidates] = useState<SquadCandidate[] | null>(null);
+  // Who is on the team and with which marks — a typed price changes nothing here.
+  const key = `${slug}:${roster
+    .map(
+      (row) =>
+        `${row.registrationId}${row.isCaptain ? "c" : ""}${row.isIcon ? "i" : ""}${row.isRetained ? "r" : ""}`,
+    )
+    .join(",")}`;
+  useEffect(() => {
+    let live = true;
+    let request = candidateCache.get(key);
+    if (request === undefined) {
+      request = squadCandidatesAction(slug);
+      candidateCache.set(key, request);
+      // Only the latest answer is worth keeping; the next roster asks again.
+      setTimeout(() => {
+        candidateCache.delete(key);
+      }, 5_000);
+    }
+    void request.then((list) => {
+      if (live) {
+        setCandidates(list);
+      }
+    });
+    return () => {
+      live = false;
+    };
+  }, [slug, key]);
+  return candidates;
+}
+
+/** Rows drawn per step: a long list renders in pages as it scrolls, never all at once. */
+const PAGE = 50;
+
+/**
  * A search box that finds an approved player — the combobox pattern: type, the
  * list narrows, arrows move, Enter picks. Players already on another team are
  * listed with that team's name, so moving one is a choice and not an accident.
+ *
+ * EVERY match is reachable. The list used to stop at 30 with nothing to say
+ * so, which in a season of 150 meant most players could only be found by
+ * typing their name exactly. It now counts the matches and draws them 50 at a
+ * time as the list scrolls (or as the arrow keys walk past the end).
+ *
+ * `blockOtherTeams` is for placing bought players: somebody already on another
+ * team — or pre-signed anywhere — is shown greyed out with where they are, and
+ * cannot be picked, so nobody ends up on two squads.
  */
-function PlayerPicker({
+export function PlayerPicker({
   label,
   placeholder,
   candidates,
@@ -291,6 +343,9 @@ function PlayerPicker({
   exclude,
   onPick,
   onlyOnTeam,
+  blockOtherTeams = false,
+  inputRef,
+  testId,
 }: {
   label: string;
   placeholder: string;
@@ -300,18 +355,37 @@ function PlayerPicker({
   onPick: (candidate: SquadCandidate) => void;
   /** After the auction starts, only this team's own players can take the armband. */
   onlyOnTeam: boolean;
+  blockOtherTeams?: boolean;
+  inputRef?: RefObject<HTMLInputElement | null>;
+  testId?: string;
 }) {
   const listId = useId();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
+  const [limit, setLimit] = useState(PAGE);
   const rootRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+
+  const blocked = useCallback(
+    (candidate: SquadCandidate): boolean =>
+      blockOtherTeams &&
+      (candidate.isCaptain ||
+        candidate.isIcon ||
+        candidate.isRetained ||
+        (candidate.teamId !== null && candidate.teamId !== teamId)),
+    [blockOtherTeams, teamId],
+  );
 
   const matches = useMemo(() => {
     if (candidates === null) {
       return [];
     }
     const needle = query.trim().toLowerCase();
+    // This team's own first, then the free, then those placed elsewhere — a
+    // stable sort, so each group keeps the alphabetical order it arrived in.
+    const rank = (candidate: SquadCandidate): number =>
+      candidate.teamId === teamId ? 0 : blocked(candidate) ? 2 : candidate.teamId === null ? 1 : 2;
     return candidates
       .filter((candidate) => !exclude.includes(candidate.id))
       .filter((candidate) => !onlyOnTeam || candidate.teamId === teamId)
@@ -321,9 +395,14 @@ function PlayerPicker({
           (candidate.name ?? "").toLowerCase().includes(needle) ||
           candidate.number.toLowerCase().includes(needle),
       )
-      .sort((a, b) => Number(b.teamId === teamId) - Number(a.teamId === teamId))
-      .slice(0, 30);
-  }, [candidates, query, exclude, teamId, onlyOnTeam]);
+      .sort((a, b) => rank(a) - rank(b));
+  }, [candidates, query, exclude, teamId, onlyOnTeam, blocked]);
+
+  const free = useMemo(
+    () => matches.filter((candidate) => candidate.teamId === null && !blocked(candidate)).length,
+    [matches, blocked],
+  );
+  const shown = matches.slice(0, limit);
 
   useEffect(() => {
     if (!open) {
@@ -340,18 +419,37 @@ function PlayerPicker({
     };
   }, [open]);
 
+  // The highlighted row follows the arrow keys into view.
+  useEffect(() => {
+    if (open) {
+      document.getElementById(`${listId}-${String(active)}`)?.scrollIntoView({ block: "nearest" });
+    }
+  }, [active, open, listId]);
+
   const pick = (candidate: SquadCandidate | undefined) => {
-    if (candidate === undefined) {
+    if (candidate === undefined || blocked(candidate)) {
       return;
     }
     onPick(candidate);
     setQuery("");
+    setLimit(PAGE);
+    setActive(0);
     setOpen(false);
   };
+
+  const where = (candidate: SquadCandidate): string =>
+    candidate.teamId === teamId
+      ? "on this team"
+      : candidate.teamName !== null
+        ? `on ${candidate.teamName}`
+        : candidate.isCaptain || candidate.isIcon || candidate.isRetained
+          ? "pre-signed"
+          : `#${candidate.number}`;
 
   return (
     <div className="pd-picker" ref={rootRef}>
       <input
+        ref={inputRef}
         className="pd-input"
         style={{ width: "100%" }}
         role="combobox"
@@ -360,36 +458,59 @@ function PlayerPicker({
         aria-controls={listId}
         aria-autocomplete="list"
         aria-activedescendant={
-          open && matches[active] !== undefined ? `${listId}-${String(active)}` : undefined
+          open && shown[active] !== undefined ? `${listId}-${String(active)}` : undefined
         }
         placeholder={placeholder}
         value={query}
+        data-testid={testId}
+        autoComplete="off"
         onFocus={() => {
           setOpen(true);
         }}
         onChange={(event) => {
           setQuery(event.target.value);
           setActive(0);
+          setLimit(PAGE);
           setOpen(true);
+          listRef.current?.scrollTo({ top: 0 });
         }}
         onKeyDown={(event) => {
           if (event.key === "ArrowDown") {
             event.preventDefault();
             setOpen(true);
-            setActive((index) => Math.min(index + 1, Math.max(0, matches.length - 1)));
+            const next = Math.min(active + 1, Math.max(0, matches.length - 1));
+            if (next >= limit) {
+              setLimit((current) => current + PAGE);
+            }
+            setActive(next);
           } else if (event.key === "ArrowUp") {
             event.preventDefault();
             setActive((index) => Math.max(index - 1, 0));
           } else if (event.key === "Enter") {
             event.preventDefault();
-            pick(matches[active]);
+            pick(shown[active]);
           } else if (event.key === "Escape") {
             setOpen(false);
           }
         }}
       />
       {open ? (
-        <ul className="pd-picker-list" id={listId} role="listbox" aria-label={label}>
+        <ul
+          ref={listRef}
+          className="pd-picker-list"
+          id={listId}
+          role="listbox"
+          aria-label={label}
+          onScroll={(event) => {
+            const list = event.currentTarget;
+            if (
+              shown.length < matches.length &&
+              list.scrollTop + list.clientHeight >= list.scrollHeight - 120
+            ) {
+              setLimit((current) => current + PAGE);
+            }
+          }}
+        >
           {candidates === null ? (
             <li className="pd-picker-empty">Loading players…</li>
           ) : matches.length === 0 ? (
@@ -397,41 +518,51 @@ function PlayerPicker({
               {onlyOnTeam ? "No one on this team matches." : "No approved player matches."}
             </li>
           ) : (
-            matches.map((candidate, index) => (
-              <li
-                key={candidate.id}
-                id={`${listId}-${String(index)}`}
-                role="option"
-                aria-selected={index === active}
-                className="pd-picker-option"
-                onPointerDown={(event) => {
-                  event.preventDefault();
-                  pick(candidate);
-                }}
-                onPointerEnter={() => {
-                  setActive(index);
-                }}
-              >
-                <span className="pd-picker-who">
-                  <PlayerImage
-                    name={candidate.name ?? "Unnamed"}
-                    seed={candidate.id}
-                    src={candidate.photoUrl}
-                    size="xs"
-                    shape="round"
-                    decorative
-                  />
-                  <span>{candidate.name ?? "Unnamed"}</span>
-                </span>
-                <span className="pd-quiet">
-                  {candidate.teamId === teamId
-                    ? "on this team"
-                    : candidate.teamName !== null
-                      ? `on ${candidate.teamName}`
-                      : candidate.number}
-                </span>
+            <>
+              <li className="pd-picker-count" role="presentation" data-testid="picker-count">
+                {matches.length} player{matches.length === 1 ? "" : "s"}
+                {blockOtherTeams ? ` · ${String(free)} not on a team` : ""}
               </li>
-            ))
+              {shown.map((candidate, index) => {
+                const off = blocked(candidate);
+                return (
+                  <li
+                    key={candidate.id}
+                    id={`${listId}-${String(index)}`}
+                    role="option"
+                    aria-selected={index === active}
+                    aria-disabled={off || undefined}
+                    className="pd-picker-option"
+                    data-blocked={off ? "true" : undefined}
+                    onPointerDown={(event) => {
+                      event.preventDefault();
+                      pick(candidate);
+                    }}
+                    onPointerEnter={() => {
+                      setActive(index);
+                    }}
+                  >
+                    <span className="pd-picker-who">
+                      <PlayerImage
+                        name={candidate.name ?? "Unnamed"}
+                        seed={candidate.id}
+                        src={candidate.photoUrl}
+                        size="xs"
+                        shape="round"
+                        decorative
+                      />
+                      <span>{candidate.name ?? "Unnamed"}</span>
+                    </span>
+                    <span className="pd-quiet">{where(candidate)}</span>
+                  </li>
+                );
+              })}
+              {shown.length < matches.length ? (
+                <li className="pd-picker-empty" role="presentation">
+                  Scroll for {matches.length - shown.length} more…
+                </li>
+              ) : null}
+            </>
           )}
         </ul>
       ) : null}

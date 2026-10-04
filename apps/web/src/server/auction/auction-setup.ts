@@ -74,6 +74,21 @@ function limitsFor(unit: MoneyUnit) {
 
 type Bound = { min: number; max: number; money: boolean };
 
+/**
+ * One amount in the season's unit, as the organiser typed it — the same rules
+ * and messages as the setup form. Used where a purse or a price is typed on
+ * its own (results entered by hand). `price` allows 0: a player can go free.
+ */
+export function parseAmount(
+  raw: string | undefined,
+  kind: "purse" | "price",
+  label: string,
+  unit: MoneyUnit,
+): { ok: true; value: number } | { ok: false; error: string } {
+  const bound = MONEY_LIMITS[unit][kind];
+  return parseWhole(raw, label, kind === "price" ? { ...bound, min: 0 } : bound, unit);
+}
+
 function parseWhole(
   raw: string | undefined,
   label: string,

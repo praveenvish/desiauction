@@ -54,6 +54,7 @@ const RECORD_FIELDS = {
   status: auctions.status,
   config: auctions.config,
   kind: auctions.kind,
+  enteredByHand: auctions.enteredByHand,
 } as const;
 
 /** The season's REAL auction (the newest, as before 0101). Never a practice. */
@@ -154,6 +155,8 @@ export interface AuctionView {
     name: string;
     status: AuctionStatus;
     config: AuctionConfig;
+    /** Held outside the app and typed in afterwards (0105): there was no room. */
+    enteredByHand: boolean;
   };
   readonly paddles: readonly PaddleView[];
   readonly lots: readonly LotView[];
@@ -244,6 +247,7 @@ export async function auctionView(db: Db, auction: AuctionRecord): Promise<Aucti
       name: auction.name,
       status: auction.status,
       config: auction.config,
+      enteredByHand: auction.enteredByHand === true,
     },
     paddles: paddleRows.map((row) =>
       Object.freeze({
