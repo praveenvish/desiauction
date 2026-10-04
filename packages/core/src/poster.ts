@@ -583,12 +583,21 @@ export interface SeasonSquadInput {
   spentPaise: number;
 }
 
+/**
+ * `before` — no lot has come up yet: the sheet is the pre-auction snapshot of
+ * every team with the captains and icons already named, and it carries no
+ * money. `after` — the results sheet. Decided upstream from the auction row.
+ */
+export type SeasonStage = "before" | "after";
+
 export interface SeasonPosterInput {
   competitionName: string;
   competitionLogoUrl: string | null;
   squads: readonly SeasonSquadInput[];
   /** What the season's auction counts in: prices print as "₹…" or "… pts". */
   unit: MoneyUnit;
+  /** Absent means `after` — the sheet as it always was. */
+  stage?: SeasonStage;
 }
 
 export interface SeasonSquad {
@@ -604,6 +613,7 @@ export interface SeasonSquad {
 export interface SeasonPoster {
   competitionName: string;
   competitionLogoUrl: string | null;
+  stage: SeasonStage;
   chip: string;
   /** "48 players · 6 teams" — the line that holds with prices hidden. */
   countLine: string;
@@ -612,6 +622,27 @@ export interface SeasonPoster {
   squads: readonly SeasonSquad[];
   /** The largest squad — what the grid has to be sized for. */
   largestSquad: number;
+}
+
+/**
+ * "6 teams · 6 captains · 12 icons" — before the night, the players on the
+ * sheet are the named ones, so the line counts them by what they are named.
+ * A player who is captain AND icon counts once in each.
+ */
+function snapshotLine(squads: readonly SeasonSquadInput[], teamsLabel: string): string {
+  const members = squads.flatMap((squad) => squad.members);
+  const counted = (mark: PosterMark, one: string, many: string): string | null => {
+    const n = members.filter((member) => member.marks.includes(mark)).length;
+    return n === 0 ? null : `${String(n)} ${n === 1 ? one : many}`;
+  };
+  return [
+    teamsLabel,
+    counted("captain", "captain", "captains"),
+    counted("icon", "icon", "icons"),
+    counted("retained", "retained", "retained"),
+  ]
+    .filter((part): part is string => part !== null)
+    .join(" · ");
 }
 
 /**
@@ -649,11 +680,16 @@ export function buildSeasonPoster(input: SeasonPosterInput): SeasonPoster {
   const players = input.squads.reduce((total, squad) => total + squad.members.length, 0);
   const spent = input.squads.reduce((total, squad) => total + squad.spentPaise, 0);
   const teamsLabel = `${String(squads.length)} team${squads.length === 1 ? "" : "s"}`;
+  const stage = input.stage ?? "after";
   return {
     competitionName: clamp(input.competitionName, 34),
     competitionLogoUrl: input.competitionLogoUrl,
+    stage,
     chip: teamsLabel,
-    countLine: `${String(players)} player${players === 1 ? "" : "s"} · ${teamsLabel}`,
+    countLine:
+      stage === "before"
+        ? snapshotLine(input.squads, teamsLabel)
+        : `${String(players)} player${players === 1 ? "" : "s"} · ${teamsLabel}`,
     spentLabel: formatAmount(paise(spent), input.unit),
     squads,
     largestSquad: squads.reduce((max, squad) => Math.max(max, squad.rows.length), 0),
