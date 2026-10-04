@@ -16,6 +16,7 @@ import {
   type PosterSize,
   type PosterTheme,
   type SeasonPosterInput,
+  type SeasonStage,
   type SeasonSquadInput,
   type TeamPosterInput,
   type TeamPosterMember,
@@ -672,7 +673,10 @@ async function teamPosterFrom(
         return null;
       }
       const auction = await liveAuction(db, gated.competition.id);
-      if (auction === null) {
+      // "Meet the squad" draws no money, so before an auction exists it is the
+      // captain and icons the organizer has already named. The squad sheet
+      // prints a purse, and an invented one is fiction — it still waits.
+      if (auction === null && request.kind !== "reveal") {
         return null;
       }
       const squad = await squadOf(db, gated.competition.id, auction, teamId);
@@ -696,7 +700,7 @@ async function teamPosterFrom(
         coachName: team.coachName,
         members: squad.members,
         spentPaise: squad.spentPaise,
-        pursePaise: pursePerTeamOf(auction.config),
+        pursePaise: auction === null ? 0 : pursePerTeamOf(auction.config),
       };
     },
   );
@@ -760,9 +764,14 @@ const SEASON_FACE_PX = 160;
 async function liveAuction(
   db: Db,
   competitionId: string,
-): Promise<{ id: string; config: unknown; enteredByHand: boolean } | null> {
+): Promise<{ id: string; config: unknown; status: string; enteredByHand: boolean } | null> {
   const [auction] = await db
-    .select({ id: auctions.id, config: auctions.config, enteredByHand: auctions.enteredByHand })
+    .select({
+      id: auctions.id,
+      config: auctions.config,
+      status: auctions.status,
+      enteredByHand: auctions.enteredByHand,
+    })
     .from(auctions)
     .where(
       and(
@@ -776,6 +785,22 @@ async function liveAuction(
 }
 
 /**
+ * BEFORE OR AFTER THE NIGHT.
+ *
+ * Before the room opens, a season sheet is the snapshot an organizer posts to
+ * build up to auction night — the teams and the captains and icons they
+ * already have — and "Season results" over it would be a false headline.
+ */
+function seasonStageOf(auction: { status: string; enteredByHand: boolean } | null): SeasonStage {
+  // Results typed in after a night held elsewhere (0105) are always "after".
+  if (auction?.enteredByHand === true) {
+    return "after";
+  }
+  // `scheduled` is an auction created but not opened: no lot has come up yet.
+  return auction === null || auction.status === "scheduled" ? "before" : "after";
+}
+
+/**
  * ONE SQUAD: the pre-signed players and the ones the room bought.
  *
  * Icons, captains and retained players never went to the block, so they have no
@@ -784,6 +809,9 @@ async function liveAuction(
  * posts. Shared by the squad poster, the reveal and the season sheet so the
  * three can never disagree about who is in a team.
  *
+ * With no auction yet (`auction` null) there is nothing bought, and the
+ * pre-signed players are the whole squad.
+ *
  * RESULTS ENTERED BY HAND (0105): a player placed on the team with no price
  * typed has no lot either — so for such an auction every member without a
  * sold lot is read here, pre-signed or not, and shown at no price.
@@ -791,10 +819,10 @@ async function liveAuction(
 async function squadOf(
   db: Db,
   competitionId: string,
-  auction: { id: string; enteredByHand: boolean },
+  auction: { id: string; enteredByHand: boolean } | null,
   teamId: string,
 ): Promise<{ members: SquadRow[]; spentPaise: number }> {
-  const auctionId = auction.id;
+  const auctionId = auction?.id ?? null;
   const preSigned = await db
     .select({
       registrationId: registrations.id,
@@ -814,13 +842,28 @@ async function squadOf(
         eq(registrations.competitionId, competitionId),
         eq(registrations.teamId, teamId),
         eq(registrations.status, "approved"),
-        auction.enteredByHand ? sql`true` : preSignedSql,
+        auction?.enteredByHand === true ? sql`true` : preSignedSql,
         // A captain named after the night was bought — the `bought` list below
         // carries them with their price.
-        sql`not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.auctionId} = ${auctionId} and ${lots.status} = 'sold')`,
+        auctionId === null
+          ? sql`true`
+          : sql`not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.auctionId} = ${auctionId} and ${lots.status} = 'sold')`,
       ),
     )
     .orderBy(asc(shownName));
+
+  if (auctionId === null) {
+    return {
+      members: preSigned.map((row): SquadRow => ({
+        name: row.name ?? UNNAMED,
+        role: row.role ?? "",
+        pricePaise: null,
+        marks: marksOf(row),
+        photoKey: posterPhotoKey(row),
+      })),
+      spentPaise: 0,
+    };
+  }
 
   const bought = await db
     .select({
@@ -1065,10 +1108,10 @@ async function seasonPosterFrom(
     dbHandle,
     { personId: gated.personId, orgId: gated.competition.orgId },
     async (db) => {
+      // No auction yet is not a refusal: the pre-auction snapshot is exactly
+      // the teams with the captains and icons already named.
       const auction = await liveAuction(db, gated.competition.id);
-      if (auction === null) {
-        return null;
-      }
+      const stage = seasonStageOf(auction);
       const franchises = await db
         .select({
           id: teams.id,
@@ -1093,11 +1136,12 @@ async function seasonPosterFrom(
         kind: "season",
         theme: request.theme,
         size: request.size,
-        prices: request.prices,
+        // Before the night there is no price to draw, whatever was asked.
+        prices: stage === "before" ? false : request.prices,
         squadSize: squads.reduce((total, squad) => total + squad.members.length, 0),
         via: "organizer",
       });
-      return { franchises, squads };
+      return { franchises, squads, stage };
     },
   );
 
@@ -1105,8 +1149,7 @@ async function seasonPosterFrom(
     return {
       ok: false,
       status: 404,
-      message:
-        "There is no season sheet yet — it needs an auction and at least one franchise in it.",
+      message: "There is no season sheet yet — it needs at least one franchise in the season.",
     };
   }
 
@@ -1125,6 +1168,7 @@ async function seasonPosterFrom(
       competitionName: gated.competition.name,
       competitionLogoUrl,
       unit: gated.unit,
+      stage: read.stage,
       squads: read.franchises.map((team, index): SeasonSquadInput => ({
         teamName: team.name,
         teamShortName: team.shortName,

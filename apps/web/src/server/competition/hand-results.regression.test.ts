@@ -35,7 +35,7 @@ import { env } from "../../env";
 import { createOrg } from "../orgs/orgs";
 import { createCompetition, createTeam, type CompetitionSummary } from "./competitions";
 import { ownedTeamIdsOn } from "./team-ownership";
-import { playerPosterFor, teamPosterFor } from "./posters";
+import { playerPosterFor, seasonPosterFor, teamPosterFor } from "./posters";
 import { auctionHoldsRoster, rosterAuction } from "./registration-aggregate";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
@@ -202,6 +202,12 @@ describe("RESULTS ENTERED BY HAND", () => {
     const left = await playerPosterFor(owner, comp.slug, reg.left1, REQUEST);
     if (!left.ok) throw new Error(left.message);
     expect(left.input.outcome).toBe("unsold");
+  });
+
+  it("draws the season sheet as results, not a pre-auction snapshot", async () => {
+    const season = await seasonPosterFor(owner, comp.slug, REQUEST);
+    if (!season.ok) throw new Error(season.message);
+    expect(season.input.stage).toBe("after");
   });
 
   it("refuses a season where nobody was placed", async () => {
