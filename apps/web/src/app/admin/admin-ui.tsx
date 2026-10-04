@@ -1,4 +1,4 @@
-import { initialsOf } from "@desiauction/core";
+import { initialsOf } from "@desiauction/core/initials";
 import { EmptyState, IconEye, type BadgeTone, type KitTone } from "@desiauction/ui";
 import { isNotificationKind, notificationOf } from "@desiauction/messaging/catalogue";
 import type { ReactNode } from "react";

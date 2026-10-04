@@ -1,4 +1,4 @@
-import { initialsOf } from "@desiauction/core";
+import { initialsOf } from "@desiauction/core/initials";
 import type { KitTone } from "@desiauction/ui";
 
 /**
