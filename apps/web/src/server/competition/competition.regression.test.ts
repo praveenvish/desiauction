@@ -43,6 +43,7 @@ import {
   createCompetition,
   createTeam,
   resolveCompetition,
+  setCompetitionNoPhotoStyle,
   tournamentsOf,
   createTournament,
   setTeamCoach,
@@ -53,6 +54,7 @@ import { confirmAdults, transition, transitionBatch } from "./registration-aggre
 import { ForbiddenError } from "../orgs/authz";
 import { outcomesProjection } from "../admin/views";
 import { purgeOrg } from "../test-support/purge-org";
+import { seasonNoPhotoStyle } from "./season-no-photo";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
@@ -984,5 +986,39 @@ describe("PRR P0-2 — a minor's data is never on a public surface (DPDP §9)", 
 
     await db.delete(registrationsTable).where(eq(registrationsTable.competitionId, competition.id));
     await db.delete(people).where(inArray(people.id, ids));
+  });
+});
+
+describe("0107 — how a season draws a player with no photo", () => {
+  it("defaults to initials, saves the organizer's choice with an audit row, refuses anything else", async () => {
+    const season = await createCompetition(db, orgX.id, owner, {
+      sport: "cricket",
+      name: `Silhouette ${RUN}`,
+    });
+    expect(await seasonNoPhotoStyle(season.slug)).toBe("initials");
+
+    await setCompetitionNoPhotoStyle(db, season, owner, "silhouette");
+    expect(await seasonNoPhotoStyle(season.slug)).toBe("silhouette");
+    const [audit] = await db
+      .select({ action: auditLog.action, actor: auditLog.actor })
+      .from(auditLog)
+      .where(
+        and(
+          eq(auditLog.subject, season.id),
+          eq(auditLog.action, "competition.no_photo_style_changed"),
+        ),
+      );
+    expect(audit?.actor).toBe(owner);
+
+    // The database, not just the action, refuses a third style.
+    await expect(
+      db
+        .update(competitionsTable)
+        .set({ noPhotoStyle: "grey-person" })
+        .where(eq(competitionsTable.id, season.id)),
+    ).rejects.toMatchObject({ cause: { constraint_name: "competitions_no_photo_style_check" } });
+
+    // An unknown season reads the default rather than failing a layout.
+    expect(await seasonNoPhotoStyle(`no-such-season-${RUN}`)).toBe("initials");
   });
 });

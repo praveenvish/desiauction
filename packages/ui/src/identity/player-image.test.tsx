@@ -1,10 +1,11 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { NoPhotoStyleProvider } from "./no-photo-style";
 import { PlayerImage, smallCopyOf } from "./player-image";
 
 describe("PlayerImage", () => {
-  it("renders the branded mark when no photo exists — never a silhouette", () => {
+  it("renders the branded mark when no photo exists — initials by default", () => {
     render(<PlayerImage name="Rohit Sharma" seed="p1" />);
     const frame = screen.getByTestId("player-image");
     expect(frame).toHaveAttribute("data-state", "mark");
@@ -121,6 +122,39 @@ describe("PlayerImage", () => {
     it("the hero frame keeps the full photo", () => {
       render(<PlayerImage name="Anil K" seed="s2" src={photo} size="hero" />);
       expect(screen.getByTestId("player-image").querySelector("img")).toHaveAttribute("src", photo);
+    });
+  });
+
+  describe("the season's silhouette (0107)", () => {
+    it("draws the cricketer when the season chose it, not the initials", () => {
+      render(
+        <NoPhotoStyleProvider style="silhouette">
+          <PlayerImage name="Rohit Sharma" seed="s1" />
+        </NoPhotoStyleProvider>,
+      );
+      const frame = screen.getByTestId("player-image");
+      expect(frame.querySelector("[data-placeholder='silhouette']")).not.toBeNull();
+      expect(frame.querySelector("text")).toBeNull();
+      // Still named for assistive tech.
+      expect(screen.getByRole("img", { name: "Rohit Sharma" })).toBeInTheDocument();
+    });
+
+    it("a real photo still wins over the silhouette", () => {
+      render(
+        <NoPhotoStyleProvider style="silhouette">
+          <PlayerImage name="Rohit Sharma" seed="s2" src="/photo.jpg" />
+        </NoPhotoStyleProvider>,
+      );
+      expect(screen.getByTestId("player-image").querySelector("img")).not.toBeNull();
+    });
+
+    it("the prop overrides the season", () => {
+      render(
+        <NoPhotoStyleProvider style="silhouette">
+          <PlayerImage name="Rohit Sharma" seed="s3" noPhoto="initials" />
+        </NoPhotoStyleProvider>,
+      );
+      expect(screen.getByTestId("player-image").querySelector("text")).toHaveTextContent("RS");
     });
   });
 });

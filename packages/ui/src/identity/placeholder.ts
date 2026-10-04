@@ -2,9 +2,10 @@
  * The premium branded placeholder generator (C-25, IP-1_DESIGN §10).
  *
  * Pure and deterministic: the same seed always yields the same mark, across
- * sessions and machines. No human-figure silhouette is representable in this
- * API — a player without a photo gets a branded floodlit mark, never a grey
- * person-shape. Rendering consumes theme-stable `--identity-*` tokens so a
+ * sessions and machines. No generic human-figure silhouette is representable
+ * in this API — a player without a photo gets a branded floodlit mark, never a
+ * grey person-shape. (A season may choose the branded cricketer instead — see
+ * `silhouette.ts`, C-25 as amended 2026-10-05.) Rendering consumes theme-stable `--identity-*` tokens so a
  * player's identity does not change when the theme flips.
  */
 

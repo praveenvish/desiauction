@@ -149,6 +149,7 @@ function FaceCard({
         <Tile
           ctx={ctx}
           layer="items"
+          face
           src={row.photoUrl}
           monogram={row.monogram}
           width={fit.photoWidth}
@@ -597,6 +598,7 @@ export function renderTopBuysPoster(model: TopBuysPoster, options: PosterRenderO
               <Tile
                 ctx={ctx}
                 layer="items"
+                face
                 src={row.photoUrl}
                 monogram={row.monogram}
                 width={fit.photo}
@@ -828,6 +830,7 @@ export function renderSeasonPoster(model: SeasonPoster, options: PosterRenderOpt
                         <Tile
                           ctx={ctx}
                           layer="items"
+                          face
                           src={row.photoUrl}
                           monogram={row.monogram}
                           width={faces.photoWidth}

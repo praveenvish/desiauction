@@ -2,7 +2,9 @@
 
 import { useId, useState, type CSSProperties } from "react";
 
+import { useNoPhotoStyle } from "./no-photo-style";
 import { placeholderIdentity, type PlaceholderIdentity } from "./placeholder";
+import { SILHOUETTE_BODY, SILHOUETTE_GRILLE, type NoPhotoStyle } from "./silhouette";
 import styles from "./player-image.module.css";
 
 export type PlayerImageSize = "xs" | "sm" | "md" | "lg" | "xl" | "hero";
@@ -54,6 +56,11 @@ export interface PlayerImageProps {
    * guarantee holds exactly when that box has a definite size.
    */
   fluid?: boolean;
+  /**
+   * How a missing photo is drawn. Omitted, the season's choice from
+   * `NoPhotoStyleProvider` applies (initials outside a season).
+   */
+  noPhoto?: NoPhotoStyle;
 }
 
 /**
@@ -117,7 +124,7 @@ function Pattern({ identity, px }: { identity: PlaceholderIdentity; px: number }
   }
 }
 
-/** The branded mark — never a silhouette (C-25). */
+/** The branded initials mark (C-25) — the default for a player with no photo. */
 function Mark({
   name,
   seed,
@@ -217,6 +224,65 @@ function Mark({
 }
 
 /**
+ * The season's cricketer (`silhouette.ts`), on the same field and team wash
+ * as the mark, so a squad reads as one team whichever the season chose.
+ */
+function Silhouette({
+  name,
+  px,
+  teamColor,
+  decorative,
+  round,
+}: {
+  name: string;
+  px: number;
+  teamColor?: string | undefined;
+  decorative: boolean;
+  round: boolean;
+}) {
+  const uid = useId().replace(/:/g, "");
+  const washId = `ps-wash-${uid}`;
+  return (
+    <svg
+      className={styles["mark"]}
+      viewBox="0 0 100 100"
+      width={px}
+      height={px}
+      {...(decorative
+        ? { "aria-hidden": true, focusable: "false" }
+        : { role: "img", "aria-label": name.trim() === "" ? "Player" : name })}
+      data-placeholder="silhouette"
+    >
+      <defs>
+        <radialGradient id={washId} cx="28%" cy="18%" r="95%">
+          <stop
+            offset="0"
+            stopColor={teamColor ?? "var(--identity-accent)"}
+            stopOpacity={teamColor === undefined ? 0.2 : 0.62}
+          />
+          <stop offset="1" stopColor={teamColor ?? "var(--identity-accent)"} stopOpacity={0} />
+        </radialGradient>
+      </defs>
+      <rect width={100} height={100} fill="var(--identity-field)" />
+      <rect width={100} height={100} fill={`url(#${washId})`} />
+      <g fill="var(--identity-glyph)" opacity={0.9}>
+        {SILHOUETTE_BODY.map((d) => (
+          <path key={d} d={d} />
+        ))}
+      </g>
+      <g stroke="var(--identity-field)" strokeWidth={2} strokeLinecap="round" fill="none">
+        {SILHOUETTE_GRILLE.map((d) => (
+          <path key={d} d={d} />
+        ))}
+      </g>
+      {round || teamColor === undefined ? null : (
+        <rect x={0} y={100 - 100 / 16} width={100} height={100 / 16} fill={teamColor} />
+      )}
+    </svg>
+  );
+}
+
+/**
  * Photo when it exists and loads; the branded mark otherwise. Fixed square
  * dimensions in both states — zero layout shift by construction (C-25).
  */
@@ -230,7 +296,10 @@ export function PlayerImage({
   ring = false,
   decorative = false,
   fluid = false,
+  noPhoto,
 }: PlayerImageProps) {
+  const seasonStyle = useNoPhotoStyle();
+  const fallback = noPhoto ?? seasonStyle;
   const px = SIZES[size];
   // Remembered per URL, not as bare booleans: a live surface re-renders the
   // same frame for the next player, and a failure (or a finished load) for the
@@ -313,6 +382,14 @@ export function PlayerImage({
             }}
           />
         </>
+      ) : fallback === "silhouette" ? (
+        <Silhouette
+          name={name}
+          px={px}
+          teamColor={teamColor}
+          decorative={decorative}
+          round={shape === "round"}
+        />
       ) : (
         <Mark
           name={name}

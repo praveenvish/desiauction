@@ -3,6 +3,8 @@
 import { useId, useState } from "react";
 
 import { IDENTITY_CARD_VIEW, identityCardOf, type IdentityCard } from "./identity-card";
+import { useNoPhotoStyle } from "./no-photo-style";
+import { SILHOUETTE_BODY, SILHOUETTE_GRILLE, type NoPhotoStyle } from "./silhouette";
 import styles from "./player-portrait.module.css";
 
 export interface PlayerPortraitProps {
@@ -12,7 +14,8 @@ export interface PlayerPortraitProps {
   seed?: string;
   /**
    * Photo URL. Absent, null (no photo, or consent withheld — DPDP §5), still
-   * loading or failed → the large identity card. Never a silhouette.
+   * loading or failed → the large identity card: initials in foil, or the
+   * season's cricketer when it chose one (`noPhoto`).
    */
   src?: string | null | undefined;
   /**
@@ -22,6 +25,8 @@ export interface PlayerPortraitProps {
    */
   decorative?: boolean;
   className?: string;
+  /** How a missing photo is drawn; omitted, the season's choice applies. */
+  noPhoto?: NoPhotoStyle;
 }
 
 /** Each pattern at poster size, in the player's accent tone. */
@@ -93,10 +98,12 @@ function IdentityPoster({
   name,
   seed,
   decorative,
+  silhouette,
 }: {
   name: string;
   seed: string;
   decorative: boolean;
+  silhouette: boolean;
 }) {
   const card = identityCardOf(seed, name);
   const uid = useId().replace(/:/g, "");
@@ -139,7 +146,22 @@ function IdentityPoster({
       <rect width={width} height={height} fill="var(--identity-field)" />
       <rect width={width} height={height} fill={`url(#${washId})`} />
       <PosterPattern card={card} stroke={accent} />
-      {card.initials !== null ? (
+      {silhouette ? (
+        // The season's cricketer, in the same foil, standing on the card's
+        // foot: 340 units wide, centred, its shoulders at the bottom edge.
+        <g transform="translate(30 160) scale(3.4)" data-placeholder="silhouette">
+          <g fill={`url(#${foilId})`}>
+            {SILHOUETTE_BODY.map((d) => (
+              <path key={d} d={d} />
+            ))}
+          </g>
+          <g stroke="var(--identity-field)" strokeWidth={2} strokeLinecap="round" fill="none">
+            {SILHOUETTE_GRILLE.map((d) => (
+              <path key={d} d={d} />
+            ))}
+          </g>
+        </g>
+      ) : card.initials !== null ? (
         <g
           className={styles["glyph"]}
           data-script={card.script}
@@ -178,7 +200,10 @@ export function PlayerPortrait({
   src,
   decorative = false,
   className,
+  noPhoto,
 }: PlayerPortraitProps) {
+  const seasonStyle = useNoPhotoStyle();
+  const silhouette = (noPhoto ?? seasonStyle) === "silhouette";
   // Remembered per URL (as PlayerImage does): the same card is re-rendered for
   // the next player, and the last player's failure must not decide this one.
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
@@ -196,7 +221,12 @@ export function PlayerPortrait({
           player's own face-card rather than a blank box, and a failure simply
           leaves it there. */}
       {!showPhoto || !loaded ? (
-        <IdentityPoster name={name} seed={seed} decorative={decorative || showPhoto} />
+        <IdentityPoster
+          name={name}
+          seed={seed}
+          decorative={decorative || showPhoto}
+          silhouette={silhouette}
+        />
       ) : null}
       {showPhoto ? (
         <img

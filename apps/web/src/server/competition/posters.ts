@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { isNoPhotoStyle, type NoPhotoStyle } from "@desiauction/ui";
 import {
   DEFAULT_AUCTION_CONFIG,
   isTier,
@@ -90,6 +91,8 @@ export interface PosterSource<T> {
    * than no code.
    */
   readonly shareUrl?: string | null;
+  /** How the season draws a player with no photo (0107). */
+  readonly noPhoto: NoPhotoStyle;
 }
 
 export type PosterResult<T> = PosterSource<T> | PosterRefusal;
@@ -140,6 +143,8 @@ interface Gate {
   readonly showBranding: boolean;
   /** What the season's auction counts in — every price on a poster is in it. */
   readonly unit: MoneyUnit;
+  /** Initials or the cricketer for a player with no photo (0107). */
+  readonly noPhoto: NoPhotoStyle;
   readonly grant: PosterGrant;
 }
 
@@ -256,6 +261,7 @@ export async function posterGateFor(personId: string, slug: string): Promise<Gat
         logoKey: competitions.logoUrl,
         unit: competitions.auctionUnit,
         visibility: competitions.visibility,
+        noPhoto: competitions.noPhotoStyle,
       })
       .from(competitions)
       .where(eq(competitions.id, competition.id))
@@ -271,6 +277,7 @@ export async function posterGateFor(personId: string, slug: string): Promise<Gat
     // own mark off every poster a season produces.
     showBranding: row !== undefined && isTier(row.tier) ? row.tier === "free" : true,
     unit: row?.unit ?? "inr",
+    noPhoto: isNoPhotoStyle(row?.noPhoto) ? row.noPhoto : "initials",
     grant: { organizer, ownRegistrationIds, ownTeamIds },
   };
 }
@@ -578,6 +585,7 @@ async function playerPosterFrom(
   return {
     ok: true,
     showBranding: gated.showBranding,
+    noPhoto: gated.noPhoto,
     filename: posterFilename(gated.competition.slug, read.playerName, request.size),
     shareUrl:
       gated.published && read.number !== ""
@@ -725,6 +733,7 @@ async function teamPosterFrom(
   return {
     ok: true,
     showBranding: gated.showBranding,
+    noPhoto: gated.noPhoto,
     // The squad's own page: a QR on a squad sheet should open that squad.
     shareUrl: gated.published
       ? `${env.PUBLIC_BASE_URL}/c/${encodeURIComponent(gated.competition.slug)}/t/${slugifyName(read.teamName)}?ref=qr`
@@ -1066,6 +1075,7 @@ async function topBuysPosterFrom(
   return {
     ok: true,
     showBranding: gated.showBranding,
+    noPhoto: gated.noPhoto,
     shareUrl: seasonShareUrl(gated),
     filename: posterFilename(gated.competition.slug, `top ${String(count)}`, request.size),
     input: {
@@ -1169,6 +1179,7 @@ async function seasonPosterFrom(
   return {
     ok: true,
     showBranding: gated.showBranding,
+    noPhoto: gated.noPhoto,
     shareUrl: seasonShareUrl(gated),
     filename: posterFilename(gated.competition.slug, "all squads", request.size),
     input: {

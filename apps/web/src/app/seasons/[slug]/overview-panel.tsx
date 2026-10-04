@@ -32,10 +32,13 @@ import {
   type KitTone,
   Notice,
   Pill,
+  PlayerImage,
   SectionCard,
   Select,
+  useNoPhotoStyle,
   useToast,
   VisuallyHidden,
+  type NoPhotoStyle,
 } from "@desiauction/ui";
 import { ENTRY_CATEGORIES, entryCategoryLabel, roleOptions } from "@desiauction/core";
 import Link from "next/link";
@@ -50,6 +53,7 @@ import {
   advanceCompetitionAction,
   cloneCompetitionAction,
   setCompetitionVisibilityAction,
+  setNoPhotoStyleAction,
   setSquadListingAction,
   updateCompetitionDetailsAction,
   type DetailsField,
@@ -594,6 +598,32 @@ export function OverviewPanel({
     if (result.ok) {
       toast({
         title: listed ? "Squads can be listed in search" : "Squads taken out of search",
+        tone: "success",
+      });
+      router.refresh();
+    } else {
+      toast({ title: result.error ?? "Could not update.", tone: "danger" });
+    }
+  };
+
+  // 0107: how a player with no photo is drawn — the season's own choice,
+  // read from the layout's provider so the row and every face agree.
+  const noPhotoStyle = useNoPhotoStyle();
+  const [noPhotoBusy, setNoPhotoBusy] = useState<NoPhotoStyle | null>(null);
+  const chooseNoPhotoStyle = async (style: NoPhotoStyle) => {
+    if (style === noPhotoStyle) {
+      return;
+    }
+    setNoPhotoBusy(style);
+    const result = await release(setNoPhotoStyleAction(slug, style), () => {
+      setNoPhotoBusy(null);
+    });
+    if (result.ok) {
+      toast({
+        title:
+          style === "silhouette"
+            ? "Players without a photo now show the player silhouette"
+            : "Players without a photo now show their initials",
         tone: "success",
       });
       router.refresh();
@@ -1347,6 +1377,43 @@ export function OverviewPanel({
                 </span>
               </li>
             ) : null}
+            <li className="ov-look" data-testid="no-photo-row">
+              <span className="ov-look-thumb" aria-hidden>
+                <PlayerImage name="Player" seed="no-photo-preview" size="sm" decorative />
+              </span>
+              <span className="ov-look-text">
+                <strong>Players without a photo</strong>
+                <span>
+                  {noPhotoStyle === "silhouette"
+                    ? "Show a player silhouette — on every page, poster and share card."
+                    : "Show their initials — on every page, poster and share card."}
+                </span>
+              </span>
+              <span className="ov-look-actions" role="group" aria-label="Players without a photo">
+                <Button
+                  size="sm"
+                  variant={noPhotoStyle === "initials" ? "secondary" : "ghost"}
+                  aria-pressed={noPhotoStyle === "initials"}
+                  loading={noPhotoBusy === "initials"}
+                  disabled={noPhotoBusy !== null}
+                  data-testid="no-photo-initials"
+                  onClick={() => void chooseNoPhotoStyle("initials")}
+                >
+                  Initials
+                </Button>
+                <Button
+                  size="sm"
+                  variant={noPhotoStyle === "silhouette" ? "secondary" : "ghost"}
+                  aria-pressed={noPhotoStyle === "silhouette"}
+                  loading={noPhotoBusy === "silhouette"}
+                  disabled={noPhotoBusy !== null}
+                  data-testid="no-photo-silhouette"
+                  onClick={() => void chooseNoPhotoStyle("silhouette")}
+                >
+                  Silhouette
+                </Button>
+              </span>
+            </li>
             {isPublic && view.platformHold === null ? (
               <li className="ov-look" data-testid="embed-row">
                 <span className="ov-look-thumb" aria-hidden>
