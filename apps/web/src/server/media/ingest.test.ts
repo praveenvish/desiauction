@@ -1,4 +1,4 @@
-import { MAX_IMAGE_BYTES, isValidMediaKey, mediaKeyBelongsTo } from "@desiauction/core";
+import { MAX_IMAGE_BYTES, isValidMediaKey, mediaKeyBelongsTo, thumbKeyOf } from "@desiauction/core";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 
@@ -67,6 +67,34 @@ describe("ingestUpload (P0-6) — the attach stores our bytes, never the client'
     expect(port.deleted).toEqual([]);
   });
 
+  it("writes the photo's 256px WebP copy beside it", async () => {
+    const port = new MemoryPort();
+    const big = await sharp({
+      create: { width: 1600, height: 1200, channels: 3, background: "#225588" },
+    })
+      .jpeg()
+      .toBuffer();
+    port.objects.set(RAW, { type: "image/jpeg", bytes: big });
+    const result = await ingestUpload(port, RAW, TARGET, TOKEN);
+    if (!result.ok) throw new Error(result.error);
+
+    const small = port.objects.get(thumbKeyOf(result.key) ?? "");
+    expect(small?.type).toBe("image/webp");
+    const meta = await sharp(small?.bytes).metadata();
+    // The shorter edge is 256, so a square frame's cover crop stays sharp.
+    expect(Math.min(meta.width, meta.height)).toBe(256);
+    expect(small?.bytes.byteLength ?? Infinity).toBeLessThan(big.byteLength);
+  });
+
+  it("writes no small copy for a team crest", async () => {
+    const port = new MemoryPort();
+    const raw = RAW.replace("/player/", "/team/");
+    port.objects.set(raw, { type: "image/jpeg", bytes: await gpsJpeg() });
+    const result = await ingestUpload(port, raw, { ...TARGET, subject: "team" }, TOKEN);
+    if (!result.ok) throw new Error(result.error);
+    expect([...port.objects.keys()].sort()).toEqual([raw, result.key].sort());
+  });
+
   it("refuses and deletes a text file uploaded under a .jpg key", async () => {
     const port = new MemoryPort();
     port.objects.set(RAW, { type: "image/jpeg", bytes: Buffer.from("just some text ".repeat(8)) });
@@ -130,5 +158,22 @@ describe("BucketStorage.readObject — a capped read of the client's object", ()
       status: "missing",
     });
     await expect(port(Buffer.alloc(0)).readObject("../etc/passwd", 4096)).rejects.toThrow();
+  });
+});
+
+describe("BucketStorage.delete — a player photo takes its small copy with it", () => {
+  it("deletes the small copy, then the photo", async () => {
+    const deleted: string[] = [];
+    const port = new BucketStorage({
+      publicBase: "https://cdn.example",
+      sign: ({ method, key }) => `${method} ${key}`,
+      transport: (url) => {
+        deleted.push(url);
+        return Promise.resolve({ status: 204, headers: { get: () => null }, body: null });
+      },
+    });
+    const photo = `org/${ORG}/player/${SUBJECT}/${TOKEN}.jpg`;
+    await port.delete(photo);
+    expect(deleted).toEqual([`DELETE ${thumbKeyOf(photo) ?? ""}`, `DELETE ${photo}`]);
   });
 });

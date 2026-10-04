@@ -1,6 +1,6 @@
-import { MAX_IMAGE_BYTES, deriveMediaKey, type MediaSubject } from "@desiauction/core";
+import { MAX_IMAGE_BYTES, deriveMediaKey, thumbKeyOf, type MediaSubject } from "@desiauction/core";
 
-import { imageTypeOfKey, sanitizeImage } from "./sanitize";
+import { imageTypeOfKey, makeThumbnail, sanitizeImage } from "./sanitize";
 import type { StoragePort } from "./storage-port";
 
 export type IngestResult =
@@ -51,7 +51,34 @@ export async function ingestUpload(
   }
   const key = deriveMediaKey({ ...target, contentType: clean.contentType, token });
   await port.writeObject(key, clean.contentType, clean.bytes);
+  await writeThumbnail(port, key, clean.bytes);
   return { ok: true, key, rawKey };
+}
+
+/**
+ * Write a player photo's small copy beside it (`thumbKeyOf`). Best-effort: a
+ * photo without one still shows everywhere — readers fall back to the photo —
+ * so a failure here never fails the upload. Also the backfill's one step.
+ */
+export async function writeThumbnail(
+  port: StoragePort,
+  key: string,
+  bytes: Buffer,
+): Promise<boolean> {
+  const thumb = thumbKeyOf(key);
+  if (thumb === null) {
+    return false;
+  }
+  const small = await makeThumbnail(bytes);
+  if (small === null) {
+    return false;
+  }
+  try {
+    await port.writeObject(thumb, "image/webp", small);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Best-effort removal; an object we cannot delete is still never attached. */

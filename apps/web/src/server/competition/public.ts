@@ -303,6 +303,7 @@ interface ShowcaseRow {
   name: string | null;
   role: string | null;
   dateOfBirth: string | null;
+  adultConfirmedAt: Date | null;
   battingStyle: string | null;
   bowlingStyle: string | null;
   attributes: unknown;
@@ -347,7 +348,10 @@ const showcaseSoldPrice = sql<
  * age: with no date there is none to publish.
  */
 function publicPhotoKey(r: ShowcaseRow, now: Date): string | null {
-  return mayPublishPhoto(r.dateOfBirth, now) && r.photoConsentAt !== null ? r.photoKey : null;
+  return mayPublishPhoto(r.dateOfBirth, now, r.adultConfirmedAt !== null) &&
+    r.photoConsentAt !== null
+    ? r.photoKey
+    : null;
 }
 
 /**
@@ -459,6 +463,7 @@ export async function publicShowcase(slug: string): Promise<ShowcasePool | null>
       name: shownName,
       role: registrations.role,
       dateOfBirth: registrations.dateOfBirth,
+      adultConfirmedAt: registrations.adultConfirmedAt,
       battingStyle: registrations.battingStyle,
       bowlingStyle: registrations.bowlingStyle,
       attributes: registrations.attributes,
@@ -564,6 +569,7 @@ export async function publicPlayerCard(
       name: shownName,
       role: registrations.role,
       dateOfBirth: registrations.dateOfBirth,
+      adultConfirmedAt: registrations.adultConfirmedAt,
       battingStyle: registrations.battingStyle,
       bowlingStyle: registrations.bowlingStyle,
       attributes: registrations.attributes,
@@ -1111,6 +1117,7 @@ export async function publicTeam(slug: string, teamSlug: string): Promise<Public
     name: shownName,
     role: registrations.role,
     dateOfBirth: registrations.dateOfBirth,
+    adultConfirmedAt: registrations.adultConfirmedAt,
     photoKey: shownPhotoKey,
     photoConsentAt: shownPhotoConsentAt,
     isIcon: registrations.isIcon,
@@ -1158,10 +1165,14 @@ export async function publicTeam(slug: string, teamSlug: string): Promise<Public
   const now = new Date();
   const photo = (row: {
     dateOfBirth: string | null;
+    adultConfirmedAt: Date | null;
     photoConsentAt: Date | null;
     photoKey: string | null;
   }) =>
-    mayPublishPhoto(row.dateOfBirth, now) && row.photoConsentAt !== null ? row.photoKey : null;
+    mayPublishPhoto(row.dateOfBirth, now, row.adultConfirmedAt !== null) &&
+    row.photoConsentAt !== null
+      ? row.photoKey
+      : null;
   const toMember = (
     row: (typeof preSignedRows)[number],
     pricePaise: number | null,

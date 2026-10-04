@@ -31,6 +31,8 @@ export interface RegistrationEditInput {
   basePriceBand?: string;
   /** ISO `yyyy-mm-dd`, the only shape `deriveAge` reads. */
   dateOfBirth?: string;
+  /** The organizer's statement that the player is 18 or older (0106). */
+  adultConfirmed?: boolean;
   /** The pack's attribute key → one of its option keys, or "". */
   attributes?: Record<string, string>;
   fatherName?: string;
@@ -57,6 +59,7 @@ export interface RegistrationEditSet {
   role?: string | null;
   basePriceBand?: string | null;
   dateOfBirth?: string | null;
+  adultConfirmedAt?: Date | null;
   battingStyle?: string | null;
   bowlingStyle?: string | null;
   /** The WHOLE json object after the edit — merged with what was stored. */
@@ -180,6 +183,11 @@ export function planRegistrationEdit(
       set.dateOfBirth = input.dateOfBirth;
       changed.push("dateOfBirth");
     }
+  }
+
+  if (input.adultConfirmed !== undefined) {
+    set.adultConfirmedAt = input.adultConfirmed ? context.now : null;
+    changed.push("adultConfirmed");
   }
 
   if (input.attributes !== undefined) {

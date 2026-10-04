@@ -20,7 +20,7 @@ import {
   teams,
   type Db,
 } from "@desiauction/db";
-import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 
 import { logSecurityEvent, type SecurityAction } from "../auth/security-events";
 import type { RegistrationEditSet } from "./registration-edit";
@@ -785,4 +785,50 @@ export async function updateRegistrationDetails(
     });
     return { ok: true };
   });
+}
+
+/**
+ * The organizer states that these players are 18 or older (0106) — the
+ * Players list's bulk "Mark 18+", and the import's "everyone in this sheet".
+ *
+ * Only rows of THIS season, and only rows nobody confirmed yet, so the first
+ * statement's time and author stand. Each player's timeline says who said it,
+ * the same way a sheet edit of the field does.
+ */
+export async function confirmAdults(
+  db: Db,
+  orgId: string,
+  competitionId: string,
+  registrationIds: readonly string[],
+  actorId: string,
+  now: Date,
+): Promise<number> {
+  if (registrationIds.length === 0) {
+    return 0;
+  }
+  const confirmed = await db
+    .update(registrations)
+    .set({ adultConfirmedAt: now })
+    .where(
+      and(
+        eq(registrations.competitionId, competitionId),
+        inArray(registrations.id, [...registrationIds]),
+        isNull(registrations.adultConfirmedAt),
+      ),
+    )
+    .returning({ id: registrations.id });
+  if (confirmed.length > 0) {
+    await db.insert(auditLog).values(
+      confirmed.map((row) => ({
+        id: newId(),
+        actor: actorId,
+        action: "registration.details_edited",
+        scopeType: "org" as const,
+        scopeId: orgId,
+        subject: row.id,
+        meta: { fields: "adultConfirmed" },
+      })),
+    );
+  }
+  return confirmed.length;
 }

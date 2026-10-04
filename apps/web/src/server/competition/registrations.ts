@@ -630,6 +630,9 @@ export interface RegistrationRow {
   age: number | null;
   /** ISO `yyyy-mm-dd` as stored — the sheet's date field edits it. Review-gated. */
   dateOfBirth: string | null;
+  /** The organizer confirmed this player is 18 or older (0106): a photo of an
+   *  unknown age may then show on public pages. A date of birth still decides. */
+  adultConfirmed: boolean;
   battingStyle: string | null;
   bowlingStyle: string | null;
   /**
@@ -1059,6 +1062,7 @@ export async function queryRegistrations(
       bowlingStyle: registrations.bowlingStyle,
       attributes: registrations.attributes,
       createdAt: registrations.createdAt,
+      adultConfirmedAt: registrations.adultConfirmedAt,
     })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
@@ -1080,8 +1084,9 @@ export async function queryRegistrations(
   const sport = season?.sport ?? DEFAULT_SPORT_KEY;
   const now = new Date();
   const rows: RegistrationRow[] = raw.map(
-    ({ photoKey, photoConsentAt, attributes, createdAt, ...r }) => ({
+    ({ photoKey, photoConsentAt, attributes, createdAt, adultConfirmedAt, ...r }) => ({
       ...r,
+      adultConfirmed: adultConfirmedAt !== null,
       createdAt: createdAt.toISOString(),
       dateOfBirth: r.dateOfBirth,
       duplicateName: dupKeys.has(nameKey(r.name)),

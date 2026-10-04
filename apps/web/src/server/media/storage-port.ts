@@ -4,7 +4,8 @@ import { dirname, join } from "node:path";
 import {
   deriveMediaKey,
   isAllowedImageType,
-  isValidMediaKey,
+  isStoredMediaKey,
+  thumbKeyOf,
   type AllowedImageType,
 } from "@desiauction/core";
 
@@ -95,14 +96,19 @@ export class LocalStorage implements StoragePort {
   }
 
   async delete(key: string): Promise<void> {
-    if (!isValidMediaKey(key)) {
+    if (!isStoredMediaKey(key)) {
       throw new Error("Rejected: malformed media key");
+    }
+    // A player photo's small copy goes with it (`thumbKeyOf`).
+    const thumb = thumbKeyOf(key);
+    if (thumb !== null) {
+      await rm(join(LOCAL_ROOT, thumb), { force: true });
     }
     await rm(join(LOCAL_ROOT, key), { force: true });
   }
 
   async readObject(key: string, maxBytes: number): Promise<StoredObject> {
-    if (!isValidMediaKey(key)) {
+    if (!isStoredMediaKey(key)) {
       throw new Error("Rejected: malformed media key");
     }
     let handle;
@@ -135,7 +141,7 @@ export class LocalStorage implements StoragePort {
     }
     // Defense in depth (S1): never resolve a path from an unvalidated key, even
     // if a future caller forgets the route-level gate. `..` cannot pass this.
-    if (!isValidMediaKey(key)) {
+    if (!isStoredMediaKey(key)) {
       throw new Error("Rejected: malformed media key");
     }
     const dest = join(LOCAL_ROOT, key);
@@ -221,12 +227,21 @@ export class BucketStorage implements StoragePort {
   }
 
   async delete(key: string): Promise<void> {
-    const url = this.config.sign({ method: "DELETE", key, expiresSeconds: this.uploadExpiry });
-    await this.transport(url, { method: "DELETE" });
+    // A player photo's small copy goes with it (`thumbKeyOf`) — first, so a
+    // failure leaves the photo's key in the caller's hands to report.
+    const thumb = thumbKeyOf(key);
+    for (const target of thumb === null ? [key] : [thumb, key]) {
+      const url = this.config.sign({
+        method: "DELETE",
+        key: target,
+        expiresSeconds: this.uploadExpiry,
+      });
+      await this.transport(url, { method: "DELETE" });
+    }
   }
 
   async readObject(key: string, maxBytes: number): Promise<StoredObject> {
-    if (!isValidMediaKey(key)) {
+    if (!isStoredMediaKey(key)) {
       throw new Error("Rejected: malformed media key");
     }
     const url = this.config.sign({ method: "GET", key, expiresSeconds: 60 });
@@ -249,7 +264,7 @@ export class BucketStorage implements StoragePort {
   }
 
   async writeObject(key: string, contentType: AllowedImageType, bytes: Buffer): Promise<void> {
-    if (!isValidMediaKey(key) || !isAllowedImageType(contentType)) {
+    if (!isStoredMediaKey(key) || !isAllowedImageType(contentType)) {
       throw new Error("Rejected: malformed media key or type");
     }
     // Same signed-content-type PUT the browser uses, so the object is served

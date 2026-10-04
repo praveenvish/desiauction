@@ -111,6 +111,7 @@ import {
   addNote,
   assignTeam,
   auctionHoldsRoster,
+  confirmAdults,
   rosterAuction,
   setRegistrationMarks,
   transition,
@@ -1099,6 +1100,35 @@ async function notifyAffected(
   } catch {
     return { notifyFailed: registrationIds.length };
   }
+}
+
+/**
+ * "Mark 18+" on the Players list: the organizer states the selected players are
+ * 18 or older, so a photo of unknown age may show on public pages (0106). Same
+ * review gate as the rest of the bulk bar. A player already confirmed keeps
+ * the first confirmation; a date of birth that says under 18 still wins at
+ * read time (`mayPublishPhoto`).
+ */
+export async function bulkConfirmAdultAction(
+  slug: string,
+  registrationIds: string[],
+): Promise<{ ok: true; confirmed: number } | { ok: false; error: string }> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error };
+  }
+  const confirmed = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    confirmAdults(
+      db,
+      gate.competition.orgId,
+      gate.competition.id,
+      registrationIds,
+      gate.personId,
+      new Date(),
+    ),
+  );
+  revalidatePath(`/c/${gate.competition.slug}`);
+  return { ok: true, confirmed };
 }
 
 /** Bulk triage — same review gate, same core event, applied atomically (identical to N singles). */
@@ -3090,6 +3120,8 @@ export async function importCommitAction(
     policy?: ImportPolicy;
     /** Read from the season's connected Sheet — a landed import stamps "last synced". */
     fromSheet?: boolean;
+    /** "Everyone in this sheet is 18 or older" — ticked by the organizer (0106). */
+    adultsConfirmed?: boolean;
   },
 ): Promise<ImportCommitResult> {
   const gate = await reviewGate(slug);
@@ -3171,6 +3203,7 @@ export async function importCommitAction(
         screened.rows,
         options?.shape?.policy ?? options?.policy ?? "fill-blanks",
         locked && auction !== null ? auction.id : null,
+        options?.adultsConfirmed === true ? new Date() : null,
       );
     });
   } catch (error) {

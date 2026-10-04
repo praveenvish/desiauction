@@ -548,6 +548,26 @@ function DetailsTab({
             commit={save("dateOfBirth")}
             testId="edit-dob"
           />
+          {/* With no date of birth, the club's word decides whether the photo
+              may show on the public page (0106). A date, once entered,
+              decides on its own — so the question goes away. */}
+          {row.dateOfBirth === null ? (
+            <SegmentSetting
+              label="18 or older?"
+              value={row.adultConfirmed ? "yes" : "no"}
+              options={[
+                { value: "no", label: "Not confirmed" },
+                { value: "yes", label: "Yes, 18+" },
+              ]}
+              commit={(value) =>
+                raw({ adultConfirmed: value === "yes" }, "adultConfirmed", {
+                  adultConfirmed: value === "yes",
+                })
+              }
+              hint="Their photo shows on the public page only once you confirm they are 18 or older."
+              testId="edit-adult"
+            />
+          ) : null}
           <TextSetting
             label="Father’s name"
             value={row.fatherName ?? ""}

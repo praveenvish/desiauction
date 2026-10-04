@@ -330,3 +330,38 @@ describe("CLUB-ONLY PLAYERS — a Hindi master sheet of names", () => {
     ).rejects.toMatchObject({ cause: { constraint_name: "people_club_only_uncontactable_check" } });
   });
 });
+
+describe("0106 — 'everyone in this sheet is 18 or older'", () => {
+  it("unticked confirms nobody; ticked confirms every player the file names", async () => {
+    const season = await createCompetition(db, org.id, owner, {
+      sport: "cricket",
+      name: `Adults ${RUN}`,
+    });
+    const rows = parseRegistrationCsv("name,father_name\nकिशन लाल,\nभंवर लाल,").rows;
+    const confirmedIn = async () =>
+      db
+        .select({ at: registrations.adultConfirmedAt })
+        .from(registrations)
+        .where(eq(registrations.competitionId, season.id));
+
+    await commitRegistrationImport(db, season.id, org.id, owner, rows);
+    expect((await confirmedIn()).map((row) => row.at)).toEqual([null, null]);
+
+    // The same file again, ticked: both rows are "unchanged" and still confirmed.
+    const at = new Date();
+    const result = await commitRegistrationImport(
+      db,
+      season.id,
+      org.id,
+      owner,
+      rows,
+      "fill-blanks",
+      null,
+      at,
+    );
+    expect(result.unchanged).toBe(2);
+    const after = await confirmedIn();
+    expect(after).toHaveLength(2);
+    expect(after.every((row) => row.at?.getTime() === at.getTime())).toBe(true);
+  });
+});
