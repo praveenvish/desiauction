@@ -36,6 +36,7 @@ import {
   useToast,
   VisuallyHidden,
 } from "@desiauction/ui";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 
 import { useMoney } from "../../../../components/money-unit";
@@ -76,7 +77,6 @@ import { decisionToast, PlayerSheet } from "../_players/player-sheet";
 import { useMutate } from "../_players/use-mutate";
 import { useRoster } from "../_players/use-roster";
 import { AddPlayerDialog } from "./add-player-dialog";
-import { ImportDialog } from "./import-dialog";
 import { RegistrationStatusGlyph } from "../../../../components/status/registration-status-glyph";
 import "../_players/players-desk.css";
 import { release, releaseIfLost } from "../../../../lib/release";
@@ -169,6 +169,16 @@ const MISSING_LABEL: Record<string, string> = {
   role: "No role",
 };
 
+/*
+ * The import dialog — column mapping, value mapping, the Drive photo step —
+ * is the heaviest thing this page owns and most visits never open it. Loaded
+ * on the first press of "Import players" instead of with the page, which keeps
+ * the route inside its first-load budget (bundle-budget.json).
+ */
+const ImportDialog = dynamic(() => import("./import-dialog").then((mod) => mod.ImportDialog), {
+  ssr: false,
+});
+
 export function RegistrationDashboardPanel({
   slug,
   stats,
@@ -232,6 +242,8 @@ export function RegistrationDashboardPanel({
   const [approvingAll, setApprovingAll] = useState(false);
   const [search, setSearch] = useState(filters.search);
   const [importOpen, setImportOpen] = useState(false);
+  // Mounted from the first open on, so closing and reopening keeps its state.
+  const [importMounted, setImportMounted] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [bulkDecline, setBulkDecline] = useState(false);
@@ -741,6 +753,7 @@ export function RegistrationDashboardPanel({
             variant="secondary"
             data-testid="open-import"
             onClick={() => {
+              setImportMounted(true);
               setImportOpen(true);
             }}
           >
@@ -1486,14 +1499,16 @@ export function RegistrationDashboardPanel({
         />
       ) : null}
 
-      <ImportDialog
-        slug={slug}
-        open={importOpen}
-        onClose={() => {
-          setImportOpen(false);
-        }}
-        registrationOpen={registrationOpen}
-      />
+      {importMounted ? (
+        <ImportDialog
+          slug={slug}
+          open={importOpen}
+          onClose={() => {
+            setImportOpen(false);
+          }}
+          registrationOpen={registrationOpen}
+        />
+      ) : null}
 
       <ExportDialog
         slug={slug}
