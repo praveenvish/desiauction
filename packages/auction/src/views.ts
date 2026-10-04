@@ -155,7 +155,7 @@ export interface AuctionView {
     name: string;
     status: AuctionStatus;
     config: AuctionConfig;
-    /** Held outside the app and typed in afterwards (0105): there was no room. */
+    /** Held outside the app and typed in afterwards (0106): there was no room. */
     enteredByHand: boolean;
   };
   readonly paddles: readonly PaddleView[];

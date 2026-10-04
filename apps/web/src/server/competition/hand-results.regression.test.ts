@@ -1,4 +1,4 @@
-// RESULTS ENTERED BY HAND (0105), against real Postgres.
+// RESULTS ENTERED BY HAND (0106), against real Postgres.
 //
 // A season whose auction happened outside the app: players are placed on
 // teams with an optional price, then published. What publishing writes must

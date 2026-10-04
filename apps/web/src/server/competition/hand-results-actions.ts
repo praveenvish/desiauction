@@ -25,7 +25,7 @@ import { assignTeam } from "./registration-aggregate";
 import { resolveMemberCompetition } from "./resolve";
 
 /**
- * AUCTION RESULTS ENTERED BY HAND (0105).
+ * AUCTION RESULTS ENTERED BY HAND (0106).
  *
  * For a season whose auction happened outside the app: the organiser puts each
  * bought player on a team from the Teams tab, types the price if there was one,

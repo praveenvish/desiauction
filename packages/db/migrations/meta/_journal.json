@@ -734,7 +734,14 @@
       "idx": 104,
       "version": "7",
       "when": 1792771200000,
-      "tag": "0105_offline_auction_results",
+      "tag": "0105_adult_confirmed",
+      "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1792857600000,
+      "tag": "0106_offline_auction_results",
       "breakpoints": true
     }
   ]

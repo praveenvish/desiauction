@@ -14,7 +14,7 @@ import type { TeamCard, TeamRosterRow } from "../../../../server/competition/tea
 import { PlayerPicker, useSquadCandidates } from "./squad-desk";
 
 /**
- * RESULTS OF AN AUCTION HELD OUTSIDE THE APP (0105).
+ * RESULTS OF AN AUCTION HELD OUTSIDE THE APP (0106).
  *
  * The whole job is "who did this team buy, and for how much", typed as fast as
  * the organiser can read it off the sheet:

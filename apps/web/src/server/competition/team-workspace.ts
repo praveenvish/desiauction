@@ -102,7 +102,7 @@ export interface TeamsWorkspaceOptions {
   roster: boolean;
   /**
    * `competition.manage`: may type in the results of an auction held outside
-   * the app (0105). Omitted → false.
+   * the app (0106). Omitted → false.
    */
   manage?: boolean;
 }
@@ -176,7 +176,7 @@ export interface TeamsWorkspace {
    * the screen can link to. Null before an auction exists.
    */
   /**
-   * Results of an auction held outside the app (0105), for an organiser:
+   * Results of an auction held outside the app (0106), for an organiser:
    * `open` while the season has no auction in the app and players can be
    * placed by hand; `published` once those results were published. Omitted
    * otherwise.

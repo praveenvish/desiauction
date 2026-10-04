@@ -91,7 +91,7 @@ export interface AuctionRecord {
    * go out.
    */
   kind: AuctionKind;
-  /** Results typed in after an auction held outside the app (0105). */
+  /** Results typed in after an auction held outside the app (0106). */
   enteredByHand?: boolean;
 }
 
@@ -296,7 +296,7 @@ function isUniqueViolation(error: unknown, constraint: string): boolean {
   );
 }
 
-// --- Results entered by hand (0105) -------------------------------------------------
+// --- Results entered by hand (0106) -------------------------------------------------
 
 export type PublishByHandResult =
   | { ok: true; auctionId: string; sold: number; unsold: number }

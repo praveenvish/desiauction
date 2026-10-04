@@ -361,7 +361,10 @@ export {
   validateUpload,
   bytesMatchImageType,
   deriveMediaKey,
+  isStoredMediaKey,
   isValidMediaKey,
+  thumbKeyOf,
+  THUMB_EDGE,
   mediaKeyBelongsTo,
 } from "./media";
 export type { AllowedImageType, MediaSubject, MediaUpload, MediaValidation } from "./media";

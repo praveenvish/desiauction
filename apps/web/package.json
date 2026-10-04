@@ -25,6 +25,7 @@
     "mail:gallery": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/mail-gallery.ts",
     "seed:admin": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/seed-platform-admin.ts",
     "backfill:squads": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/backfill-auction-squads.ts",
+    "backfill:thumbs": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/backfill-photo-thumbs.ts",
     "test:integration": "vitest run src",
     "demo:tournament-small": "playwright test e2e/competitions.spec.ts --headed --workers=1",
     "demo:tournament-medium": "playwright test e2e/registration-ops.spec.ts e2e/fixtures.spec.ts --headed --workers=1",

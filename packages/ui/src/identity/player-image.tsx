@@ -56,6 +56,18 @@ export interface PlayerImageProps {
   fluid?: boolean;
 }
 
+/**
+ * A stored player photo's 256px copy, or null when `src` is not one.
+ *
+ * Mirrors `thumbKeyOf` in @desiauction/core (this package does not depend on
+ * core): the server writes `{token}-256.webp` beside every player photo. Any
+ * other URL — a blob preview mid-upload, a crest, an outside link — has none.
+ */
+export function smallCopyOf(src: string): string | null {
+  const match = /\/player\/[0-9A-Za-z]{26}\/[0-9A-Za-z]{26}\.(?:jpg|png|webp)$/.exec(src);
+  return match === null ? null : src.replace(/\.(?:jpg|png|webp)$/, "-256.webp");
+}
+
 function Pattern({ identity, px }: { identity: PlaceholderIdentity; px: number }) {
   const stroke = "var(--identity-line)";
   const soft = "var(--identity-line-soft)";
@@ -223,12 +235,22 @@ export function PlayerImage({
   // Remembered per URL, not as bare booleans: a live surface re-renders the
   // same frame for the next player, and a failure (or a finished load) for the
   // last player's photo must not decide what the next one shows.
-  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const [failedSrcs, setFailedSrcs] = useState<readonly string[]>([]);
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
   const photo = src === undefined || src === null || src === "" ? null : src;
-  const failed = photo !== null && failedSrc === photo;
-  const loaded = photo !== null && loadedSrc === photo;
-  const showPhoto = photo !== null && !failed;
+  // A small frame asks for the photo's 256px copy, not the stored original (up
+  // to 2048px): a list of 150 players then downloads kilobytes, not megabytes.
+  // The hero and a fluid frame can be drawn large, so they keep the original.
+  // A missing small copy falls back to the photo, and a failed photo to the mark.
+  const small = photo !== null && size !== "hero" && !fluid ? smallCopyOf(photo) : null;
+  const shown =
+    small !== null && !failedSrcs.includes(small)
+      ? small
+      : photo !== null && !failedSrcs.includes(photo)
+        ? photo
+        : null;
+  const loaded = shown !== null && loadedSrc === shown;
+  const showPhoto = shown !== null;
   const teamed = ring && teamColor !== undefined && teamColor !== "";
   // The ring's width scales with the step, so a 24px row face and a 160px
   // stage portrait carry the same visual weight of team colour.
@@ -262,12 +284,12 @@ export function PlayerImage({
       data-testid="player-image"
       data-state={showPhoto ? (loaded ? "photo" : "loading") : "mark"}
     >
-      {showPhoto ? (
+      {shown !== null ? (
         <>
           {!loaded ? <span className={styles["shimmer"]} aria-hidden /> : null}
           <img
             className={styles["photo"]}
-            src={photo}
+            src={shown}
             alt={decorative ? "" : name}
             width={px}
             height={px}
@@ -280,14 +302,14 @@ export function PlayerImage({
             // The ref sees an image that is already complete and settles it.
             ref={(node) => {
               if (node !== null && node.complete && node.naturalWidth > 0 && !loaded) {
-                setLoadedSrc(photo);
+                setLoadedSrc(shown);
               }
             }}
             onLoad={() => {
-              setLoadedSrc(photo);
+              setLoadedSrc(shown);
             }}
             onError={() => {
-              setFailedSrc(photo);
+              setFailedSrcs((failed) => (failed.includes(shown) ? failed : [...failed, shown]));
             }}
           />
         </>

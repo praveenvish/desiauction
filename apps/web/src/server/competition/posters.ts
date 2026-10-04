@@ -409,6 +409,7 @@ async function playerPosterFrom(
           photoKey: shownPhotoKey,
           photoConsentAt: shownPhotoConsentAt,
           dateOfBirth: registrations.dateOfBirth,
+          adultConfirmedAt: registrations.adultConfirmedAt,
           role: registrations.role,
           number: registrations.registrationNumber,
           jerseyNumber: registrations.jerseyNumber,
@@ -477,7 +478,7 @@ async function playerPosterFrom(
                 .limit(1)
             )[0] ?? null)
           : null;
-      // Results entered by hand (0105): placed on a team with no price typed,
+      // Results entered by hand (0106): placed on a team with no price typed,
       // so no lot — but bought all the same.
       const placedByHand =
         !preSigned && seasonAuction?.enteredByHand === true && row.preSignedTeamId !== null;
@@ -522,7 +523,8 @@ async function playerPosterFrom(
        * single byte, so a withheld photo is never fetched at all.
        */
       const photoKey =
-        row.photoConsentAt === null || !mayPublishPhoto(row.dateOfBirth, new Date())
+        row.photoConsentAt === null ||
+        !mayPublishPhoto(row.dateOfBirth, new Date(), row.adultConfirmedAt !== null)
           ? null
           : row.photoKey;
 
@@ -792,7 +794,7 @@ async function liveAuction(
  * already have — and "Season results" over it would be a false headline.
  */
 function seasonStageOf(auction: { status: string; enteredByHand: boolean } | null): SeasonStage {
-  // Results typed in after a night held elsewhere (0105) are always "after".
+  // Results typed in after a night held elsewhere (0106) are always "after".
   if (auction?.enteredByHand === true) {
     return "after";
   }
@@ -812,7 +814,7 @@ function seasonStageOf(auction: { status: string; enteredByHand: boolean } | nul
  * With no auction yet (`auction` null) there is nothing bought, and the
  * pre-signed players are the whole squad.
  *
- * RESULTS ENTERED BY HAND (0105): a player placed on the team with no price
+ * RESULTS ENTERED BY HAND (0106): a player placed on the team with no price
  * typed has no lot either — so for such an auction every member without a
  * sold lot is read here, pre-signed or not, and shown at no price.
  */
@@ -831,6 +833,7 @@ async function squadOf(
       photoKey: shownPhotoKey,
       photoConsentAt: shownPhotoConsentAt,
       dateOfBirth: registrations.dateOfBirth,
+      adultConfirmedAt: registrations.adultConfirmedAt,
       isIcon: registrations.isIcon,
       isCaptain: registrations.isCaptain,
       isRetained: registrations.isRetained,
@@ -873,6 +876,7 @@ async function squadOf(
       photoKey: shownPhotoKey,
       photoConsentAt: shownPhotoConsentAt,
       dateOfBirth: registrations.dateOfBirth,
+      adultConfirmedAt: registrations.adultConfirmedAt,
       price: lots.soldPrice,
       isIcon: registrations.isIcon,
       isCaptain: registrations.isCaptain,
@@ -932,8 +936,10 @@ function posterPhotoKey(row: {
   photoKey: string | null;
   photoConsentAt: Date | null;
   dateOfBirth: string | null;
+  adultConfirmedAt: Date | null;
 }): string | null {
-  return row.photoConsentAt === null || !mayPublishPhoto(row.dateOfBirth, new Date())
+  return row.photoConsentAt === null ||
+    !mayPublishPhoto(row.dateOfBirth, new Date(), row.adultConfirmedAt !== null)
     ? null
     : row.photoKey;
 }
@@ -1009,6 +1015,7 @@ async function topBuysPosterFrom(
           photoKey: shownPhotoKey,
           photoConsentAt: shownPhotoConsentAt,
           dateOfBirth: registrations.dateOfBirth,
+          adultConfirmedAt: registrations.adultConfirmedAt,
           price: lots.soldPrice,
           teamName: teams.name,
           teamColor: teams.primaryColor,
@@ -1418,7 +1425,7 @@ async function pickerFrom(gated: Gate): Promise<PosterPicker> {
               .from(registrations)
               .innerJoin(people, eq(people.id, registrations.personId))
               // The squad they are on without a sale — pre-signed, or placed by
-              // hand at no price (0105).
+              // hand at no price (0106).
               .leftJoin(rosterTeam, eq(rosterTeam.id, registrations.teamId))
               .leftJoin(
                 lots,

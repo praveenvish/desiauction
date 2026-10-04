@@ -90,6 +90,18 @@ describe("mayPublishPhoto (P0-6 — a face fails CLOSED on an unknown age)", () 
     expect(mayPublishPhoto("not-a-date", now)).toBe(false);
     expect(mayPublishPhoto("2027-01-01", now)).toBe(false); // a future date is no age
   });
+
+  it("publishes an unknown age once the club confirmed the player is 18 or older (0105)", () => {
+    expect(mayPublishPhoto(null, now, true)).toBe(true);
+    expect(mayPublishPhoto("", now, true)).toBe(true);
+    expect(mayPublishPhoto(null, now, false)).toBe(false);
+  });
+
+  it("never lets the club's confirmation override a date of birth that says under 18", () => {
+    expect(mayPublishPhoto("2015-01-01", now, true)).toBe(false);
+    expect(mayPublishPhoto("2008-07-23", now, true)).toBe(false);
+    expect(mayPublishPhoto("2000-01-01", now, false)).toBe(true);
+  });
 });
 
 describe("parseRole — the vocabulary a registration form is actually filled in with", () => {

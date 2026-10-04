@@ -166,7 +166,7 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
           {practice !== null && status === "scheduled" ? (
             <PracticeCard slug={slug} card={practice} />
           ) : null}
-          {/* 0105: before any auction, the other road — it already happened. */}
+          {/* 0106: before any auction, the other road — it already happened. */}
           {status === null && dashboard.viewer.canManage ? (
             <p className="auc-hand-hint" data-testid="auction-hand-hint">
               Auction already held outside the app?{" "}

@@ -86,6 +86,9 @@ export function ImportDialog({
   const [fileWins, setFileWins] = useState(false);
   /* Off by default: a transaction ID is a claim until the desk checks it. */
   const [paidWhenReferenced, setPaidWhenReferenced] = useState(false);
+  // The organizer's word that everyone in THIS file is 18 or older (0105) —
+  // never a default, and never carried to the next file.
+  const [adultsConfirmed, setAdultsConfirmed] = useState(false);
   /** Flagged numbers the organizer ticked as real (E.164) — see ImportNotices. */
   const [realPhones, setRealPhones] = useState<string[]>([]);
   /** Every number flagged as made up since this file was read, by row. */
@@ -188,6 +191,7 @@ export function ImportDialog({
     // Nor its "that number is real" answers.
     setRealPhones([]);
     setFlagged([]);
+    setAdultsConfirmed(false);
   };
 
   /**
@@ -462,6 +466,7 @@ export function ImportDialog({
       skipInvalid,
       shape: shape(),
       fromSheet,
+      adultsConfirmed,
     });
     // Remember the mapping only once the import it describes actually landed —
     // a mapping saved beside a failed import is a mapping nobody validated.
@@ -937,6 +942,28 @@ export function ImportDialog({
                           The button states the whole bargain — what lands and what
                           is left — so "skip" is a choice the organizer read, not a
                           default they were given. */}
+                    {/* PUBLIC PHOTOS NEED A KNOWN ADULT (P0-6). A sheet with no
+                          dates of birth hides every face on the public page
+                          unless the organizer says, here, that these are adults. */}
+                    {preview.validCount > 0 ? (
+                      <label className="io-inline import-paid" htmlFor="adults-confirmed">
+                        <input
+                          id="adults-confirmed"
+                          type="checkbox"
+                          data-testid="adults-confirmed"
+                          checked={adultsConfirmed}
+                          onChange={(event) => {
+                            setAdultsConfirmed(event.target.checked);
+                          }}
+                        />
+                        <span>
+                          Everyone in this sheet is <strong>18 or older</strong>{" "}
+                          <span className="dash-hint">
+                            — their photos can then show on the public page
+                          </span>
+                        </span>
+                      </label>
+                    ) : null}
                     {preview.errors.length > 0 && preview.validCount > 0 ? (
                       <Button
                         onClick={() => void commitImport(true)}

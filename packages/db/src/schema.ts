@@ -1198,6 +1198,10 @@ export const registrations = pgTable(
     // --- Player profile (M-parity: matches the incumbent's player card) ---
     // ISO yyyy-mm-dd; age is DERIVED at read time, never stored (it rots).
     dateOfBirth: text("date_of_birth"),
+    // The organizer stated this player is 18 or older (0105) — the other way a
+    // face may ride a public surface when there is no date of birth. NULL means
+    // nobody said so. A date of birth still decides on its own when present.
+    adultConfirmedAt: ts("adult_confirmed_at"),
     // Structured playing style (display + set filtering). Freeform-tolerant text
     // validated against enums in packages/core/src/player-profile.ts.
     battingStyle: text("batting_style"),
@@ -1213,7 +1217,7 @@ export const registrations = pgTable(
     trouserSize: text("trouser_size"),
     basePriceBand: text("base_price_band"),
     /**
-     * Price from an auction held OUTSIDE the app (0105), ×100 like every price.
+     * Price from an auction held OUTSIDE the app (0106), ×100 like every price.
      * The organiser types it while placing the player on a team by hand; NULL
      * means no price was given. Publishing the results copies it onto the
      * player's lot — after that the lot is the price, as for a live auction.
@@ -1589,7 +1593,7 @@ export const auctions = pgTable(
       .notNull()
       .default("real"),
     /*
-     * The auction was held outside the app and its results typed in (0105):
+     * The auction was held outside the app and its results typed in (0106):
      * created already completed, with no bids. Readers that show the room
      * itself (bidding history, the live board) have nothing to show for it.
      */

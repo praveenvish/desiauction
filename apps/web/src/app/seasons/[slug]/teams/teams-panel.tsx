@@ -205,7 +205,7 @@ function TeamGrid({
         </section>
       ) : null}
 
-      {/* 0105: the auction happened in a hall, not here — type the results in. */}
+      {/* 0106: the auction happened in a hall, not here — type the results in. */}
       {view.handEntry === "open" && view.viewer.canSeeRoster && view.teams.length > 0 ? (
         <PublishByHand slug={slug} teams={view.teams} />
       ) : null}

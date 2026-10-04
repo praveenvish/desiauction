@@ -26,7 +26,7 @@ const NOT_SHOWN: ReadonlySet<string> = new Set([
   "auction_exists",
   "invalid_config",
   "not_ready",
-  // publishResultsByHand's: the Teams tab's publish dialog words it (0105).
+  // publishResultsByHand's: the Teams tab's publish dialog words it (0106).
   "nobody_placed",
   // `reason: "undo"` is the audit reason written on a reversal, not a refusal.
   "undo",
