@@ -91,7 +91,7 @@ describe("mayPublishPhoto (P0-6 — a face fails CLOSED on an unknown age)", () 
     expect(mayPublishPhoto("2027-01-01", now)).toBe(false); // a future date is no age
   });
 
-  it("publishes an unknown age once the club confirmed the player is 18 or older (0105)", () => {
+  it("publishes an unknown age once the club confirmed the player is 18 or older (0106)", () => {
     expect(mayPublishPhoto(null, now, true)).toBe(true);
     expect(mayPublishPhoto("", now, true)).toBe(true);
     expect(mayPublishPhoto(null, now, false)).toBe(false);

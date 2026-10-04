@@ -788,7 +788,7 @@ export async function updateRegistrationDetails(
 }
 
 /**
- * The organizer states that these players are 18 or older (0105) — the
+ * The organizer states that these players are 18 or older (0106) — the
  * Players list's bulk "Mark 18+", and the import's "everyone in this sheet".
  *
  * Only rows of THIS season, and only rows nobody confirmed yet, so the first

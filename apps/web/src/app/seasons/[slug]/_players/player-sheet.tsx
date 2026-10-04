@@ -549,7 +549,7 @@ function DetailsTab({
             testId="edit-dob"
           />
           {/* With no date of birth, the club's word decides whether the photo
-              may show on the public page (0105). A date, once entered,
+              may show on the public page (0106). A date, once entered,
               decides on its own — so the question goes away. */}
           {row.dateOfBirth === null ? (
             <SegmentSetting

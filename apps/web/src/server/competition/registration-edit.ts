@@ -31,7 +31,7 @@ export interface RegistrationEditInput {
   basePriceBand?: string;
   /** ISO `yyyy-mm-dd`, the only shape `deriveAge` reads. */
   dateOfBirth?: string;
-  /** The organizer's statement that the player is 18 or older (0105). */
+  /** The organizer's statement that the player is 18 or older (0106). */
   adultConfirmed?: boolean;
   /** The pack's attribute key → one of its option keys, or "". */
   attributes?: Record<string, string>;

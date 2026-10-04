@@ -331,7 +331,7 @@ describe("CLUB-ONLY PLAYERS — a Hindi master sheet of names", () => {
   });
 });
 
-describe("0105 — 'everyone in this sheet is 18 or older'", () => {
+describe("0106 — 'everyone in this sheet is 18 or older'", () => {
   it("unticked confirms nobody; ticked confirms every player the file names", async () => {
     const season = await createCompetition(db, org.id, owner, {
       sport: "cricket",

@@ -504,7 +504,7 @@ export async function commitRegistrationImport(
    */
   lockedAuctionId: string | null = null,
   /**
-   * The organizer ticked "everyone in this sheet is 18 or older" (0105): every
+   * The organizer ticked "everyone in this sheet is 18 or older" (0106): every
    * player the file names is confirmed, at this instant, in the same
    * transaction. Null — the default, and an unticked box — confirms nobody and
    * clears nobody.

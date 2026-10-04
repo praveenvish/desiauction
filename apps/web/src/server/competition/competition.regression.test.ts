@@ -930,7 +930,7 @@ describe("PRR P0-2 — a minor's data is never on a public surface (DPDP §9)", 
     await db.delete(people).where(inArray(people.id, [minor.id, adult.id]));
   });
 
-  it("0105: a photo with no date of birth shows only once the club confirmed 18+", async () => {
+  it("0106: a photo with no date of birth shows only once the club confirmed 18+", async () => {
     const competition = await createCompetition(db, orgX.id, owner, {
       sport: "cricket",
       name: `Adults ${RUN}`,

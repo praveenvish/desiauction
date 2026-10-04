@@ -4,9 +4,11 @@ import {
   IconPlay,
   IconUser,
   Pill,
+  SectionCard,
   ToastProvider,
   type KitTone,
 } from "@desiauction/ui";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PageTitle } from "../../../../components/shell/page-title";
@@ -164,17 +166,48 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
           {practice !== null && status === "scheduled" ? (
             <PracticeCard slug={slug} card={practice} />
           ) : null}
-          <AuctionPanel
-            slug={slug}
-            dashboard={dashboard}
-            appointments={appointments}
-            {...(standing !== undefined ? { standing } : {})}
-            auctioneersSlot={
-              auctioneers !== null ? (
-                <AuctioneerPanel key="auctioneers" slug={slug} view={auctioneers} />
-              ) : null
-            }
-          />
+          {/* 0105: before any auction, the other road — it already happened. */}
+          {status === null && dashboard.viewer.canManage ? (
+            <p className="auc-hand-hint" data-testid="auction-hand-hint">
+              Auction already held outside the app?{" "}
+              <Link href={`/seasons/${slug}/teams`}>Add the results on the Teams tab</Link> to get
+              posters and team cards.
+            </p>
+          ) : null}
+          {dashboard.view?.auction.enteredByHand === true ? (
+            /* No room ran, so there is no bidding to review — just what was
+               typed in, and where it is used. */
+            <SectionCard
+              icon={<IconGavel />}
+              title="Results entered by hand"
+              description={`This auction was held outside the app. ${String(dashboard.view.lotStats.sold)} player${dashboard.view.lotStats.sold === 1 ? "" : "s"} bought with a price, ${String(dashboard.view.lotStats.unsold)} unsold. The squads are final.`}
+              data-testid="auction-by-hand"
+            >
+              <span className="date-row">
+                <ButtonLink href={`/seasons/${slug}/teams`} variant="secondary" size="sm">
+                  <IconUser size={16} />
+                  See the teams
+                </ButtonLink>
+                {dashboard.viewer.canPoster ? (
+                  <ButtonLink href={`/seasons/${slug}/posters`} size="sm">
+                    Make posters
+                  </ButtonLink>
+                ) : null}
+              </span>
+            </SectionCard>
+          ) : (
+            <AuctionPanel
+              slug={slug}
+              dashboard={dashboard}
+              appointments={appointments}
+              {...(standing !== undefined ? { standing } : {})}
+              auctioneersSlot={
+                auctioneers !== null ? (
+                  <AuctioneerPanel key="auctioneers" slug={slug} view={auctioneers} />
+                ) : null
+              }
+            />
+          )}
         </div>
       </main>
     </ToastProvider>

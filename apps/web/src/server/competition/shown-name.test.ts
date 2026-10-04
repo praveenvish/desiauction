@@ -34,7 +34,7 @@ describe("the shown photo, as a URL", () => {
     expect(consentedPhotoUrl(row, sign)).toBe("/media/k/a.jpg");
   });
 
-  it("shows a face of unknown age once the club confirmed the player is 18 or older (0105)", () => {
+  it("shows a face of unknown age once the club confirmed the player is 18 or older (0106)", () => {
     const row = { photoKey: "k/a.jpg", photoConsentAt: NOW, dateOfBirth: null };
     expect(publicPhotoUrl({ ...row, adultConfirmedAt: NOW }, NOW, sign)).toBe("/media/k/a.jpg");
     // A date of birth that says under 18 wins over the tick.

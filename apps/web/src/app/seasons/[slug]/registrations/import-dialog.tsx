@@ -86,7 +86,7 @@ export function ImportDialog({
   const [fileWins, setFileWins] = useState(false);
   /* Off by default: a transaction ID is a claim until the desk checks it. */
   const [paidWhenReferenced, setPaidWhenReferenced] = useState(false);
-  // The organizer's word that everyone in THIS file is 18 or older (0105) —
+  // The organizer's word that everyone in THIS file is 18 or older (0106) —
   // never a default, and never carried to the next file.
   const [adultsConfirmed, setAdultsConfirmed] = useState(false);
   /** Flagged numbers the organizer ticked as real (E.164) — see ImportNotices. */

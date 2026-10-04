@@ -433,6 +433,7 @@ export {
   type SeasonPosterInput,
   type SeasonSquad,
   type SeasonSquadInput,
+  type SeasonStage,
   type TeamPoster,
   type TeamPosterInput,
   type TeamPosterMember,

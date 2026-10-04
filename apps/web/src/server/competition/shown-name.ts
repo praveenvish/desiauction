@@ -63,7 +63,7 @@ export function consentedPhotoUrl(
  * P0-6: and neither does a face of UNKNOWN age. `mayPublishPhoto`, not
  * `!isMinor` — the latter lets a DOB-less import row (a child, as often as
  * not) through. An unknown age publishes only once the organizer confirmed the
- * player is 18 or older (`adultConfirmedAt`, 0105).
+ * player is 18 or older (`adultConfirmedAt`, 0106).
  */
 export function publicPhotoUrl(
   row: ShownPhotoRow & { dateOfBirth: string | null; adultConfirmedAt: Date | null },

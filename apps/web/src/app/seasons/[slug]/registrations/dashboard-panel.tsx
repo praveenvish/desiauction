@@ -569,7 +569,7 @@ export function RegistrationDashboardPanel({
 
   /**
    * "MARK 18+": the organizer's word that the selected players are adults, so
-   * a photo with no date of birth behind it may show on the public page (0105).
+   * a photo with no date of birth behind it may show on the public page (0106).
    * A player whose date of birth says under 18 stays hidden whatever this says.
    */
   const confirmAdults = async () => {

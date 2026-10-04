@@ -630,7 +630,7 @@ export interface RegistrationRow {
   age: number | null;
   /** ISO `yyyy-mm-dd` as stored — the sheet's date field edits it. Review-gated. */
   dateOfBirth: string | null;
-  /** The organizer confirmed this player is 18 or older (0105): a photo of an
+  /** The organizer confirmed this player is 18 or older (0106): a photo of an
    *  unknown age may then show on public pages. A date of birth still decides. */
   adultConfirmed: boolean;
   battingStyle: string | null;

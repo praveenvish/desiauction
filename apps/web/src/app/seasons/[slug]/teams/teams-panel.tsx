@@ -47,6 +47,7 @@ import type { TeamsWorkspaceView } from "../../../../server/competition/actions"
 import type { TeamCard } from "../../../../server/competition/team-workspace";
 import { inviteOwnerAction } from "../../../../server/auction/owner-actions";
 import { ExportDialog } from "../_players/export-dialog";
+import { BoughtByHand, PublishByHand } from "./hand-entry";
 import { RosterSheetHost, SquadPreSign } from "./squad-desk";
 import { TeamLogoUploader } from "./team-logo-uploader";
 import { captainOf, iconsOf, preSigned, roleMix, setupSteps, type RoleShare } from "./teams-model";
@@ -147,7 +148,12 @@ function TeamGrid({
                 {view.squadMax !== undefined && view.squadMax !== null
                   ? `, squad of ${String(view.squadMax)}`
                   : ""}{" "}
-                — {locked ? "locked when the auction started." : "set in the auction's rules."}{" "}
+                —{" "}
+                {view.handEntry === "published"
+                  ? "set when the results were published."
+                  : locked
+                    ? "locked when the auction started."
+                    : "set in the auction's rules."}{" "}
                 <Link className="tm-lede-link" href={`/seasons/${slug}/auction`}>
                   Rules of the night
                   <IconArrowRight size={14} className="icon-trail" aria-hidden />
@@ -194,6 +200,23 @@ function TeamGrid({
           </span>
           <ButtonLink href={`/seasons/${slug}/auction`} data-testid="teams-create-auction">
             Create the auction
+            <IconArrowRight size={16} aria-hidden />
+          </ButtonLink>
+        </section>
+      ) : null}
+
+      {/* 0105: the auction happened in a hall, not here — type the results in. */}
+      {view.handEntry === "open" && view.viewer.canSeeRoster && view.teams.length > 0 ? (
+        <PublishByHand slug={slug} teams={view.teams} />
+      ) : null}
+      {view.handEntry === "published" ? (
+        <section className="tm-next" data-testid="hand-published">
+          <span className="tm-next-text">
+            <strong>Results published</strong>
+            <span>The squads are final. Posters and team cards now show them.</span>
+          </span>
+          <ButtonLink href={`/seasons/${slug}/posters`} data-testid="hand-make-posters">
+            Make posters
             <IconArrowRight size={16} aria-hidden />
           </ButtonLink>
         </section>
@@ -616,6 +639,23 @@ function RosterDetail({
         )
       ) : null}
 
+      {view.handEntry === "open" && view.viewer.canSeeRoster ? (
+        <SectionCard
+          className="tm-hand-card"
+          icon={<IconGavel />}
+          title="Bought in auction"
+          description="Auction held outside the app? Add who this team bought — points are optional."
+        >
+          <BoughtByHand
+            slug={slug}
+            teamId={team.id}
+            teamName={team.name}
+            teamColor={team.color}
+            roster={roster}
+          />
+        </SectionCard>
+      ) : null}
+
       {view.viewer.canSeeRoster ? (
         <SectionCard
           flush
@@ -732,6 +772,8 @@ function RosterDetail({
                         <td className="tm-roster-price tm-num" data-label="Buy price">
                           {row.buyPrice !== undefined && row.buyPrice !== null ? (
                             money.exact(row.buyPrice)
+                          ) : row.handPrice !== undefined && row.handPrice !== null ? (
+                            money.exact(row.handPrice)
                           ) : row.isCaptain || row.isIcon || row.isRetained ? (
                             <Pill tone={row.isCaptain ? "blue" : row.isIcon ? "amber" : "purple"}>
                               {row.isCaptain ? "Captain" : row.isIcon ? "Icon" : "Retained"} ·

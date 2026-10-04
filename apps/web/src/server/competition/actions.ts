@@ -541,6 +541,7 @@ const teamsWorkspaceViewOnce = cache(async (slug: string): Promise<TeamsWorkspac
     const workspace = await teamsWorkspace(db, competition, {
       money: canSeeMoney,
       roster: canSeeRoster,
+      manage: canManage,
     });
     return {
       ...workspace,
@@ -1103,7 +1104,7 @@ async function notifyAffected(
 
 /**
  * "Mark 18+" on the Players list: the organizer states the selected players are
- * 18 or older, so a photo of unknown age may show on public pages (0105). Same
+ * 18 or older, so a photo of unknown age may show on public pages (0106). Same
  * review gate as the rest of the bulk bar. A player already confirmed keeps
  * the first confirmation; a date of birth that says under 18 still wins at
  * read time (`mayPublishPhoto`).
@@ -3119,7 +3120,7 @@ export async function importCommitAction(
     policy?: ImportPolicy;
     /** Read from the season's connected Sheet — a landed import stamps "last synced". */
     fromSheet?: boolean;
-    /** "Everyone in this sheet is 18 or older" — ticked by the organizer (0105). */
+    /** "Everyone in this sheet is 18 or older" — ticked by the organizer (0106). */
     adultsConfirmed?: boolean;
   },
 ): Promise<ImportCommitResult> {
