@@ -1,6 +1,6 @@
+import { imageResponse } from "../../../../../server/image-text/image-response";
 import { buildPlayerPoster, buildPlayerShareCard } from "@desiauction/core";
 import { initialsFor } from "@desiauction/ui";
-import { ImageResponse } from "next/og";
 
 import { inlineStoredImage, posterBrandMark } from "../../../../../server/competition/posters";
 import { publicPlayerCard, publicPlayerPoster } from "../../../../../server/competition/public";
@@ -57,7 +57,7 @@ export default async function OpengraphImage({
       teamCrestUrl,
       competitionLogoUrl,
     });
-    return new ImageResponse(renderPlayerLinkCard(model, { brandMarkSrc }), {
+    return await imageResponse(renderPlayerLinkCard(model, { brandMarkSrc }), {
       ...LINK_CARD_SIZE,
       fonts,
     });
@@ -68,7 +68,7 @@ export default async function OpengraphImage({
   // makes no claim about the night.
   const card = await publicPlayerCard(slug, number);
   if (card === null) {
-    return new ImageResponse(renderShareFallback(), { ...size });
+    return await imageResponse(renderShareFallback(), { ...size });
   }
   const { player } = card;
   const model = buildPlayerShareCard({
@@ -84,5 +84,8 @@ export default async function OpengraphImage({
   });
   const { initials } = initialsFor(player.name);
   const photo = await inlineStoredImage(card.photoKey);
-  return new ImageResponse(renderPlayerShareCard(model, initials ?? "DA", photo), { ...size });
+  return await imageResponse(renderPlayerShareCard(model, initials ?? "DA", photo), {
+    ...size,
+    fonts: await posterFonts(),
+  });
 }

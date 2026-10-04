@@ -1,3 +1,4 @@
+import { initialsOf } from "@desiauction/core";
 import { EmptyState, IconEye, type BadgeTone, type KitTone } from "@desiauction/ui";
 import { isNotificationKind, notificationOf } from "@desiauction/messaging/catalogue";
 import type { ReactNode } from "react";
@@ -113,14 +114,7 @@ export function AdminPageHead({
 
 /** Two initials for a person's monogram; "?" for the unnamed. */
 export function monogram(name: string | null): string {
-  const words = (name ?? "")
-    .trim()
-    .split(/\s+/)
-    .filter((word) => word !== "");
-  if (words.length === 0) return "?";
-  const first = words[0]?.[0] ?? "";
-  const last = words.length > 1 ? (words[words.length - 1]?.[0] ?? "") : "";
-  return (first + last).toUpperCase();
+  return initialsOf(name ?? "") || "?";
 }
 
 /**

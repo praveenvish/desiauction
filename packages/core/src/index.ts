@@ -18,6 +18,8 @@ export {
 } from "./money";
 export type { Paise, DeductResult, ParsePaiseResult, FeeStatus, MoneyUnit } from "./money";
 export type { Clock } from "./clock";
+export { initialsOf, type InitialsOptions } from "./initials";
+export { hasDevanagari } from "./script";
 export { normalizePhone } from "./phone";
 export { looksLikePlaceholderPhone } from "./placeholder-phone";
 export { scrub, scrubError, scrubText, REDACTED } from "./scrub";

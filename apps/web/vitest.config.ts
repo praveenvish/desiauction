@@ -14,6 +14,9 @@ try {
 }
 
 export default defineConfig({
+  // Next compiles JSX itself (tsconfig `jsx: preserve`); a .tsx test or a
+  // server module that builds an image tree needs the automatic runtime here.
+  esbuild: { jsx: "automatic" },
   test: {
     // env.ts is fail-closed at import (§11); tests get the local docker-compose
     // URL (non-secret). CI overrides with its service container.

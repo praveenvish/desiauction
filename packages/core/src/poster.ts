@@ -15,6 +15,7 @@
  * anyway, because Satori cannot resolve a CSS variable.
  */
 
+import { initialsOf } from "./initials";
 import { formatAmount, paise, type MoneyUnit } from "./money";
 import { roleLabel } from "./player-profile";
 
@@ -225,9 +226,23 @@ export function heroNumberOf(jersey: string | null | undefined): string | null {
 }
 
 /** Names wrap badly on a poster long before they are truncated in a list. */
+const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
+/**
+ * At most `max` LETTERS as a reader counts them, then "…". Counted in
+ * graphemes, not UTF-16 units: a Hindi letter with its vowel sign is two or
+ * three units, so a unit count cut "दिनेश" between न and its े and left a
+ * dangling sign on the poster.
+ */
 function clamp(value: string, max: number): string {
   const trimmed = value.trim();
-  return trimmed.length <= max ? trimmed : `${trimmed.slice(0, max - 1).trimEnd()}…`;
+  const letters = Array.from(GRAPHEMES.segment(trimmed), (part) => part.segment);
+  return letters.length <= max
+    ? trimmed
+    : `${letters
+        .slice(0, max - 1)
+        .join("")
+        .trimEnd()}…`;
 }
 
 /**
@@ -243,25 +258,9 @@ export function crestMark(shortName: string | null | undefined, name: string): s
 }
 
 export function monogramOf(name: string): string {
-  /*
-   * Each word is stripped to its letters and digits BEFORE its initial is
-   * taken, not merely tested for having one. "Demo Cup (settled)" produced
-   * "D(" on a real poster: the bracketed word passed a has-a-letter filter and
-   * then handed over its opening parenthesis as its first character. Any name
-   * with a bracket, a quote or a dash does the same, and a competition suffix
-   * in brackets is an ordinary way to name a season.
-   */
-  const parts = name
-    .trim()
-    .split(/\s+/)
-    .map((part) => part.replace(/[^a-z0-9]/gi, ""))
-    .filter((part) => part !== "");
-  if (parts.length === 0) {
-    return "?";
-  }
-  const first = parts[0]?.[0] ?? "";
-  const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "";
-  return (first + last).toUpperCase();
+  // A person, a team or a season: first and last word, as a letter of any
+  // script (`initialsOf`). Hindi names used to come out "?".
+  return initialsOf(name) || "?";
 }
 
 /**
@@ -331,7 +330,7 @@ export function shortNameOf(name: string): string {
     return clamp(parts[0] ?? name, 14);
   }
   const last = parts[parts.length - 1] ?? "";
-  return `${clamp(parts[0] ?? "", 12)} ${last.slice(0, 1).toUpperCase()}.`;
+  return `${clamp(parts[0] ?? "", 12)} ${initialsOf(last) || last.slice(0, 1)}.`;
 }
 
 /** The smallest handle: the first name alone, for a face the size of a coin. */

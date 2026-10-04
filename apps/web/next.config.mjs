@@ -117,7 +117,10 @@ export default {
    * production there is no transport, and standalone tracing still copies pino
    * into the server's node_modules.
    */
-  serverExternalPackages: ["pino", "pino-pretty"],
+  // harfbuzzjs loads its .wasm beside its own module (`new URL(..., import.meta.url)`),
+  // which a bundled copy cannot find; opentype.js rides with it. Both are read from
+  // node_modules at runtime, and the standalone trace copies the .wasm.
+  serverExternalPackages: ["pino", "pino-pretty", "harfbuzzjs", "opentype.js"],
   headers() {
     return Promise.resolve([
       // Everything except /embed (see EMBED_CSP above).

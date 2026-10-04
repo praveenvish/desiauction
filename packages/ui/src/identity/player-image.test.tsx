@@ -38,10 +38,10 @@ describe("PlayerImage", () => {
     expect(img).toHaveAttribute("alt", "Smriti M");
   });
 
-  it("renders Devanagari initials without breaking graphemes", () => {
+  it("renders Devanagari initials as base letters", () => {
     render(<PlayerImage name="रोहित शर्मा" seed="p4" />);
     const frame = screen.getByTestId("player-image");
-    expect(frame.querySelector("text")).toHaveTextContent("रोश");
+    expect(frame.querySelector("text")).toHaveTextContent("रश");
   });
 
   it("renders the neutral diamond mark when the name is unknowable", () => {
