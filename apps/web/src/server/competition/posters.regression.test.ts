@@ -575,6 +575,8 @@ describe("SEASON POSTERS — the whole auction is the organizer's to publish", (
     if (!season.ok) {
       return;
     }
+    // The night has been run: this is the results sheet.
+    expect(season.input.stage).toBe("after");
     expect(season.input.squads.map((squad) => squad.teamName)).toEqual(["Alpha XI", "Beta United"]);
     expect(season.input.squads[0]?.members.map((member) => member.name)).toContain("Sold Player");
     expect(season.input.squads[0]?.spentPaise).toBe(7_500_000);
@@ -623,6 +625,129 @@ describe("SEASON POSTERS — the whole auction is the organizer's to publish", (
     if (!("ok" in forPlayer)) {
       expect(forPlayer.kinds).toEqual(["player"]);
     }
+  });
+});
+
+/**
+ * THE PRE-AUCTION SNAPSHOT.
+ *
+ * Registrations done, captains and icons named, no lot has come up — and the
+ * organizer wants one poster of every team with the players it already has.
+ * Before this, both squad-shaped posters refused until an auction row existed,
+ * though the captain and icon marks live on the registrations, not the auction.
+ */
+describe("PRE-AUCTION SNAPSHOT — the teams before the night", () => {
+  let early = { id: "", slug: "" };
+  const lions = { teamId: "" };
+  const tigers = { teamId: "" };
+
+  beforeAll(async () => {
+    const competition = await createCompetition(db, org.id, organizer, {
+      sport: "cricket",
+      name: `Snapshot Cup ${RUN}`,
+    });
+    early = { id: competition.id, slug: competition.slug };
+    for (const [name, team] of [
+      ["Lions", lions],
+      ["Tigers", tigers],
+    ] as const) {
+      const created = await createTeam(db, org.id, early.id, organizer, name);
+      if (!created.ok) {
+        throw new Error("team setup failed");
+      }
+      team.teamId = created.team.id;
+    }
+    const named: [string, string, { isCaptain?: boolean; isIcon?: boolean }][] = [
+      ["Lions Captain", "11", { isCaptain: true }],
+      ["Lions Icon", "12", { isIcon: true }],
+    ];
+    for (const [name, suffix, marks] of named) {
+      const id = newId();
+      await db.insert(registrationsTable).values({
+        id,
+        orgId: org.id,
+        competitionId: early.id,
+        personId: await person(name, suffix),
+        role: "batter",
+        status: "approved",
+        registrationNumber: registrationNumber(id),
+        teamId: lions.teamId,
+        ...marks,
+      });
+    }
+    // In the pool, on no team: not on anybody's snapshot.
+    const pooled = newId();
+    await db.insert(registrationsTable).values({
+      id: pooled,
+      orgId: org.id,
+      competitionId: early.id,
+      personId: await person("Pool Player", "13"),
+      role: "batter",
+      status: "approved",
+      registrationNumber: registrationNumber(pooled),
+    });
+  });
+
+  it("draws every team with its captain and icons before an auction exists, and no money", async () => {
+    const season = await seasonPosterFor(organizer, early.slug, { ...REQUEST, prices: true });
+    expect(season.ok).toBe(true);
+    if (!season.ok) {
+      return;
+    }
+    expect(season.input.stage).toBe("before");
+    expect(season.input.squads.map((squad) => squad.teamName)).toEqual(["Lions", "Tigers"]);
+    const lionsSquad = season.input.squads[0];
+    expect(lionsSquad?.members.map((member) => [member.name, member.marks])).toEqual([
+      ["Lions Captain", ["captain"]],
+      ["Lions Icon", ["icon"]],
+    ]);
+    expect(lionsSquad?.spentPaise).toBe(0);
+    expect(season.input.squads[1]?.members).toEqual([]);
+
+    // Prices were asked for and not drawn — the audit row records what was.
+    const [row] = await db
+      .select({ meta: auditLog.meta })
+      .from(auditLog)
+      .where(and(eq(auditLog.action, "season.poster_generated"), eq(auditLog.subject, early.id)))
+      .orderBy(desc(auditLog.at), desc(auditLog.id))
+      .limit(1);
+    expect((row?.meta as { prices?: string }).prices).toBe("hidden");
+  });
+
+  it("draws a team's reveal, but not its squad sheet — that one prints a purse", async () => {
+    const reveal = await teamPosterFor(organizer, early.slug, lions.teamId, {
+      ...REQUEST,
+      kind: "reveal",
+    });
+    expect(reveal.ok).toBe(true);
+    if (reveal.ok) {
+      expect(reveal.input.members.map((member) => member.name)).toEqual([
+        "Lions Captain",
+        "Lions Icon",
+      ]);
+    }
+    expect(
+      await teamPosterFor(organizer, early.slug, lions.teamId, { ...REQUEST, kind: "team" }),
+    ).toMatchObject({ ok: false, status: 404 });
+  });
+
+  it("stays the snapshot until the room opens, then becomes the results sheet", async () => {
+    const id = newId();
+    await db.insert(auctionsTable).values({
+      id,
+      orgId: org.id,
+      competitionId: early.id,
+      name: `Snapshot Cup ${RUN} auction`,
+      status: "scheduled",
+      config: DEFAULT_AUCTION_CONFIG,
+      createdBy: organizer,
+    });
+    const scheduled = await seasonPosterFor(organizer, early.slug, REQUEST);
+    expect(scheduled.ok && scheduled.input.stage).toBe("before");
+
+    await db.update(auctionsTable).set({ status: "live" }).where(eq(auctionsTable.id, id));
+    const live = await seasonPosterFor(organizer, early.slug, REQUEST);
+    expect(live.ok && live.input.stage).toBe("after");
   });
 });
 

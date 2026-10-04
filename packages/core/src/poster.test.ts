@@ -19,6 +19,7 @@ import {
   shortNameOf,
   splitName,
   type PlayerPosterInput,
+  type PosterMark,
   type TeamPosterInput,
   type TeamPosterMember,
   type TopBuyInput,
@@ -408,6 +409,50 @@ describe("season poster", () => {
     });
     expect(p.spentLabel).toBe("25,000 pts");
     expect(p.squads[0]?.spentLabel).toBe("25,000 pts");
+  });
+
+  it("is the results sheet unless told otherwise", () => {
+    const p = buildSeasonPoster({
+      competitionName: "BSCB-5",
+      competitionLogoUrl: null,
+      unit: "inr",
+      squads: [{ teamName: "Alpha XI", teamCrestUrl: null, members: [], spentPaise: 0 }],
+    });
+    expect(p.stage).toBe("after");
+  });
+
+  it("before the night, counts the teams by the captains and icons they already have", () => {
+    const member = (name: string, marks: PosterMark[]): TeamPosterMember => ({
+      name,
+      role: "batter",
+      pricePaise: null,
+      marks,
+      photoUrl: null,
+    });
+    const p = buildSeasonPoster({
+      competitionName: "BSCB-5",
+      competitionLogoUrl: null,
+      unit: "inr",
+      stage: "before",
+      squads: [
+        {
+          teamName: "Alpha XI",
+          teamCrestUrl: null,
+          members: [member("A", ["captain", "icon"]), member("B", ["icon"])],
+          spentPaise: 0,
+        },
+        {
+          teamName: "Beta United",
+          teamCrestUrl: null,
+          members: [member("C", ["captain"])],
+          spentPaise: 0,
+        },
+        { teamName: "Gamma", teamCrestUrl: null, members: [], spentPaise: 0 },
+      ],
+    });
+    expect(p.stage).toBe("before");
+    expect(p.countLine).toBe("3 teams · 2 captains · 2 icons");
+    expect(p.squads[0]?.rows[0]?.badges).toEqual(["C", "ICON"]);
   });
 });
 

@@ -684,9 +684,10 @@ export function renderSeasonPoster(model: SeasonPoster, options: PosterRenderOpt
     band,
     metrics.gap,
   );
-  const sub = options.prices
-    ? `${model.countLine} · ${model.spentLabel} committed`
-    : model.countLine;
+  // Before the night nothing has been spent, so there is no money to draw.
+  const before = model.stage === "before";
+  const prices = options.prices && !before;
+  const sub = prices ? `${model.countLine} · ${model.spentLabel} committed` : model.countLine;
   return (
     <Frame ctx={ctx}>
       <Header
@@ -696,7 +697,12 @@ export function renderSeasonPoster(model: SeasonPoster, options: PosterRenderOpt
         chip={model.chip}
       />
       <div style={{ display: "flex", width: "100%", height: titleBand, alignItems: "center" }}>
-        <TitleBlock ctx={ctx} kicker="Season results" title="ALL SQUADS" sub={sub} />
+        <TitleBlock
+          ctx={ctx}
+          kicker={before ? "Ahead of auction night" : "Season results"}
+          title={before ? "THE TEAMS" : "ALL SQUADS"}
+          sub={sub}
+        />
       </div>
       <div
         style={{
@@ -770,7 +776,7 @@ export function renderSeasonPoster(model: SeasonPoster, options: PosterRenderOpt
                         letterSpacing: 1,
                       }}
                     >
-                      {options.prices ? squad.spentLabel : squad.countLabel}
+                      {prices ? squad.spentLabel : squad.countLabel}
                     </div>
                   </div>
                   <div
@@ -788,11 +794,31 @@ export function renderSeasonPoster(model: SeasonPoster, options: PosterRenderOpt
                       justifyContent: "center",
                     }}
                   >
+                    {drawn.length === 0 ? (
+                      // A team with nobody named yet is still on the sheet —
+                      // its whole squad is decided on the night.
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          width: faces.gridWidth,
+                          height: faces.photoHeight,
+                          borderRadius: metrics.chipRadius,
+                          border: `2px dashed ${palette.border}`,
+                          color: palette.body,
+                          fontSize: nameSize,
+                        }}
+                      >
+                        Squad at auction
+                      </div>
+                    ) : null}
                     {drawn.map((row, index) => (
                       <div
                         key={`${squad.teamName}-${row.name}-${String(index)}`}
                         style={{
                           display: "flex",
+                          position: "relative",
                           flexDirection: "column",
                           alignItems: "center",
                           width: faces.cellWidth,
@@ -811,6 +837,13 @@ export function renderSeasonPoster(model: SeasonPoster, options: PosterRenderOpt
                           fontSize={Math.round(faces.photoWidth * 0.36)}
                           ring={squad.teamColor ?? ctx.skin.palette.accent}
                           ringWidth={2}
+                        />
+                        {/* Who the captain and the icons are is the point of
+                            the sheet before the night, and worth knowing after. */}
+                        <Badges
+                          ctx={ctx}
+                          row={row}
+                          size={Math.max(11, Math.round(faces.photoWidth * 0.14))}
                         />
                         {faces.labelHeight === 0 ? null : (
                           <div
