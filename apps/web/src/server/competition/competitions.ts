@@ -677,6 +677,32 @@ export async function setCompetitionSquadListing(
   });
 }
 
+/**
+ * How the season draws players with no photo (0107): initials or the
+ * cricketer. Audited like the other "how the season looks" choices — it
+ * changes every poster and page the season's players appear on.
+ */
+export async function setCompetitionNoPhotoStyle(
+  db: Db,
+  competition: CompetitionSummary,
+  personId: string,
+  style: "initials" | "silhouette",
+): Promise<void> {
+  await db
+    .update(competitions)
+    .set({ noPhotoStyle: style })
+    .where(eq(competitions.id, competition.id));
+  await db.insert(auditLog).values({
+    id: newId(),
+    actor: personId,
+    action: "competition.no_photo_style_changed",
+    scopeType: "org",
+    scopeId: competition.orgId,
+    subject: competition.id,
+    meta: { to: style, slug: competition.slug },
+  });
+}
+
 /** Whether squads are listed, and what the rule decides right now, for the organizer. */
 export async function squadListingState(
   db: Db,

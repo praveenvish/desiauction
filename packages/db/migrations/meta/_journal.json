@@ -743,6 +743,13 @@
       "when": 1792857600000,
       "tag": "0106_adult_confirmed",
       "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1792944000000,
+      "tag": "0107_no_photo_style",
+      "breakpoints": true
     }
   ]
 }

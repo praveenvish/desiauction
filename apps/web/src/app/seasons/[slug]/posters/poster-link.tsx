@@ -1,9 +1,16 @@
 import type { PlayerPoster } from "@desiauction/core";
 
-import { mix, withAlpha } from "./poster-color";
+import { mix, WHITE, withAlpha } from "./poster-color";
 import { Backlight, Coin, Number3D, Portrait, depthFor, metalText } from "./poster-depth";
 import { DISPLAY, FIGURES, SERIF } from "./poster-fonts";
-import { BrandLockup, contextFor, vis, type PosterRenderOptions } from "./poster-kit";
+import {
+  BrandLockup,
+  contextFor,
+  noPhotoFigure,
+  silhouetteFor,
+  vis,
+  type PosterRenderOptions,
+} from "./poster-kit";
 import { CAPS, ITALIC, ResultPanel, displayLine, fit, type PanelMetrics } from "./poster-player";
 
 /**
@@ -36,7 +43,7 @@ const PANEL: PanelMetrics = {
 
 export function renderPlayerLinkCard(
   model: PlayerPoster,
-  options: Pick<PosterRenderOptions, "brandMarkSrc">,
+  options: Pick<PosterRenderOptions, "brandMarkSrc" | "noPhoto">,
 ) {
   const ctx = contextFor(
     {
@@ -47,9 +54,11 @@ export function renderPlayerLinkCard(
       brandMarkSrc: options.brandMarkSrc,
       prices: true,
       sponsor: null,
+      ...(options.noPhoto === undefined ? {} : { noPhoto: options.noPhoto }),
     },
     model.teamColor,
   );
+  const photo = model.photoUrl ?? noPhotoFigure(ctx);
   const { palette } = ctx.skin;
   const depth = depthFor(ctx.skin);
   const { width, height } = LINK_CARD_SIZE;
@@ -78,7 +87,7 @@ export function renderPlayerLinkCard(
       }}
     >
       <Backlight ctx={ctx} depth={depth} centerX={280} centerY={300} radius={300} />
-      {model.photoUrl === null ? (
+      {photo === null ? (
         <Number3D
           ctx={ctx}
           text={model.heroNumber ?? model.monogram}
@@ -105,7 +114,7 @@ export function renderPlayerLinkCard(
           )}
           <Portrait
             ctx={ctx}
-            src={model.photoUrl}
+            src={photo}
             left={70}
             top={130}
             width={420}
@@ -245,7 +254,7 @@ export interface TeamLinkCard {
  */
 export function renderTeamLinkCard(
   card: TeamLinkCard,
-  options: Pick<PosterRenderOptions, "brandMarkSrc">,
+  options: Pick<PosterRenderOptions, "brandMarkSrc" | "noPhoto">,
 ) {
   const ctx = contextFor(
     {
@@ -255,9 +264,12 @@ export function renderTeamLinkCard(
       brandMarkSrc: options.brandMarkSrc,
       prices: true,
       sponsor: null,
+      ...(options.noPhoto === undefined ? {} : { noPhoto: options.noPhoto }),
     },
     card.teamColor,
   );
+  // A face with no photo, in a season that chose the cricketer (0107).
+  const faceFigure = options.noPhoto === "silhouette" ? silhouetteFor(ctx, WHITE) : null;
   const { palette } = ctx.skin;
   const depth = depthFor(ctx.skin);
   const { width, height } = LINK_CARD_SIZE;
@@ -426,6 +438,7 @@ export function renderTeamLinkCard(
                       size={52}
                       colour={mix(teamColour, palette.surface, 0.35)}
                       label={face.monogram}
+                      src={faceFigure}
                     />
                   ) : (
                     <img

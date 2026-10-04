@@ -21,7 +21,14 @@ import {
   type Depth,
 } from "./poster-depth";
 import { DISPLAY, FIGURES, SERIF } from "./poster-fonts";
-import { contextFor, shown, vis, type PosterContext, type PosterRenderOptions } from "./poster-kit";
+import {
+  contextFor,
+  noPhotoFigure,
+  shown,
+  vis,
+  type PosterContext,
+  type PosterRenderOptions,
+} from "./poster-kit";
 
 /**
  * THE PLAYER POSTER, v3.
@@ -500,7 +507,7 @@ export function renderPlayerPoster(model: PlayerPoster, options: PosterRenderOpt
   const layout = LAYOUT[options.size];
   const { width, height } = POSTER_SIZES[options.size];
   const contentWidth = width - 2 * layout.pad;
-  const photo = model.photoUrl;
+  const photo = model.photoUrl ?? noPhotoFigure(ctx);
   const stageMid = layout.stage.left + layout.stage.width / 2;
   const heroText = model.heroNumber ?? model.monogram;
   const n = layout.name;

@@ -1070,6 +1070,13 @@ export const competitions = pgTable(
      */
     listSquadsInSearch: boolean("list_squads_in_search").notNull().default(false),
     /**
+     * How a player with no photo is drawn in this season (0107): "initials"
+     * (the branded mark, the default) or "silhouette" (one cricketer figure,
+     * tinted in the team's colour). Drawing only — consent and the age rule
+     * still decide whether a real photo shows.
+     */
+    noPhotoStyle: text("no_photo_style").notNull().default("initials"),
+    /**
      * THE PLATFORM HOLD (0072). Set by the moderation desk when a public season
      * page is taken down; cleared when the hold is lifted. While it is set the
      * season cannot be public — a CHECK, not a convention — so no publishing

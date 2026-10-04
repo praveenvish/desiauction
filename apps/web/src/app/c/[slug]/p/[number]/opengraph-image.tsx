@@ -1,6 +1,7 @@
+import { seasonNoPhotoStyle } from "../../../../../server/competition/season-no-photo";
 import { imageResponse } from "../../../../../server/image-text/image-response";
 import { buildPlayerPoster, buildPlayerShareCard } from "@desiauction/core";
-import { initialsFor } from "@desiauction/ui";
+import { initialsFor, silhouetteDataUri } from "@desiauction/ui";
 
 import { inlineStoredImage, posterBrandMark } from "../../../../../server/competition/posters";
 import { publicPlayerCard, publicPlayerPoster } from "../../../../../server/competition/public";
@@ -42,7 +43,10 @@ export default async function OpengraphImage({
   params: Promise<{ slug: string; number: string }>;
 }) {
   const { slug, number } = await params;
-  const poster = await publicPlayerPoster(slug, number);
+  const [poster, noPhoto] = await Promise.all([
+    publicPlayerPoster(slug, number),
+    seasonNoPhotoStyle(slug),
+  ]);
   if (poster !== null) {
     const [photoUrl, teamCrestUrl, competitionLogoUrl, brandMarkSrc, fonts] = await Promise.all([
       inlineStoredImage(poster.photoKey, 640),
@@ -57,7 +61,7 @@ export default async function OpengraphImage({
       teamCrestUrl,
       competitionLogoUrl,
     });
-    return await imageResponse(renderPlayerLinkCard(model, { brandMarkSrc }), {
+    return await imageResponse(renderPlayerLinkCard(model, { brandMarkSrc, noPhoto }), {
       ...LINK_CARD_SIZE,
       fonts,
     });
@@ -83,7 +87,11 @@ export default async function OpengraphImage({
     competitionName: player.competitionName,
   });
   const { initials } = initialsFor(player.name);
-  const photo = await inlineStoredImage(card.photoKey);
+  // No photo, in a season that chose the cricketer (0107): the figure takes
+  // the photo's tile, on the card's own field.
+  const photo =
+    (await inlineStoredImage(card.photoKey)) ??
+    (noPhoto === "silhouette" ? silhouetteDataUri({ field: "#141B2A", figure: "#C9D3E6" }) : null);
   return await imageResponse(renderPlayerShareCard(model, initials ?? "DA", photo), {
     ...size,
     fonts: await posterFonts(),

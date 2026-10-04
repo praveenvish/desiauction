@@ -1,4 +1,5 @@
 import { monogramOf, type PosterKind, type PosterSize, type PosterTheme } from "@desiauction/core";
+import { silhouetteDataUri, type NoPhotoStyle } from "@desiauction/ui";
 import type { ReactNode } from "react";
 
 import { mix, withAlpha } from "./poster-color";
@@ -89,6 +90,11 @@ export interface PosterRenderOptions {
    * that opens a 404 is worse than no code.
    */
   readonly shareUrl?: string | null;
+  /**
+   * How a player with no photo is drawn (0107): the season's initials or its
+   * cricketer. Omitted means initials, the default every season starts with.
+   */
+  readonly noPhoto?: NoPhotoStyle;
 }
 
 export interface PosterContext {
@@ -151,6 +157,38 @@ export interface TileProps {
    * own sponsor lockup on the first real render.
    */
   fit?: "cover" | "contain";
+  /**
+   * A PLAYER's face, as opposed to a crest or a logo: when it has no photo and
+   * the season chose the cricketer (0107), the cricketer is drawn instead of
+   * the initials. A missing crest is still a monogram.
+   */
+  face?: boolean;
+}
+
+/**
+ * The cricketer for a face tile with no photo, over the tile's own fill (the
+ * team gradient), with the grille cut in the panel colour.
+ */
+export function silhouetteFor(ctx: PosterContext, figure: string): string {
+  return silhouetteDataUri({ field: null, figure, cutout: ctx.skin.palette.panel });
+}
+
+/**
+ * What a hero draws for a player with no photo when the season chose the
+ * cricketer (0107): the figure, as if it were the photograph, so it gets the
+ * same lit arch, rim and number behind it. Null for an initials season — the
+ * hero then draws the giant number or initials, as before.
+ */
+export function noPhotoFigure(ctx: PosterContext): string | null {
+  if (ctx.options.noPhoto !== "silhouette") {
+    return null;
+  }
+  const { palette } = ctx.skin;
+  return silhouetteDataUri({
+    field: null,
+    figure: mix(palette.heading, palette.surface, 0.25),
+    cutout: palette.surface,
+  });
 }
 
 /**
@@ -175,6 +213,7 @@ export function Tile({
   ringWidth,
   round = false,
   fit = "cover",
+  face = false,
 }: TileProps) {
   const { skin } = ctx;
   const { palette } = skin;
@@ -207,7 +246,17 @@ export function Tile({
         ...vis(ctx, layer),
       }}
     >
-      {src === null || !shown(ctx, layer) ? (
+      {!shown(ctx, layer) ? (
+        monogram
+      ) : src === null && face && ctx.options.noPhoto === "silhouette" ? (
+        // Fills the tile, shoulders on its bottom edge, like a cropped photo.
+        <img
+          src={silhouetteFor(ctx, ring === null ? palette.accent : skin.palette.heading)}
+          width={width}
+          height={height}
+          alt=""
+        />
+      ) : src === null ? (
         monogram
       ) : (
         <img

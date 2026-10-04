@@ -117,6 +117,14 @@ export type { FillPaint, FillTextToken } from "./identity/fill-contrast";
 export { placeholderIdentity, initialsFor } from "./identity/placeholder";
 export type { PlaceholderIdentity, PlaceholderPattern } from "./identity/placeholder";
 export { PlayerImage } from "./identity/player-image";
+export { NoPhotoStyleProvider, useNoPhotoStyle } from "./identity/no-photo-style";
+export {
+  NO_PHOTO_STYLES,
+  isNoPhotoStyle,
+  silhouetteDataUri,
+  silhouetteSvg,
+} from "./identity/silhouette";
+export type { NoPhotoStyle } from "./identity/silhouette";
 export { PlayerPortrait } from "./identity/player-portrait";
 export type { PlayerPortraitProps } from "./identity/player-portrait";
 export { identityCardOf, IDENTITY_CARD_VIEW } from "./identity/identity-card";
