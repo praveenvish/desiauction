@@ -26,7 +26,7 @@ import type { SportPack } from "./sports/types";
  * built from `REGISTRATION_ROLES`, an alias for cricket's four — so a
  * footballer had no role to pick even before anything refused them one.
  */
-const ROSTER = "name,phone,role\nRohit,9876543210,midfielder\nJas,9876543211,goalkeeper";
+const ROSTER = "name,phone,role\nRohit,9876543201,midfielder\nJas,9876543211,goalkeeper";
 
 describe("a role means what the season's sport says it means", () => {
   it("admits a football role to a football season", () => {
@@ -98,7 +98,7 @@ describe("a role means what the season's sport says it means", () => {
       ["esports", "support", "anchor"],
       ["esports", "shotcaller", "igl"],
     ] as const) {
-      const csv = `name,phone,role\nPlayer One,9876543210,${written}`;
+      const csv = `name,phone,role\nPlayer One,9876543201,${written}`;
       const result = parseRegistrationCsv(csv, undefined, { pack: sportPackFor(sport) });
       expect(result.errors, `${sport}: ${written}`).toEqual([]);
       expect(result.rows[0]?.role, `${sport}: ${written}`).toBe(stored);
@@ -109,7 +109,7 @@ describe("a role means what the season's sport says it means", () => {
     // Not a silent cricket bug: 58 call sites parse cricket files, and the four
     // production paths pass the season's own pack. Stated so the default is a
     // decision somebody made rather than one nobody noticed.
-    const result = parseRegistrationCsv("name,phone,role\nRohit,9876543210,batter");
+    const result = parseRegistrationCsv("name,phone,role\nRohit,9876543201,batter");
     expect(result.errors).toEqual([]);
     expect(result.rows[0]?.role).toBe("batter");
   });
@@ -138,7 +138,7 @@ const ROLELESS: SportPack = {
 
 describe("a sport whose players have no position", () => {
   it("accepts a blank role", () => {
-    const result = parseRegistrationCsv("name,phone,role\nRohit,9876543210,", undefined, {
+    const result = parseRegistrationCsv("name,phone,role\nRohit,9876543201,", undefined, {
       pack: ROLELESS,
     });
     expect(result.errors).toEqual([]);
@@ -152,7 +152,7 @@ describe("a sport whose players have no position", () => {
      * so "banana" would be stored as a playing role. Empty and wrong are
      * different answers, and only the first of them is optional.
      */
-    const result = parseRegistrationCsv("name,phone,role\nRohit,9876543210,banana", undefined, {
+    const result = parseRegistrationCsv("name,phone,role\nRohit,9876543201,banana", undefined, {
       pack: ROLELESS,
     });
     expect(result.rows).toEqual([]);
@@ -161,7 +161,7 @@ describe("a sport whose players have no position", () => {
 
   it("accepts a blank role in ESPORTS, which is a shipped pack and not a fixture", () => {
     // The branch, reached through the registry rather than a hand-built pack.
-    const result = parseRegistrationCsv("name,phone,role\nGhost,9876543210,", undefined, {
+    const result = parseRegistrationCsv("name,phone,role\nGhost,9876543201,", undefined, {
       pack: sportPackFor("esports"),
     });
     expect(result.errors).toEqual([]);
@@ -170,15 +170,28 @@ describe("a sport whose players have no position", () => {
 
   it("still places an esports role when the file names one", () => {
     // Optional does not mean ignored: a roster that says "AWPer" gets a sniper.
-    const result = parseRegistrationCsv("name,phone,role\nGhost,9876543210,AWPer", undefined, {
+    const result = parseRegistrationCsv("name,phone,role\nGhost,9876543201,AWPer", undefined, {
       pack: sportPackFor("esports"),
     });
     expect(result.errors).toEqual([]);
     expect(result.rows[0]?.role).toBe("sniper");
   });
 
-  it("refuses a blank role where the sport DOES require one", () => {
-    const result = parseRegistrationCsv("name,phone,role\nRohit,9876543210,", undefined, {
+  /*
+   * A blank role imports even where the sport requires one: the organizer adds
+   * the player now and sets the role before approving, and APPROVAL is where a
+   * required role is enforced (`evaluateRegistration`, `invalid_role`).
+   */
+  it("imports a blank role where the sport requires one, leaving it to approval", () => {
+    const result = parseRegistrationCsv("name,phone,role\nRohit,9876543201,", undefined, {
+      pack: sportPackFor("football"),
+    });
+    expect(result.errors).toEqual([]);
+    expect(result.rows[0]?.role).toBe("");
+  });
+
+  it("still refuses a role the sport does not have", () => {
+    const result = parseRegistrationCsv("name,phone,role\nRohit,9876543201,batter", undefined, {
       pack: sportPackFor("football"),
     });
     expect(result.rows).toEqual([]);

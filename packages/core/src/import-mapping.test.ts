@@ -30,7 +30,7 @@ import { CRICKET, FOOTBALL, splitAttributeWrite, sportPackFor } from "./sports";
  */
 const FORM_CSV = [
   "Timestamp,Email Address,Player Name,Mobile Number,Which role do you play?,Date of Birth,Batting Style,Bowling Style",
-  "15/03/2026 14:32:11,rohit@example.com,Rohit Sharma,9876543210,Batsman,15/03/1998,Right Hand Batsman,Off-Break",
+  "15/03/2026 14:32:11,rohit@example.com,Rohit Sharma,9876543201,Batsman,15/03/1998,Right Hand Batsman,Off-Break",
   "15/03/2026 14:35:02,jasprit@example.com,Jasprit Bumrah,9876543211,Fast Bowler,02/12/1995,Right Hand Batsman,Right Arm Fast",
   "15/03/2026 14:41:19,rishabh@example.com,Rishabh Pant,9876543212,Wicket Keeper Batsman,04/10/1997,Left Hand Batsman,",
 ].join("\n");
@@ -76,8 +76,52 @@ describe("detectMapping — the common case needs no configuration", () => {
   });
 
   it("names the required columns a file is missing rather than guessing", () => {
+    const detected = detectMapping(["Timestamp", "Batting Style"]);
+    expect(detected.missing).toEqual(["name"]);
+  });
+
+  // Only the name is required: a master sheet of names imports, and the screen
+  // says what a missing phone or role will mean instead of refusing the file.
+  it("needs nothing but a name column", () => {
     const detected = detectMapping(["Timestamp", "Player Name", "Batting Style"]);
-    expect(detected.missing).toEqual(["phone", "role"]);
+    expect(detected.missing).toEqual([]);
+  });
+
+  /*
+   * A HINDI MASTER SHEET (BPL4). Every header was Devanagari, and the matcher
+   * deleted the vowel signs before looking — "मोबाइल नंबर" became "म ब इल न बर"
+   * — so not one column was recognised and the file stopped at step one.
+   */
+  it("reads a Hindi header row", () => {
+    const detected = detectMapping([
+      "\uFEFFक्रमांक",
+      "खिलाड़ी का नाम (फाइनल हिंदी नाम)",
+      "पिता का नाम",
+      "मोबाइल नंबर",
+      "गांव",
+      "बल्लेबाजी स्टाइल",
+      "फोटो",
+      "Registration Row(s)",
+    ]);
+    expect(detected.columns.map((column) => column.field)).toEqual([
+      null,
+      "name",
+      "father_name",
+      "phone",
+      null,
+      "batting_style",
+      "photo_link",
+      null,
+    ]);
+    expect(detected.missing).toEqual([]);
+    // The serial-number columns are a sheet's bookkeeping, said so on screen.
+    expect(detected.columns[0]?.noise).toBe(true);
+    expect(detected.columns[7]?.noise).toBe(true);
+  });
+
+  it("keeps Hindi vowel signs, so two different words stay two", () => {
+    expect(normalizeHeader("मोबाइल नंबर")).toBe("मोबाइल नंबर");
+    expect(normalizeHeader("बल्लेबाज")).not.toBe(normalizeHeader("बल्लेबाजी"));
   });
 
   /*
@@ -133,7 +177,7 @@ describe("applyMapping — the file becomes the shape the parser already reads",
       "1995-12-02",
       "1997-10-04",
     ]);
-    expect(result.rows[0]?.phone).toBe("+919876543210");
+    expect(result.rows[0]?.phone).toBe("+919876543201");
     expect(result.rows[0]?.bowlingStyle).toBe("off_break");
   });
 
@@ -146,15 +190,15 @@ describe("applyMapping — the file becomes the shape the parser already reads",
   it("obeys a correction the organizer made to the guess", () => {
     // They decide the WhatsApp column is the number to use.
     const csv =
-      "Player Name,Mobile Number,WhatsApp Number,Role\nA Player,9000000001,9876543210,Batsman";
+      "Player Name,Mobile Number,WhatsApp Number,Role\nA Player,9000000001,9876543201,Batsman";
     const rows = tokenizeCsv(csv);
     const corrected = applyMapping(rows, { name: 0, phone: 2, role: 3 });
     const result = parseRegistrationRecords(corrected, undefined, { now: NOW });
-    expect(result.rows[0]?.phone).toBe("+919876543210");
+    expect(result.rows[0]?.phone).toBe("+919876543201");
   });
 
   it("translates values the organizer taught it", () => {
-    const csv = "Player Name,Mobile,Role,Category\nA Player,9876543210,Batsman,Star Player";
+    const csv = "Player Name,Mobile,Role,Category\nA Player,9876543201,Batsman,Star Player";
     const rows = tokenizeCsv(csv);
     const mapped = applyMapping(
       rows,
@@ -172,14 +216,14 @@ describe("applyMapping — the file becomes the shape the parser already reads",
    * column left by one and write a birthday into a bowling style.
    */
   it("keeps columns aligned when a row is short", () => {
-    const csv = "Player Name,Mobile,Role,Bowling Style\nA Player,9876543210,Batsman";
+    const csv = "Player Name,Mobile,Role,Bowling Style\nA Player,9876543201,Batsman";
     const mapped = applyMapping(tokenizeCsv(csv), {
       name: 0,
       phone: 1,
       role: 2,
       bowling_style: 3,
     });
-    expect(mapped[1]).toEqual(["A Player", "9876543210", "Batsman", ""]);
+    expect(mapped[1]).toEqual(["A Player", "9876543201", "Batsman", ""]);
     expect(parseRegistrationRecords(mapped, undefined, { now: NOW }).errors).toEqual([]);
   });
 });
@@ -200,8 +244,8 @@ describe("signatureOf — recognising the same form next season", () => {
 
 describe("sampleRow — what makes a mapping checkable at a glance", () => {
   it("returns the first row that carries any data", () => {
-    const csv = "Player Name,Mobile\n,\nRohit Sharma,9876543210";
-    expect(sampleRow(tokenizeCsv(csv))).toEqual(["Rohit Sharma", "9876543210"]);
+    const csv = "Player Name,Mobile\n,\nRohit Sharma,9876543201";
+    expect(sampleRow(tokenizeCsv(csv))).toEqual(["Rohit Sharma", "9876543201"]);
   });
 
   it("returns blanks rather than throwing on a header-only file", () => {
@@ -255,7 +299,7 @@ describe("real cricket Form wording", () => {
   it("imports Form-style style answers and reads 'not me' as blank", () => {
     const csv = [
       "Player's Name,Mobile Number,Playing Role,Batting Style,Bowling Style",
-      "Rohit Sharma,9876543210,Batsman,Right,I don't bowl",
+      "Rohit Sharma,9876543201,Batsman,Right,I don't bowl",
       "Axar Patel,9876543211,All Rounder,Left Handed,Slow Left Arm Orthodox",
       "Kuldeep Yadav,9876543212,Bowler,RHB,Chinaman",
       "Ravi Bishnoi,9876543213,Bowler,Right Hand,Leg Spin",
@@ -276,7 +320,7 @@ describe("real cricket Form wording", () => {
 
   it("still asks rather than guesses when a style has two meanings", () => {
     const records = tokenizeCsv(
-      "Name,Phone,Role,Bowling Style\nAnil Kumble,9876543210,Bowler,Left Arm Spin",
+      "Name,Phone,Role,Bowling Style\nAnil Kumble,9876543201,Bowler,Left Arm Spin",
     );
     const canonical = applyMapping(records, mappingOf(detectMapping(records[0] ?? [])));
     const result = parseRegistrationRecords(canonical, undefined, { now: NOW });
@@ -301,7 +345,7 @@ describe("emoji-decorated Form choices", () => {
   it("reads the choice under the emoji", () => {
     const csv = [
       '"Timestamp","Name","Father’s Name","Mobile","Player Type"',
-      '"2026/02/05 10:54:08 PM GMT+5:30","Rohit Sharma ","Gurunath Sharma","9876543210","⚔️ Allrounder"',
+      '"2026/02/05 10:54:08 PM GMT+5:30","Rohit Sharma ","Gurunath Sharma","9876543201","⚔️ Allrounder"',
       '"2026/02/05 10:55:08 PM GMT+5:30","Virat Kohli","Prem Kohli","9876543211","🏏 Batsman"',
       '"2026/02/05 10:56:08 PM GMT+5:30","Jasprit Bumrah","Jasbir Bumrah","9876543212","🎯 Bowler"',
       '"2026/02/05 10:57:08 PM GMT+5:30","Rishabh Pant","Rajendra Pant","9876543213","🧤 Wicketkeeper"',
@@ -366,7 +410,7 @@ describe("errors an organizer can act on", () => {
 
 describe("editCsvRow — fixing a row in place", () => {
   const FILE =
-    '"Name","Mobile","Player Type"\n"Rohit, R","9876543210","🏏 Batsman"\n\n"Virat","9876543210","Bowler"';
+    '"Name","Mobile","Player Type"\n"Rohit, R","9876543201","🏏 Batsman"\n\n"Virat","9876543201","Bowler"';
 
   it("changes only the addressed cells, counting lines the way the parser does", () => {
     // The blank line is dropped by the parser, so Virat is line 3, not 4.
@@ -379,7 +423,7 @@ describe("editCsvRow — fixing a row in place", () => {
     );
     expect(result.errors).toEqual([]);
     expect(result.rows.map((row) => [row.name, row.phone])).toEqual([
-      ["Rohit, R", "+919876543210"],
+      ["Rohit, R", "+919876543201"],
       ["Virat", "+919876543211"],
     ]);
   });
@@ -529,7 +573,7 @@ describe("withDetectedPhoto", () => {
   const headers = ["Player Name", "Mobile Number", "Role", "Upload your recent photo"];
   const records = [
     headers,
-    ["Rohit", "9876543210", "Batsman", "https://drive.google.com/open?id=1PhotoFileId0001"],
+    ["Rohit", "9876543201", "Batsman", "https://drive.google.com/open?id=1PhotoFileId0001"],
   ];
   const detected = detectMapping(headers, records);
 
@@ -563,7 +607,7 @@ describe("withDetectedPhoto", () => {
  */
 const FOOTBALL_FORM_CSV = [
   "Timestamp,Email Address,Player Name,Mobile Number,Playing position,Preferred foot",
-  "15/03/2026 14:32:11,sunil@example.com,Sunil Chhetri,9876543210,Forward,Right foot",
+  "15/03/2026 14:32:11,sunil@example.com,Sunil Chhetri,9876543201,Forward,Right foot",
   "15/03/2026 14:35:02,gurpreet@example.com,Gurpreet Sandhu,9876543211,Goalkeeper,Righty",
   "15/03/2026 14:41:19,anirudh@example.com,Anirudh Thapa,9876543212,Midfielder,Both feet",
   "15/03/2026 14:44:40,sandesh@example.com,Sandesh Jhingan,9876543213,Defender,Left foot",
@@ -609,7 +653,7 @@ describe("a sport's own attributes — found by the pack's headerAliases", () =>
     const odd = tokenizeCsv(
       [
         "Player Name,Mobile Number,Position,Strong foot",
-        "Sunil Chhetri,9876543210,Forward,Rightish",
+        "Sunil Chhetri,9876543201,Forward,Rightish",
       ].join("\n"),
     );
     const mapping = mappingOf(detectMapping(odd[0] ?? [], odd, FOOTBALL));
@@ -657,7 +701,7 @@ describe("a sport's own attributes — found by the pack's headerAliases", () =>
       expect(pack.key).toBe(sport);
       const role = pack.roles.values[0]?.label ?? "";
       const file = tokenizeCsv(
-        `Player Name,Mobile Number,Position,${header}\nAsha Rao,9876543210,${role},${answer}`,
+        `Player Name,Mobile Number,Position,${header}\nAsha Rao,9876543201,${role},${answer}`,
       );
       const mapping = mappingOf(detectMapping(file[0] ?? [], file, pack));
       expect(mapping[field as MappableField], `${sport}: ${header}`).toBe(3);
@@ -717,7 +761,7 @@ describe("cricket imports exactly as it did", () => {
 
   it("still leaves a football column unmapped in a cricket season", () => {
     const file = tokenizeCsv(
-      "Player Name,Mobile Number,Role,Preferred foot\nA B C,9876543210,Batsman,Left",
+      "Player Name,Mobile Number,Role,Preferred foot\nA B C,9876543201,Batsman,Left",
     );
     expect(detectMapping(file[0] ?? [], file, CRICKET).columns[3]?.field).toBeNull();
   });

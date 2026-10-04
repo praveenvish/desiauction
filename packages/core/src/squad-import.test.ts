@@ -37,7 +37,7 @@ describe("reading a yes the way a spreadsheet writes one", () => {
     // auction, and the file would be reported clean.
     expect(parseCsvFlag("maybe")).toBeNull();
     expect(parseCsvFlag("TBC")).toBeNull();
-    const result = parse("Rohit,9876543210,batter,Andheri Arrows,maybe,,");
+    const result = parse("Rohit,9876543201,batter,Andheri Arrows,maybe,,");
     expect(result.rows).toEqual([]);
     expect(result.errors[0]?.message).toContain('unreadable is_icon "maybe"');
   });
@@ -45,7 +45,7 @@ describe("reading a yes the way a spreadsheet writes one", () => {
 
 describe("the squad columns", () => {
   it("carries team, icon, captain and retained off the file", () => {
-    const result = parse("Rohit,9876543210,batter,Andheri Arrows,no,yes,yes");
+    const result = parse("Rohit,9876543201,batter,Andheri Arrows,no,yes,yes");
     expect(result.errors).toEqual([]);
     expect(result.rows[0]).toMatchObject({
       teamName: "Andheri Arrows",
@@ -61,7 +61,7 @@ describe("the squad columns", () => {
      * leaves fifty-six cells empty; reading those as `false` would clear every
      * Icon and Captain an organizer had set by hand, and call it an update.
      */
-    const result = parse("Rohit,9876543210,batter,,,,");
+    const result = parse("Rohit,9876543201,batter,,,,");
     expect(result.rows[0]).toMatchObject({
       teamName: null,
       isIcon: null,
@@ -73,7 +73,7 @@ describe("the squad columns", () => {
   it("refuses a team the season does not have", () => {
     // Without this a misspelt team imports as NO team — the player silently
     // unaffiliated, the file reported clean.
-    const result = parse("Rohit,9876543210,batter,Andheri Arrow,,,");
+    const result = parse("Rohit,9876543201,batter,Andheri Arrow,,,");
     expect(result.rows).toEqual([]);
     expect(result.errors[0]?.message).toContain('unknown team "Andheri Arrow"');
   });
@@ -82,7 +82,7 @@ describe("the squad columns", () => {
     // Case, spacing and punctuation are noise — the same rule the header
     // matcher already applies to column names.
     for (const spelling of ["andheri arrows", "ANDHERI  ARROWS", "Andheri-Arrows"]) {
-      const result = parse(`Rohit,9876543210,batter,${spelling},,,`);
+      const result = parse(`Rohit,9876543201,batter,${spelling},,,`);
       expect(result.errors, spelling).toEqual([]);
       expect(result.rows[0]?.teamName).toBe(spelling);
     }
@@ -91,7 +91,7 @@ describe("the squad columns", () => {
   it("checks nothing when it was not told the teams", () => {
     // A caller that has no season yet must still be able to parse — the same
     // contract `knownBands` and `now` have.
-    const result = parseRegistrationCsv([HEAD, "Rohit,9876543210,batter,Whoever,,,"].join("\n"));
+    const result = parseRegistrationCsv([HEAD, "Rohit,9876543201,batter,Whoever,,,"].join("\n"));
     expect(result.errors).toEqual([]);
     expect(result.rows[0]?.teamName).toBe("Whoever");
   });
@@ -102,7 +102,7 @@ describe("the invariants, refused in bulk instead of one row at a time", () => {
     // Both marks pre-sign the player to their team; the marquee name is very
     // often the captain. Refusing the pair blocked the commonest local-league
     // setup there is.
-    const result = parse("Rohit,9876543210,batter,Andheri Arrows,yes,yes,");
+    const result = parse("Rohit,9876543201,batter,Andheri Arrows,yes,yes,");
     expect(result.errors).toEqual([]);
     expect(result.rows[0]?.isIcon).toBe(true);
     expect(result.rows[0]?.isCaptain).toBe(true);
@@ -117,7 +117,7 @@ describe("the invariants, refused in bulk instead of one row at a time", () => {
      * spreadsheet happened to sort first.
      */
     const result = parse(
-      "Rohit,9876543210,batter,Andheri Arrows,,yes,",
+      "Rohit,9876543201,batter,Andheri Arrows,,yes,",
       "Jasprit,9876543211,bowler,Andheri Arrows,,yes,",
     );
     expect(result.rows.length).toBe(1);
@@ -128,7 +128,7 @@ describe("the invariants, refused in bulk instead of one row at a time", () => {
 
   it("allows one captain per team across different teams", () => {
     const result = parse(
-      "Rohit,9876543210,batter,Andheri Arrows,,yes,",
+      "Rohit,9876543201,batter,Andheri Arrows,,yes,",
       "Jasprit,9876543211,bowler,Bandra Blasters,,yes,",
     );
     expect(result.errors).toEqual([]);
@@ -138,7 +138,7 @@ describe("the invariants, refused in bulk instead of one row at a time", () => {
   it("lets a retained player wear the armband", () => {
     // Retention says where a player came FROM; the armband says what they are
     // to the team. You retain last season's captain.
-    const result = parse("Rohit,9876543210,batter,Andheri Arrows,,yes,yes");
+    const result = parse("Rohit,9876543201,batter,Andheri Arrows,,yes,yes");
     expect(result.errors).toEqual([]);
     expect(result.rows[0]).toMatchObject({ isCaptain: true, isRetained: true });
   });

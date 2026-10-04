@@ -479,7 +479,7 @@ export function PhotoImportPanel({
             <p>
               <strong>Everyone who uploaded a photo in your form has it.</strong> {roster.missing}{" "}
               player{roster.missing === 1 ? "" : "s"} didn&apos;t upload one — add theirs below, or
-              from the player&apos;s own page.
+              find them on the Players list under <strong>Filters → Missing → No photo</strong>.
             </p>
           ) : (
             <>

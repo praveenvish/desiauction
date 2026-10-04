@@ -722,6 +722,13 @@
       "when": 1792598400000,
       "tag": "0103_people_admin_control",
       "breakpoints": true
+    },
+    {
+      "idx": 103,
+      "version": "7",
+      "when": 1792684800000,
+      "tag": "0104_club_only_players",
+      "breakpoints": true
     }
   ]
 }

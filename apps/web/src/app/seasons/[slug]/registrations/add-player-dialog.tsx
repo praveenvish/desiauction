@@ -177,18 +177,21 @@ export function AddPlayerDialog({
               required
               {...(fieldErrors?.name !== undefined ? { error: fieldErrors.name } : {})}
             />
+            {/* Optional (0104): a player with no number is added for this club
+                only — nobody can sign in as them and nothing is sent to them. */}
             <Field
-              label="Mobile number"
+              label="Mobile number (optional)"
               name="phone"
               inputMode="tel"
               placeholder="98765 43210"
               value={form.phone}
               onChange={set("phone")}
-              required
               {...(fieldErrors?.phone !== undefined ? { error: fieldErrors.phone } : {})}
             />
             <Select label="Playing role" name="role" value={form.role} onChange={set("role")}>
-              {rolesRequired ? null : <option value="">No particular role</option>}
+              <option value="">
+                {rolesRequired ? "Set later (before the auction)" : "No particular role"}
+              </option>
               {roles.map((role) => (
                 <option key={role.key} value={role.key}>
                   {role.label}

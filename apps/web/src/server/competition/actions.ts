@@ -10,18 +10,20 @@ import {
   isMinor,
   rejectionEvent,
   parseRegistrationRecords,
-  planImport,
   sampleRow,
   signatureOf,
   slugifyName,
   tokenizeCsv,
   validateNewPlayer,
+  looksLikePlaceholderPhone,
+  normalizePhone,
   importFieldsFor,
   isFeeStatus,
   type FeeStatus,
   type ColumnMapping,
   type ImportFieldOption,
   type CsvRowError,
+  type PlaceholderPhone,
   type DateOrder,
   type DetectedMapping,
   type ImportPolicy,
@@ -46,7 +48,7 @@ import {
   withTenantDb,
   type Db,
 } from "@desiauction/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -129,9 +131,13 @@ import { captainRefusalMessage, marksFreezeWithRoster, squadMarksIn } from "./ro
 import {
   CaptainImportRefused,
   commitRegistrationImport,
-  existingForImport,
+  PhoneAttachImportRefused,
+  planAgainstStored,
+  screenAgainstStored,
+  storedForImport,
   RosterFieldImportRefused,
 } from "./registration-import";
+import { attachPhoneToClubOnly } from "./club-only-phone";
 import {
   forgetImportMapping,
   saveImportMapping,
@@ -162,7 +168,9 @@ import {
   type OrphanPreSigned,
   type RegistrationPage,
   type RegistrationQuery,
+  REGISTRATION_MISSING,
   REGISTRATION_OUTCOMES,
+  type RegistrationMissing,
   type RegistrationOutcome,
   type RegistrationRow,
   type RegistrationSort,
@@ -1004,7 +1012,7 @@ export async function triageRegistrationAction(
             : "That action isn't available for this registration.",
     };
   }
-  return { ok: true, notifying: notifyLater(gate, [registrationId], event) };
+  return { ok: true, notifying: await notifyLater(gate, [registrationId], event) };
 }
 
 /**
@@ -1021,15 +1029,27 @@ export async function triageRegistrationAction(
  * suppressed) is still written to the registration's timeline by
  * `notifyDecision`, and the count returned here is how many people we are
  * about to text, never a claim that they were reached.
+ *
+ * Only people WITH a phone count: a club-only player (0104) has none, and an
+ * email-only account cannot be texted either — the outbox suppresses both, so
+ * a toast saying "SMS on its way" for them was a promise nothing would keep.
  */
-function notifyLater(
+async function notifyLater(
   gate: { personId: string; competition: CompetitionSummary },
   registrationIds: readonly string[],
   event: RegistrationEvent,
-): number {
+): Promise<number> {
   if (registrationIds.length === 0 || event.type === "submit") {
     return 0;
   }
+  const textable = await inCompetitionOrg(gate.personId, gate.competition, async (db) => {
+    const rows = await db
+      .select({ id: registrations.id })
+      .from(registrations)
+      .innerJoin(people, eq(people.id, registrations.personId))
+      .where(and(inArray(registrations.id, [...registrationIds]), isNotNull(people.phone)));
+    return rows.length;
+  });
   after(async () => {
     const notice = await notifyAffected(gate, registrationIds, event);
     if ((notice.notifyFailed ?? 0) > 0) {
@@ -1044,7 +1064,7 @@ function notifyLater(
       );
     }
   });
-  return registrationIds.length;
+  return textable;
 }
 
 /**
@@ -1118,7 +1138,7 @@ export async function bulkTriageAction(
     ok: true,
     applied: result.applied.length,
     skipped: result.skipped.length,
-    notifying: notifyLater(gate, result.applied, event),
+    notifying: await notifyLater(gate, result.applied, event),
   };
 }
 
@@ -1639,6 +1659,8 @@ export interface DashboardParams {
   teamId?: string;
   /** A playing role — the pack's key. */
   role?: string;
+  /** "photo" | "phone" | "role": players still missing that detail. */
+  missing?: string;
   sort?: string;
   page?: string;
 }
@@ -1667,6 +1689,9 @@ function dashboardFilter(
     ...(params.teamId !== undefined && params.teamId !== "" ? { teamId: params.teamId } : {}),
     // Compared for equality in SQL, so an unknown role narrows to nobody.
     ...(params.role !== undefined && params.role !== "" ? { role: params.role } : {}),
+    ...(REGISTRATION_MISSING.includes(params.missing as RegistrationMissing)
+      ? { missing: params.missing as RegistrationMissing }
+      : {}),
   };
 }
 
@@ -2256,6 +2281,68 @@ export async function updateRegistrationDetailsAction(
   return result.value;
 }
 
+/**
+ * Give a club-only player (0104) their real number — the player sheet's
+ * "Add phone". Same gate as every other correction (`registration.review`).
+ *
+ * A filler is refused, as on the add form. Whether the number already has an
+ * account is never said (0075): the player becomes an ordinary stub, or moves
+ * onto that account, and the sheet looks the same either way — see
+ * `attachPhoneToClubOnly`. From here the player can sign in and gets messages.
+ */
+export async function addPlayerPhoneAction(
+  slug: string,
+  registrationId: string,
+  rawPhone: string,
+): Promise<RegistrationEditResult> {
+  const read = normalizePhone(rawPhone.trim());
+  if (!read.ok) {
+    return { ok: false, error: "Enter a 10-digit Indian mobile number." };
+  }
+  if (looksLikePlaceholderPhone(read.phone)) {
+    return {
+      ok: false,
+      error: "This looks like a made-up number. Add the player's real mobile number.",
+    };
+  }
+  const phone = read.phone;
+  const result = await inSeasonAs(
+    slug,
+    "registration.review",
+    async ({ db, personId, competition }): Promise<RegistrationEditResult> => {
+      const attached = await attachPhoneToClubOnly(db, {
+        competitionId: competition.id,
+        orgId: competition.orgId,
+        actorId: personId,
+        registrationId,
+        phone,
+        source: "organizer_manual",
+      });
+      if (!attached.ok) {
+        return {
+          ok: false,
+          error:
+            attached.reason === "already_in_season"
+              ? "This number is already registered in this season."
+              : "This player already has a phone number.",
+        };
+      }
+      const row = await registrationRowById(db, competition.id, registrationId);
+      return row === null
+        ? { ok: false, error: "That player is not in this season." }
+        : { ok: true, row };
+    },
+  );
+  if (!result.ok) {
+    return {
+      ok: false,
+      error:
+        result.reason === "forbidden" ? "You can't edit players in this season." : "Not available.",
+    };
+  }
+  return result.value;
+}
+
 /** Set (or clear) a team's coach (organizer, `team.manage`). */
 /**
  * DA-35: rename a team / correct its short name or colour. Same capability as
@@ -2388,6 +2475,21 @@ export async function addPlayerAction(
     }
     return { ok: false, error: "Fix the highlighted fields.", fieldErrors };
   }
+  /*
+   * A filler typed into the form is REFUSED here, where the file reads one as
+   * blank: a person is at the keyboard, and the honest answer for a player
+   * with no number is the empty box. Stored, 9999999999 would be a real
+   * stranger's identity (see core placeholder-phone.ts).
+   */
+  if (check.value.phone !== null && looksLikePlaceholderPhone(check.value.phone)) {
+    return {
+      ok: false,
+      error: "Fix the highlighted fields.",
+      fieldErrors: {
+        phone: "This looks like a made-up number. Leave it blank if the player has no phone.",
+      },
+    };
+  }
   const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
     addPlayerByPhone(db, gate.competition.id, gate.competition.orgId, gate.personId, {
       ...check.value,
@@ -2399,11 +2501,19 @@ export async function addPlayerAction(
     }),
   );
   if (!result.ok) {
-    return {
-      ok: false,
-      error: "This phone number is already registered in this competition.",
-      fieldErrors: { phone: "already registered here" },
-    };
+    return result.reason === "duplicate_name"
+      ? {
+          ok: false,
+          error: "A player with this name and no phone is already in this season.",
+          fieldErrors: {
+            name: "already here without a phone — add a phone, or make the name different",
+          },
+        }
+      : {
+          ok: false,
+          error: "This phone number is already registered in this competition.",
+          fieldErrors: { phone: "already registered here" },
+        };
   }
   return {
     ok: true,
@@ -2520,6 +2630,16 @@ export interface ImportPreview {
    * file has no photo column (or the column holds no links).
    */
   photoLinks?: number;
+  /**
+   * Numbers set aside as fillers (9000000001, 9999999999, a run of
+   * consecutive numbers): those players import with NO phone. Listed so the
+   * organizer sees each one by name and can say "that one is real".
+   */
+  placeholders?: PlaceholderPhone[];
+  /** Valid players arriving with no phone at all — club-only (0104). */
+  withoutPhone?: number;
+  /** Valid players arriving with no role — set before approving. */
+  withoutRole?: number;
   /**
    * What committing would actually DO, against what is already stored. Absent
    * only when the file could not be read at all.
@@ -2769,6 +2889,12 @@ export interface ImportShape {
    * never a default — because a reference is a claim until someone checks it.
    */
   paidWhenReferenced?: boolean;
+  /**
+   * Numbers the organizer said are REAL although they read as fillers
+   * (E.164, from the preview's `placeholders`). Every other filler imports as
+   * no phone — see core placeholder-phone.ts for why one is never stored.
+   */
+  realPhones?: string[];
 }
 
 /**
@@ -2837,6 +2963,7 @@ function parseUnderShape(
     // the football pack recognised all of them.
     pack: sportPackFor(sport),
     ...(shape?.dateOrder !== undefined ? { dateOrder: shape.dateOrder } : {}),
+    ...(shape?.realPhones !== undefined ? { realPhones: shape.realPhones } : {}),
   });
   if (shape?.paidWhenReferenced !== true) {
     return parsed;
@@ -2883,22 +3010,27 @@ export async function importPreviewAction(
     shape?.valueMaps ?? {},
   );
   if (result.rows.length === 0) {
-    return { validCount: 0, errors: result.errors, unplaced };
+    return { validCount: 0, errors: result.errors, unplaced, placeholders: result.placeholders };
   }
   const policy = shape?.policy ?? "fill-blanks";
-  const diff = await inCompetitionOrg(gate.personId, gate.competition, async (db) => {
-    const stored = await existingForImport(
-      db,
-      gate.competition.id,
-      result.rows.map((row) => row.phone),
-    );
-    return planImport(result.rows, stored, policy, sportPackFor(gate.competition.sport));
+  const { diff, screened } = await inCompetitionOrg(gate.personId, gate.competition, async (db) => {
+    const stored = await storedForImport(db, gate.competition.id, result.rows);
+    // The two refusals only the server can see, listed with the parser's own.
+    const screened = screenAgainstStored(result.rows, stored);
+    return {
+      screened,
+      diff: planAgainstStored(screened.rows, stored, policy, sportPackFor(gate.competition.sport)),
+    };
   });
+  const errors = [...result.errors, ...screened.errors].sort((a, b) => a.line - b.line);
   return {
-    validCount: result.rows.length,
-    errors: result.errors,
+    validCount: screened.rows.length,
+    errors,
     unplaced,
-    photoLinks: result.rows.filter((row) => row.photoDriveId !== null).length,
+    placeholders: result.placeholders,
+    withoutPhone: screened.rows.filter((row) => row.phone === null).length,
+    withoutRole: screened.rows.filter((row) => row.role === "").length,
+    photoLinks: screened.rows.filter((row) => row.photoDriveId !== null).length,
     diff: {
       counts: diff.counts,
       // Capped for the screen; the counts above are the whole truth and the
@@ -2982,9 +3114,6 @@ export async function importCommitAction(
       error: `Fix ${String(parsed.errors.length)} row error(s) before importing.`,
     };
   }
-  if (parsed.rows.length === 0) {
-    return { ok: false, error: "No valid rows to import." };
-  }
   /*
    * THE ROSTER LOCK, APPLIED TO A FILE.
    *
@@ -3005,7 +3134,12 @@ export async function importCommitAction(
   const carriesSquad = marksFreezeWithRoster(squadMarksIn(parsed.rows));
   const SQUAD_COLUMNS_LOCKED =
     "The auction has started, so team, Icon and Retained columns can no longer be imported. Remove them from the file to import the rest.";
-  let result: Awaited<ReturnType<typeof commitRegistrationImport>> | "squad_locked";
+  let result:
+    | Awaited<ReturnType<typeof commitRegistrationImport>>
+    | "squad_locked"
+    | "needs_fixing"
+    | "nothing_valid";
+  let skipped = parsed.errors.length;
   try {
     result = await inCompetitionOrg(gate.personId, gate.competition, async (db) => {
       // Read FOR SHARE in the commit's own transaction, so the lock this file
@@ -3015,12 +3149,25 @@ export async function importCommitAction(
       if (carriesSquad && locked) {
         return "squad_locked" as const;
       }
+      // Judged in the commit's own transaction, against what is stored NOW —
+      // the same screen the preview ran, so a skipped row is one it listed.
+      const screened = screenAgainstStored(
+        parsed.rows,
+        await storedForImport(db, gate.competition.id, parsed.rows),
+      );
+      skipped += screened.errors.length;
+      if (screened.errors.length > 0 && options?.skipInvalid !== true) {
+        return "needs_fixing" as const;
+      }
+      if (screened.rows.length === 0) {
+        return "nothing_valid" as const;
+      }
       return commitRegistrationImport(
         db,
         gate.competition.id,
         gate.competition.orgId,
         gate.personId,
-        parsed.rows,
+        screened.rows,
         options?.shape?.policy ?? options?.policy ?? "fill-blanks",
         locked && auction !== null ? auction.id : null,
       );
@@ -3030,6 +3177,12 @@ export async function importCommitAction(
       return {
         ok: false,
         error: `${captainRefusalMessage(error.refusal)} Nothing was imported — remove that captain from the file to import the rest.`,
+      };
+    }
+    if (error instanceof PhoneAttachImportRefused) {
+      return {
+        ok: false,
+        error: `${error.player} is already registered in this season under the number this file gives them. Nothing was imported — remove that number from the file to import the rest.`,
       };
     }
     if (error instanceof RosterFieldImportRefused) {
@@ -3043,6 +3196,12 @@ export async function importCommitAction(
   if (result === "squad_locked") {
     return { ok: false, error: SQUAD_COLUMNS_LOCKED };
   }
+  if (result === "needs_fixing") {
+    return { ok: false, error: `Fix ${String(skipped)} row error(s) before importing.` };
+  }
+  if (result === "nothing_valid") {
+    return { ok: false, error: "No valid rows to import." };
+  }
   if (options?.fromSheet === true) {
     await inCompetitionOrg(gate.personId, gate.competition, (db) =>
       markImportSheetSynced(db, gate.competition.id),
@@ -3055,7 +3214,7 @@ export async function importCommitAction(
     unchanged: result.unchanged,
     reinstated: result.reinstated,
     named: result.named,
-    skipped: parsed.errors.length,
+    skipped,
   };
 }
 

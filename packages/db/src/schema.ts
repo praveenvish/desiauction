@@ -86,6 +86,15 @@ export const people = pgTable("people", {
   suspendedBy: char("suspended_by", { length: 26 }).references((): AnyPgColumn => people.id, {
     onDelete: "set null",
   }),
+  /**
+   * A CLUB-ONLY PLAYER (0104): added by this org with no real phone, and so
+   * with no credential at all — nobody can sign in as them and nothing is
+   * sent to them. Set only while phone and email are both null (CHECK); a real
+   * number clears it in the same write.
+   */
+  clubOrgId: char("club_org_id", { length: 26 }).references((): AnyPgColumn => organizations.id, {
+    onDelete: "cascade",
+  }),
 });
 
 /**

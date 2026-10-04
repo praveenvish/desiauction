@@ -925,6 +925,45 @@ p + .date-row {
   color: var(--text-primary);
 }
 
+/* What the file will do about phones and roles (import-notices.tsx). The
+   made-up-number note is the one that matters, so it sits in a soft panel; the
+   other two read like the photo line beside them. */
+.import-notice {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.import-notice strong {
+  color: var(--text-primary);
+}
+
+.import-notice.reg-warning {
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.import-notice p {
+  margin: 0 0 var(--space-2);
+}
+
+.import-notice summary {
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.import-notice-list {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  max-height: 16rem;
+  overflow-y: auto;
+  display: grid;
+  gap: var(--space-1);
+}
+
 /* The drop zone's label when a Google Drive route sits above it. */
 .photo-other-ways {
   margin: var(--space-2) 0 0;

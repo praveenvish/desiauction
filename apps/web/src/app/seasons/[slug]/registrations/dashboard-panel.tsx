@@ -36,6 +36,7 @@ import {
   useToast,
   VisuallyHidden,
 } from "@desiauction/ui";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 
 import { useMoney } from "../../../../components/money-unit";
@@ -76,7 +77,6 @@ import { decisionToast, PlayerSheet } from "../_players/player-sheet";
 import { useMutate } from "../_players/use-mutate";
 import { useRoster } from "../_players/use-roster";
 import { AddPlayerDialog } from "./add-player-dialog";
-import { ImportDialog } from "./import-dialog";
 import { RegistrationStatusGlyph } from "../../../../components/status/registration-status-glyph";
 import "../_players/players-desk.css";
 import { release, releaseIfLost } from "../../../../lib/release";
@@ -157,8 +157,27 @@ interface Filters {
   fee: string;
   team: string;
   role: string;
+  /** "photo" | "phone" | "role" — players still missing that detail ("" for all). */
+  missing: string;
   sort: string;
 }
+
+/** The "fix it later" list's three questions, as the filter offers them. */
+const MISSING_LABEL: Record<string, string> = {
+  photo: "No photo",
+  phone: "No phone",
+  role: "No role",
+};
+
+/*
+ * The import dialog — column mapping, value mapping, the Drive photo step —
+ * is the heaviest thing this page owns and most visits never open it. Loaded
+ * on the first press of "Import players" instead of with the page, which keeps
+ * the route inside its first-load budget (bundle-budget.json).
+ */
+const ImportDialog = dynamic(() => import("./import-dialog").then((mod) => mod.ImportDialog), {
+  ssr: false,
+});
 
 export function RegistrationDashboardPanel({
   slug,
@@ -223,6 +242,8 @@ export function RegistrationDashboardPanel({
   const [approvingAll, setApprovingAll] = useState(false);
   const [search, setSearch] = useState(filters.search);
   const [importOpen, setImportOpen] = useState(false);
+  // Mounted from the first open on, so closing and reopening keeps its state.
+  const [importMounted, setImportMounted] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [bulkDecline, setBulkDecline] = useState(false);
@@ -386,6 +407,7 @@ export function RegistrationDashboardPanel({
         fee: filters.fee,
         team: filters.team,
         role: filters.role,
+        missing: filters.missing,
         sort: filters.sort === "recent" ? "" : filters.sort,
         ...patch,
       };
@@ -451,6 +473,7 @@ export function RegistrationDashboardPanel({
     filters.fee !== "" ||
     filters.team !== "" ||
     filters.role !== "" ||
+    filters.missing !== "" ||
     filters.sort !== "recent";
 
   /* --- Selection & bulk ----------------------------------------------- */
@@ -480,6 +503,7 @@ export function RegistrationDashboardPanel({
         ...(filters.fee !== "" ? { fee: filters.fee } : {}),
         ...(filters.team !== "" ? { teamId: filters.team } : {}),
         ...(filters.role !== "" ? { role: filters.role } : {}),
+        ...(filters.missing !== "" ? { missing: filters.missing } : {}),
       }),
       () => {
         setBulkBusy(null);
@@ -729,6 +753,7 @@ export function RegistrationDashboardPanel({
             variant="secondary"
             data-testid="open-import"
             onClick={() => {
+              setImportMounted(true);
               setImportOpen(true);
             }}
           >
@@ -1033,6 +1058,16 @@ export function RegistrationDashboardPanel({
                 Role: {labelOf(desk.roles, filters.role)}
               </ToolbarChip>
             ) : null}
+            {filters.missing !== "" ? (
+              <ToolbarChip
+                removeLabel="Remove missing-details filter"
+                onRemove={() => {
+                  changeFilter({ missing: "" });
+                }}
+              >
+                {MISSING_LABEL[filters.missing] ?? filters.missing}
+              </ToolbarChip>
+            ) : null}
             {filters.team !== "" ? (
               <ToolbarChip
                 removeLabel="Remove team filter"
@@ -1060,7 +1095,15 @@ export function RegistrationDashboardPanel({
                 data-testid="filters-reset"
                 onClick={() => {
                   setSearch("");
-                  changeFilter({ q: "", status: "", fee: "", team: "", role: "", sort: "" });
+                  changeFilter({
+                    q: "",
+                    status: "",
+                    fee: "",
+                    team: "",
+                    role: "",
+                    missing: "",
+                    sort: "",
+                  });
                 }}
               >
                 Clear all
@@ -1074,8 +1117,26 @@ export function RegistrationDashboardPanel({
             </span>
             <FilterMenu
               testId="filters-menu"
-              activeCount={[filters.role, filters.team, filters.fee].filter((v) => v !== "").length}
+              activeCount={
+                [filters.role, filters.team, filters.fee, filters.missing].filter((v) => v !== "")
+                  .length
+              }
             >
+              {/* The "fix it later" list: after a name-only import, the players
+                  still waiting for a photo, a phone or a role — each row opens
+                  the sheet where that detail is added. */}
+              <FilterSelect
+                label="Missing"
+                visibleLabel
+                value={filters.missing}
+                onChange={(value) => {
+                  changeFilter({ missing: value });
+                }}
+                options={[
+                  { value: "", label: "Anything" },
+                  ...Object.entries(MISSING_LABEL).map(([value, label]) => ({ value, label })),
+                ]}
+              />
               {desk.roles.length > 0 ? (
                 <FilterSelect
                   label="Role"
@@ -1438,14 +1499,16 @@ export function RegistrationDashboardPanel({
         />
       ) : null}
 
-      <ImportDialog
-        slug={slug}
-        open={importOpen}
-        onClose={() => {
-          setImportOpen(false);
-        }}
-        registrationOpen={registrationOpen}
-      />
+      {importMounted ? (
+        <ImportDialog
+          slug={slug}
+          open={importOpen}
+          onClose={() => {
+            setImportOpen(false);
+          }}
+          registrationOpen={registrationOpen}
+        />
+      ) : null}
 
       <ExportDialog
         slug={slug}
@@ -1464,6 +1527,7 @@ export function RegistrationDashboardPanel({
                 ...(filters.fee !== "" ? { fee: filters.fee } : {}),
                 ...(filters.team !== "" ? { teamId: filters.team } : {}),
                 ...(filters.role !== "" ? { role: filters.role } : {}),
+                ...(filters.missing !== "" ? { missing: filters.missing } : {}),
               },
             }
           : {})}

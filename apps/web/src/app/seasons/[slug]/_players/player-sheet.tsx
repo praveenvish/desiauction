@@ -24,6 +24,7 @@ import {
   personHistoryAction,
   registrationTimelineAction,
   triageRegistrationAction,
+  addPlayerPhoneAction,
   updateRegistrationDetailsAction,
   type TriageAction,
 } from "../../../../server/competition/actions";
@@ -527,15 +528,19 @@ function DetailsTab({
             commit={save("name", (value) => ({ name: value.trim(), typedName: true }))}
             testId="edit-name"
           />
-          <div className="pd-setting">
-            <div className="pd-setting-head">
-              <span>Contact</span>
+          {row.clubOnly ? (
+            <AddPhoneSetting slug={slug} row={row} mutate={mutate} />
+          ) : (
+            <div className="pd-setting">
+              <div className="pd-setting-head">
+                <span>Contact</span>
+              </div>
+              <p className="pd-readonly" data-private>
+                {personContact(row)}
+              </p>
+              <p className="pd-setting-hint">A number is who the player is — it can’t be edited.</p>
             </div>
-            <p className="pd-readonly" data-private>
-              {personContact(row)}
-            </p>
-            <p className="pd-setting-hint">A number is who the player is — it can’t be edited.</p>
-          </div>
+          )}
           <TextSetting
             label="Date of birth"
             type="date"
@@ -639,6 +644,86 @@ function DetailsTab({
           testId="edit-note"
         />
       </section>
+    </div>
+  );
+}
+
+/**
+ * "Add phone" for a club-only player (0104) — added with no real number.
+ *
+ * A button, not the autosave every other field uses: a number is who the player
+ * is from then on (they can sign in, they get messages), so it is written when
+ * the organizer says so, never because focus left a half-typed box.
+ */
+function AddPhoneSetting({ slug, row, mutate }: { slug: string; row: Row; mutate: Mutate }) {
+  const id = useId();
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const submit = async () => {
+    if (draft.trim() === "") {
+      setError("Type the player's mobile number first.");
+      return;
+    }
+    setBusy(true);
+    const result = await mutate(row, {}, () => addPlayerPhoneAction(slug, row.id, draft), {
+      quiet: true,
+    });
+    setBusy(false);
+    if (result.ok) {
+      setDraft("");
+      setError(null);
+    } else {
+      setError(result.error);
+    }
+  };
+  return (
+    <div className="pd-setting" data-testid="add-phone">
+      <div className="pd-setting-head">
+        <label htmlFor={id}>Mobile number</label>
+      </div>
+      <div className="pd-add-phone">
+        <input
+          id={id}
+          className="pd-input"
+          inputMode="tel"
+          autoComplete="off"
+          placeholder="10-digit mobile"
+          value={draft}
+          disabled={busy}
+          aria-invalid={error !== null ? true : undefined}
+          aria-describedby={`${id}-hint`}
+          data-testid="add-phone-input"
+          onChange={(event) => {
+            setDraft(event.target.value);
+            setError(null);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              void submit();
+            }
+          }}
+        />
+        <Button
+          size="sm"
+          variant="secondary"
+          loading={busy}
+          onClick={() => void submit()}
+          data-testid="add-phone-save"
+        >
+          Add number
+        </Button>
+      </div>
+      {error !== null ? (
+        <p className="pd-setting-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      <p className="pd-setting-hint" id={`${id}-hint`}>
+        Added by your club with no phone, so nobody can sign in as them and no messages are sent.
+        Check the number before adding it — after that it can&apos;t be changed here.
+      </p>
     </div>
   );
 }

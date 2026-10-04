@@ -19,6 +19,7 @@ export {
 export type { Paise, DeductResult, ParsePaiseResult, FeeStatus, MoneyUnit } from "./money";
 export type { Clock } from "./clock";
 export { normalizePhone } from "./phone";
+export { looksLikePlaceholderPhone } from "./placeholder-phone";
 export { scrub, scrubError, scrubText, REDACTED } from "./scrub";
 export type { NormalizedPhone, PhoneResult } from "./phone";
 export {
@@ -83,7 +84,7 @@ export {
   validateNewPlayer,
 } from "./registration-csv";
 export { isAmbiguousDate, parseCsvDate } from "./csv-date";
-export { planImport, planImportRow } from "./import-diff";
+export { importMatchKey, planImport, planImportRow } from "./import-diff";
 export { unplacedValues } from "./import-values";
 export type { ImportVocabulary, UnplacedValue, ValueOption } from "./import-values";
 export type {
@@ -97,6 +98,7 @@ export type {
 export {
   IMPORT_FIELDS,
   IMPORT_FIELD_LABELS,
+  RECOMMENDED_IMPORT_FIELDS,
   REQUIRED_IMPORT_FIELDS,
   applyMapping,
   attributeAliasClaims,
@@ -130,6 +132,7 @@ export type {
   CsvRowError,
   CsvParseOptions,
   CsvParseResult,
+  PlaceholderPhone,
   NewPlayerCheck,
   NewPlayerInput,
   PlayerField,

@@ -1,6 +1,8 @@
 import {
   attributeKeyOf,
+  importMatchKey,
   isBattingStyle,
+  nameKey,
   isBowlingStyle,
   normalizeTeamName,
   planImport,
@@ -9,8 +11,10 @@ import {
   sportPackFor,
   type SportPack,
   type CsvRegistrationRow,
+  type CsvRowError,
   type ExistingRegistration,
   type FieldChange,
+  type ImportDiff,
   type ImportPolicy,
 } from "@desiauction/core";
 import {
@@ -22,9 +26,10 @@ import {
   teams,
   type Db,
 } from "@desiauction/db";
-import { and, eq, inArray, isNull, ne } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 
 import { captainLockRefusal } from "./captain-lock";
+import { attachPhoneToClubOnly } from "./club-only-phone";
 import { reinstateWithdrawn } from "./registrations";
 import type { CaptainRefusal } from "./roster-lock";
 
@@ -70,9 +75,195 @@ export interface ImportResult {
 /** A stored registration as the re-import plan reads it, plus what the writer needs. */
 type StoredForImport = ExistingRegistration & {
   id: string;
+  personId: string;
   teamId: string | null;
   attributes: Record<string, unknown>;
+  /**
+   * Found for a row WITH a phone by its NAME: a club-only player (0104) who is
+   * getting their real number from this file (`attachPhoneToClubOnly`).
+   */
+  attachPhone?: true;
 };
+
+/** What a re-import finds already stored, keyed the way `planImport` looks. */
+export interface StoredRoster {
+  /** By `importMatchKey`: the phone, or `name:` for a club-only player. */
+  byKey: Map<string, StoredForImport>;
+  /**
+   * Name keys two or more of this season's club-only players share. A file
+   * row with that name and no phone cannot say which one it means, so it is
+   * refused rather than matched (`screenAgainstStored`).
+   */
+  ambiguousNames: Set<string>;
+}
+
+/** The columns the diff and the writer read, for one stored registration. */
+const STORED_COLUMNS = {
+  id: registrations.id,
+  personId: registrations.personId,
+  status: registrations.status,
+  role: registrations.role,
+  basePriceBand: registrations.basePriceBand,
+  dateOfBirth: registrations.dateOfBirth,
+  battingStyle: registrations.battingStyle,
+  bowlingStyle: registrations.bowlingStyle,
+  feeStatus: registrations.feeStatus,
+  feeAmountPaise: registrations.feeAmountPaise,
+  feeReference: registrations.feeReference,
+  note: registrations.note,
+  fatherName: registrations.fatherName,
+  jerseyName: registrations.jerseyName,
+  jerseyNumber: registrations.jerseyNumber,
+  tshirtSize: registrations.tshirtSize,
+  trouserSize: registrations.trouserSize,
+  photoDriveId: registrations.photoDriveId,
+  // The diff compares NAMES on both sides, so the stored side joins the
+  // team in rather than making a pure module resolve a ULID.
+  teamName: teams.name,
+  // The id beside the name: the armband's demote is scoped to the team the
+  // player is ON, which a file with no team column never names.
+  teamId: registrations.teamId,
+  isIcon: registrations.isIcon,
+  isCaptain: registrations.isCaptain,
+  isRetained: registrations.isRetained,
+  attributes: registrations.attributes,
+} as const;
+
+/**
+ * Everything this file could be about that is already stored: registrations
+ * whose person holds one of the file's phones, and — for rows with no phone —
+ * this season's CLUB-ONLY players (0104), who have no phone to be found by and
+ * are found by the name the season shows instead. Two queries, not one per row.
+ */
+export async function storedForImport(
+  db: Db,
+  competitionId: string,
+  rows: readonly CsvRegistrationRow[],
+): Promise<StoredRoster> {
+  const phones = [...new Set(rows.flatMap((row) => (row.phone === null ? [] : [row.phone])))];
+  const byKey = await existingForImport(db, competitionId, phones);
+  const ambiguousNames = new Set<string>();
+  const clubOnly = await db
+    .select({
+      ...STORED_COLUMNS,
+      shown: sql<string | null>`coalesce(${registrations.enteredName}, ${people.name})`,
+    })
+    .from(registrations)
+    .innerJoin(people, eq(people.id, registrations.personId))
+    .leftJoin(teams, eq(teams.id, registrations.teamId))
+    .where(and(eq(registrations.competitionId, competitionId), isNotNull(people.clubOrgId)));
+  for (const { shown, attributes, ...rest } of clubOnly) {
+    const key = importMatchKey({ phone: null, name: shown ?? "" });
+    if (byKey.has(key)) {
+      byKey.delete(key);
+      ambiguousNames.add(key);
+    } else if (!ambiguousNames.has(key)) {
+      byKey.set(key, { ...rest, attributes: (attributes ?? {}) as Record<string, unknown> });
+    }
+  }
+  /*
+   * THE NUMBER ARRIVES LATER. A corrected sheet now carries a phone for a
+   * player first imported without one: no registration holds that phone, but
+   * exactly one club-only player has that name. That row is about them — it
+   * gives them their number — so it is keyed to their record by the phone too.
+   */
+  for (const row of rows) {
+    if (row.phone === null || byKey.has(row.phone)) {
+      continue;
+    }
+    const clubOnlyRecord = byKey.get(importMatchKey({ phone: null, name: row.name }));
+    if (clubOnlyRecord !== undefined) {
+      byKey.set(row.phone, { ...clubOnlyRecord, attachPhone: true });
+    }
+  }
+  return { byKey, ambiguousNames };
+}
+
+/**
+ * The plan, plus the one change `planImport` cannot see: a phone arriving for
+ * a club-only player. Core compares registration fields; the phone lives on the
+ * person, so it is added here — and shown in the preview as any other change.
+ */
+export function planAgainstStored(
+  rows: readonly CsvRegistrationRow[],
+  stored: StoredRoster,
+  policy: ImportPolicy,
+  pack: SportPack,
+): ImportDiff {
+  const diff = planImport(rows, stored.byKey, policy, pack);
+  const counts = { ...diff.counts };
+  const planned = diff.rows.map((entry) => {
+    const record = entry.phone === null ? undefined : stored.byKey.get(entry.phone);
+    if (record?.attachPhone !== true || entry.phone === null) {
+      return entry;
+    }
+    const phoneChange = { field: "phone", label: "Mobile number", from: null, to: entry.phone };
+    if (entry.plan.kind === "unchanged") {
+      counts.unchanged -= 1;
+      counts.changed += 1;
+      return { ...entry, plan: { kind: "changed" as const, changes: [phoneChange] } };
+    }
+    if (entry.plan.kind === "changed" || entry.plan.kind === "reinstate") {
+      return { ...entry, plan: { ...entry.plan, changes: [phoneChange, ...entry.plan.changes] } };
+    }
+    return entry;
+  });
+  return { rows: planned, counts };
+}
+
+/**
+ * The rows a file cannot import as written, given what is already stored — the
+ * two cases only the server can see, reported like any parser error so the
+ * preview lists them by name and the commit leaves them behind on "skip".
+ *
+ *   - A row whose name two club-only players already share, with no phone that
+ *     finds one of them: there is no way to say which of them it is about.
+ *   - Two rows of the file about ONE club-only player (one with a phone, one
+ *     without, or two phones): only one of them can be that person.
+ */
+export function screenAgainstStored(
+  rows: readonly CsvRegistrationRow[],
+  stored: StoredRoster,
+): { rows: CsvRegistrationRow[]; errors: CsvRowError[] } {
+  const kept: CsvRegistrationRow[] = [];
+  const errors: CsvRowError[] = [];
+  /** Which line already claimed each club-only record, by registration id. */
+  const claimedBy = new Map<string, number>();
+  for (const row of rows) {
+    const byName = `name:${nameKey(row.name)}`;
+    const foundByPhone = row.phone === null ? undefined : stored.byKey.get(row.phone);
+    if (foundByPhone === undefined && stored.ambiguousNames.has(byName)) {
+      errors.push({
+        line: row.line,
+        name: row.name,
+        message: `more than one player named "${row.name}" without a phone is already in this season — rename one of them on the Players page so each name is used once, then import again`,
+        fields: ["name"],
+      });
+      continue;
+    }
+    const clubOnly =
+      foundByPhone?.attachPhone === true
+        ? foundByPhone
+        : row.phone === null
+          ? stored.byKey.get(byName)
+          : undefined;
+    if (clubOnly !== undefined) {
+      const prior = claimedBy.get(clubOnly.id);
+      if (prior !== undefined) {
+        errors.push({
+          line: row.line,
+          name: row.name,
+          message: `"${row.name}" is in this file twice (also row ${String(prior)}) — keep one row for them`,
+          fields: ["name"],
+        });
+        continue;
+      }
+      claimedBy.set(clubOnly.id, row.line);
+    }
+    kept.push(row);
+  }
+  return { rows: kept, errors };
+}
 
 /**
  * What is already stored for these phones, in the shape the diff compares
@@ -88,34 +279,8 @@ export async function existingForImport(
   }
   const rows = await db
     .select({
-      id: registrations.id,
+      ...STORED_COLUMNS,
       phone: people.phone,
-      status: registrations.status,
-      role: registrations.role,
-      basePriceBand: registrations.basePriceBand,
-      dateOfBirth: registrations.dateOfBirth,
-      battingStyle: registrations.battingStyle,
-      bowlingStyle: registrations.bowlingStyle,
-      feeStatus: registrations.feeStatus,
-      feeAmountPaise: registrations.feeAmountPaise,
-      feeReference: registrations.feeReference,
-      note: registrations.note,
-      fatherName: registrations.fatherName,
-      jerseyName: registrations.jerseyName,
-      jerseyNumber: registrations.jerseyNumber,
-      tshirtSize: registrations.tshirtSize,
-      trouserSize: registrations.trouserSize,
-      photoDriveId: registrations.photoDriveId,
-      // The diff compares NAMES on both sides, so the stored side joins the
-      // team in rather than making a pure module resolve a ULID.
-      teamName: teams.name,
-      // The id beside the name: the armband's demote is scoped to the team the
-      // player is ON, which a file with no team column never names.
-      teamId: registrations.teamId,
-      isIcon: registrations.isIcon,
-      isCaptain: registrations.isCaptain,
-      isRetained: registrations.isRetained,
-      attributes: registrations.attributes,
     })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
@@ -303,6 +468,18 @@ export class RosterFieldImportRefused extends Error {
   }
 }
 
+/**
+ * A club-only player's new number that cannot be attached — the number's
+ * holder is already registered in this season. Nothing is imported: the
+ * preview showed the change, and an import that quietly skipped it would make
+ * the preview a lie.
+ */
+export class PhoneAttachImportRefused extends Error {
+  constructor(readonly player: string) {
+    super("phone attach import refused");
+  }
+}
+
 /** A captain change in the file that the opened auction refuses; the file is not imported. */
 export class CaptainImportRefused extends Error {
   constructor(readonly refusal: CaptainRefusal) {
@@ -383,7 +560,7 @@ export async function commitRegistrationImport(
     };
 
     // Resolve existing people by phone in one query, then create stubs for the rest.
-    const phones = [...new Set(rows.map((r) => r.phone))];
+    const phones = [...new Set(rows.flatMap((r) => (r.phone === null ? [] : [r.phone])))];
     const existing = await tx
       .select({ id: people.id, phone: people.phone, name: people.name })
       .from(people)
@@ -402,7 +579,7 @@ export async function commitRegistrationImport(
     // without scanning the file once per phone.
     const nameByPhone = new Map<string, string>();
     for (const row of rows) {
-      if (!nameByPhone.has(row.phone)) {
+      if (row.phone !== null && !nameByPhone.has(row.phone)) {
         nameByPhone.set(row.phone, row.name);
       }
     }
@@ -417,8 +594,12 @@ export async function commitRegistrationImport(
      * insert used to abort the whole import on the unique phone; now that
      * person is simply found and used.
      */
+    const { byKey: stored } = await storedForImport(tx, competitionId, rows);
+    // A phone that is a club-only player's new number makes no stub of its
+    // own: it goes onto that player (`attachPhoneToClubOnly`).
+    const attaching = new Set(phones.filter((phone) => stored.get(phone)?.attachPhone === true));
     const fresh = phones
-      .filter((phone) => !personByPhone.has(phone))
+      .filter((phone) => !personByPhone.has(phone) && !attaching.has(phone))
       .map((phone) => ({ id: newId(), phone, name: nameByPhone.get(phone) ?? null }));
     for (let at = 0; at < fresh.length; at += PEOPLE_INSERT_CHUNK) {
       const chunk = fresh.slice(at, at + PEOPLE_INSERT_CHUNK);
@@ -469,21 +650,70 @@ export async function commitRegistrationImport(
      * computation the preview showed the organizer, run again here against the
      * file rather than against anything the browser sent back.
      */
-    const stored = await existingForImport(tx, competitionId, phones);
-    const diff = planImport(rows, stored, policy, pack);
+    const diff = planAgainstStored(
+      rows,
+      { byKey: stored, ambiguousNames: new Set() },
+      policy,
+      pack,
+    );
     const planByLine = new Map(diff.rows.map((entry) => [entry.line, entry.plan]));
+
+    /*
+     * CLUB-ONLY PLAYERS (0104): a row with no phone — none given, or a filler
+     * the parser set aside — that this season does not already hold by name.
+     * Each gets a person with no phone and no email, owned by this org: nobody
+     * can sign in as them, nothing is sent to them, and no other club's file
+     * can ever match them. The name is the club's own, so it goes on the
+     * person; there is no account behind it for a club to rename.
+     */
+    const clubOnlyByLine = new Map<number, string>();
+    const freshClubOnly = rows
+      .filter((row) => row.phone === null && !stored.has(importMatchKey(row)))
+      .map((row) => {
+        const id = newId();
+        clubOnlyByLine.set(row.line, id);
+        return { id, phone: null, name: row.name, clubOrgId: orgId };
+      });
+    for (let at = 0; at < freshClubOnly.length; at += PEOPLE_INSERT_CHUNK) {
+      await tx.insert(people).values(freshClubOnly.slice(at, at + PEOPLE_INSERT_CHUNK));
+    }
+    const personFor = (row: CsvRegistrationRow): string | undefined =>
+      row.phone === null
+        ? (stored.get(importMatchKey(row))?.personId ?? clubOnlyByLine.get(row.line))
+        : attaching.has(row.phone)
+          ? stored.get(row.phone)?.personId
+          : personByPhone.get(row.phone);
+    /** How an error names a row: its name, or its number when it has none. */
+    const labelOf = (row: CsvRegistrationRow): string => row.name || (row.phone ?? "");
 
     let imported = 0;
     let updated = 0;
     let unchanged = 0;
     let reinstated = 0;
     for (const row of rows) {
-      const personId = personByPhone.get(row.phone);
+      let personId = personFor(row);
       if (personId === undefined) {
         continue;
       }
       const plan = planByLine.get(row.line);
-      const record = stored.get(row.phone);
+      const record = stored.get(importMatchKey(row));
+
+      // The club-only player's number, first: the rest of the row's changes
+      // land on the registration wherever its person now is.
+      if (row.phone !== null && record?.attachPhone === true) {
+        const attached = await attachPhoneToClubOnly(tx, {
+          competitionId,
+          orgId,
+          actorId,
+          registrationId: record.id,
+          phone: row.phone,
+          source: "csv_import",
+        });
+        if (!attached.ok) {
+          throw new PhoneAttachImportRefused(labelOf(row));
+        }
+        personId = attached.personId;
+      }
 
       // Already here, and the file agrees with every column it carries.
       if (plan?.kind === "unchanged") {
@@ -498,7 +728,7 @@ export async function commitRegistrationImport(
         const values = changedValues(plan.changes, row, changedTeam, pack, record.attributes);
         if (Object.keys(values).length > 0) {
           if (lockedAuctionId !== null && ("role" in values || "basePriceBand" in values)) {
-            throw new RosterFieldImportRefused(row.name || row.phone);
+            throw new RosterFieldImportRefused(labelOf(row));
           }
           if (lockedAuctionId !== null && typeof values["isCaptain"] === "boolean") {
             const refusal = await captainLockRefusal(
@@ -576,10 +806,13 @@ export async function commitRegistrationImport(
           orgId,
           competitionId,
           personId,
-          role: row.role,
+          // Blank is "not given yet" — stored as no role, set before approval.
+          role: row.role === "" ? null : row.role,
           status: "submitted",
           registrationNumber: registrationNumber(id),
-          ...(existingAccounts.has(row.phone) && row.name !== "" ? { enteredName: row.name } : {}),
+          ...(row.phone !== null && existingAccounts.has(row.phone) && row.name !== ""
+            ? { enteredName: row.name }
+            : {}),
           ...(row.basePriceBand !== null ? { basePriceBand: row.basePriceBand } : {}),
           // DA-28: whatever the file supplied, so an imported player is not
           // permanently thinner than one who self-registered.
@@ -610,10 +843,10 @@ export async function commitRegistrationImport(
         // insert so a withdrawn row the conflict skipped is not refused for a
         // mark the reinstatement below never writes.
         if (lockedAuctionId !== null && row.isCaptain === true) {
-          throw new CaptainImportRefused({ kind: "not_in_squad", name: row.name || row.phone });
+          throw new CaptainImportRefused({ kind: "not_in_squad", name: labelOf(row) });
         }
         imported++;
-        if (namelessAccounts.has(row.phone) && row.name !== "") {
+        if (row.phone !== null && namelessAccounts.has(row.phone) && row.name !== "") {
           named++;
         }
         // DA-27: the batch row below is subject=competition, so a timeline
@@ -663,7 +896,7 @@ export async function commitRegistrationImport(
       reinstated++;
       // The rejoin of a nameless account takes the file's name too — for this
       // season, and only where the entry has none of its own yet.
-      if (namelessAccounts.has(row.phone) && row.name !== "") {
+      if (row.phone !== null && namelessAccounts.has(row.phone) && row.name !== "") {
         const entry = await tx
           .update(registrations)
           .set({ enteredName: row.name })
