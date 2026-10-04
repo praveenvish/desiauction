@@ -138,7 +138,7 @@ export function BoughtByHand({
     });
   };
 
-  const unitWord = unit === "points" ? "points" : "₹";
+  const unitWord = unit === "points" ? "points" : "price";
 
   return (
     <section className="tm-hand" aria-label={`Players ${teamName} bought`} data-testid="hand-entry">
@@ -261,7 +261,6 @@ function HandRow({
       />
       <span className="tm-hand-name">{row.name}</span>
       <span className="tm-hand-price">
-        {unit === "inr" ? <span aria-hidden>₹</span> : null}
         <input
           ref={inputRef}
           className="pd-input tm-hand-input"
@@ -419,7 +418,7 @@ export function PublishByHand({ slug, teams }: { slug: string; teams: readonly T
           </tbody>
         </table>
         <Field
-          label={unit === "points" ? "Points each team started with" : "Purse per team (₹)"}
+          label={unit === "points" ? "Points each team started with" : "Purse per team"}
           name="purse"
           inputMode="numeric"
           autoComplete="off"
