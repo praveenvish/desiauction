@@ -152,7 +152,13 @@ export type GatedAuctionConfig = Omit<AuctionConfig, "pursePerTeam"> & { pursePe
 export type GatedAuctionRules = Omit<AuctionRules, "pursePerTeam"> & { pursePerTeam?: number };
 
 export interface GatedAuctionView extends Omit<AuctionView, "auction" | "paddles"> {
-  auction: { id: string; name: string; status: AuctionStatus; config: GatedAuctionConfig };
+  auction: {
+    id: string;
+    name: string;
+    status: AuctionStatus;
+    config: GatedAuctionConfig;
+    enteredByHand: boolean;
+  };
   paddles: readonly GatedPaddleView[];
 }
 
@@ -172,6 +178,7 @@ function gateAuctionView(view: AuctionView, money: boolean): GatedAuctionView {
       id: view.auction.id,
       name: view.auction.name,
       status: view.auction.status,
+      enteredByHand: view.auction.enteredByHand,
       config: {
         squadMin: config.squadMin,
         squadMax: config.squadMax,

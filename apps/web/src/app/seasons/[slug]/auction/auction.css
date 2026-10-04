@@ -4075,3 +4075,17 @@ details.squad-team[open] .squad-team-caret {
   flex-wrap: wrap;
   gap: var(--space-2);
 }
+
+/* 0105: the pointer to entering results by hand, before any auction exists. */
+.auc-hand-hint {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.auc-hand-hint a {
+  color: var(--text-accent);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

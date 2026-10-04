@@ -1324,8 +1324,9 @@ body:has(.pd-sheet) {
   inset-inline: 0;
   top: calc(100% + 4px);
   z-index: 30;
-  max-height: 280px;
+  max-height: min(360px, 55vh);
   overflow-y: auto;
+  overscroll-behavior: contain;
   margin: 0;
   padding: var(--space-1);
   list-style: none;
@@ -1357,6 +1358,29 @@ body:has(.pd-sheet) {
 .pd-picker-option[aria-selected="true"],
 .pd-picker-option:hover {
   background: var(--surface-sunken);
+}
+
+.pd-picker-count {
+  position: sticky;
+  top: calc(-1 * var(--space-1));
+  z-index: 1;
+  margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-1)) var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-overlay);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+/* On another team, or pre-signed: listed so the organiser sees where they are,
+   but not pickable — nobody joins two squads. */
+.pd-picker-option[data-blocked="true"] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.pd-picker-option[data-blocked="true"]:hover {
+  background: none;
 }
 
 .pd-picker-empty {

@@ -540,6 +540,7 @@ const teamsWorkspaceViewOnce = cache(async (slug: string): Promise<TeamsWorkspac
     const workspace = await teamsWorkspace(db, competition, {
       money: canSeeMoney,
       roster: canSeeRoster,
+      manage: canManage,
     });
     return {
       ...workspace,

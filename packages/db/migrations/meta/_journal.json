@@ -729,6 +729,13 @@
       "when": 1792684800000,
       "tag": "0104_club_only_players",
       "breakpoints": true
+    },
+    {
+      "idx": 104,
+      "version": "7",
+      "when": 1792771200000,
+      "tag": "0105_offline_auction_results",
+      "breakpoints": true
     }
   ]
 }
