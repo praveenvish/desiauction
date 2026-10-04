@@ -4084,6 +4084,8 @@ details.squad-team[open] .squad-team-caret {
 }
 
 .auc-hand-hint a {
-  color: var(--text-link, var(--accent));
+  color: var(--text-accent);
   font-weight: var(--font-weight-semibold);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
