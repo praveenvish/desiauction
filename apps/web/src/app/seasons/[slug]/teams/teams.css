@@ -1796,3 +1796,301 @@
     animation: none;
   }
 }
+
+/* Typing results in: how far along the whole season is, under the band's copy. */
+.tm-hand-progress {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.tm-hand-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+/* --- Auction results in one list (?view=results) -------------------------- */
+
+.rs {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.rs-back {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  text-decoration: none;
+}
+
+.rs-back:hover {
+  color: var(--text-accent);
+}
+
+.rs-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.rs-head h2 {
+  margin: 0;
+  font-size: clamp(1.25rem, 2.4vw, 1.6rem);
+  color: var(--text-heading);
+}
+
+.rs-head p {
+  margin: var(--space-1) 0 0;
+  max-width: 60ch;
+  color: var(--text-secondary);
+}
+
+.rs-meter {
+  display: grid;
+  gap: 6px;
+  min-width: 200px;
+}
+
+.rs-meter-figure {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.rs-meter-figure b {
+  font-size: 1.25rem;
+  color: var(--text-heading);
+}
+
+.rs-meter-bar {
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.rs-meter-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width var(--duration-base) var(--ease-out);
+}
+
+/* Search and filters stay in reach while a long list scrolls. */
+.rs-tools {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3) 0;
+  background: var(--surface);
+}
+
+.rs-search {
+  flex: 1 1 280px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 48px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-strong, var(--border-subtle));
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+}
+
+.rs-search:focus-within {
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.rs-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.rs-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.rs-chip {
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-sm-size);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.rs-chip[aria-pressed="true"] {
+  border-color: var(--accent-line);
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface-raised));
+  color: var(--text-heading);
+  font-weight: 600;
+}
+
+.rs-chip:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.rs-team-filter {
+  min-height: 40px;
+  width: auto;
+}
+
+.rs-empty {
+  margin: 0;
+  padding: var(--space-6) 0;
+  text-align: center;
+}
+
+.rs-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+
+.rs-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 240px) 180px;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+}
+
+.rs-row + .rs-row {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.rs-row:focus-within {
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface-raised));
+}
+
+.rs-who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding-left: var(--space-2);
+  border-left: 3px solid transparent;
+}
+
+.rs-name {
+  display: grid;
+  min-width: 0;
+}
+
+.rs-name strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-heading);
+}
+
+.rs-name span {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.rs-team {
+  width: 100%;
+  min-height: 44px;
+}
+
+.rs-row:not([data-placed]) .rs-team {
+  color: var(--text-secondary);
+}
+
+.rs-fixed {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.rs-fixed b {
+  color: var(--text-heading);
+}
+
+.rs-price {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.rs-price-input {
+  width: 96px;
+  min-height: 44px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.rs-price-input:disabled {
+  opacity: 0.45;
+}
+
+.rs-unit {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.rs-tick {
+  font-size: var(--text-sm-size);
+  color: var(--success-text, var(--text-accent));
+  white-space: nowrap;
+}
+
+.rs-quiet {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+/* Phone: the name on its own line, the team and the points side by side. */
+@media (max-width: 720px) {
+  .rs-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: var(--space-2);
+  }
+
+  .rs-who {
+    grid-column: 1 / -1;
+  }
+
+  .rs-price-input {
+    width: 84px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rs-meter-bar > span {
+    transition: none;
+  }
+}

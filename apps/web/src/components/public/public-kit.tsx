@@ -15,6 +15,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 
+import { servedAsStored } from "../../lib/stored-image";
 import "./public-kit.css";
 import { sportBanner, sportGradientAngle } from "./sport-art";
 
@@ -77,7 +78,14 @@ export function PageHero({
     <header className="pk-hero" data-theme="floodlight" data-size={size}>
       {cover == null ? null : (
         <div className="pk-hero-cover" aria-hidden>
-          <Image src={cover.src} alt="" fill sizes="100vw" priority />
+          <Image
+            src={cover.src}
+            unoptimized={servedAsStored(cover.src)}
+            alt=""
+            fill
+            sizes="100vw"
+            priority
+          />
         </div>
       )}
       {cover == null && watermark !== undefined ? (
@@ -111,6 +119,32 @@ export function PageHero({
         )}
       </div>
     </header>
+  );
+}
+
+/**
+ * THE ORGANIZER'S OWN BANNER, WHOLE.
+ *
+ * A season's cover is usually a designed poster — the tournament's name, its
+ * dates, a sponsor, the prize — and a poster cropped to a band and dimmed to
+ * 30% under the copy is a poster nobody can read. The band keeps it as
+ * atmosphere (`cover`); this shows the thing itself, uncropped, in the art
+ * slot where the sport's stock glyph would otherwise sit and look unfinished.
+ * Decorative to a screen reader: the hero's copy says everything it says.
+ */
+export function HeroBanner({ src }: { src: string }) {
+  return (
+    <span className="pk-hero-banner">
+      <Image
+        src={src}
+        unoptimized={servedAsStored(src)}
+        alt=""
+        width={1200}
+        height={675}
+        sizes="(max-width: 900px) 92vw, 520px"
+        priority
+      />
+    </span>
   );
 }
 

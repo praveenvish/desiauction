@@ -182,6 +182,12 @@ export interface TeamsWorkspace {
    * otherwise.
    */
   handEntry?: "open" | "published";
+  /**
+   * 0110: `imported` — the season said up front its auction is held outside
+   * the app. The Teams tab is then where results are typed in, and must not
+   * send the organiser to "Create the auction" (which refuses such a season).
+   */
+  auctionSource: CompetitionSummary["auctionSource"];
   rulesSource: {
     auctionExists: boolean;
     locked: boolean;
@@ -409,6 +415,7 @@ export async function teamsWorkspace(
     ...(options.money ? { purseTotal, squadMax } : {}),
     approvedPlayers: stats.approved,
     ...(handEntry !== undefined ? { handEntry } : {}),
+    auctionSource: competition.auctionSource,
     // `createTeamAction` locks the team set the moment the auction leaves
     // `scheduled` (DA-07). The Teams tab now says so BEFORE the form, instead
     // of the server's refusal arriving as an error on the name field.

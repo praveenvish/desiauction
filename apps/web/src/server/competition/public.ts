@@ -1048,6 +1048,27 @@ export interface PublicTeam {
   competitionSlug: string;
   sport: string;
   competitionLogoKey: string | null;
+  /**
+   * The season around the squad: its banner (0082), crest, place, dates and
+   * organizer. Already public on `/c/[slug]` behind the same visibility gate;
+   * the squad page used to open on a blank band with none of it.
+   */
+  season: {
+    coverUrl: string | null;
+    logoUrl: string | null;
+    location: string | null;
+    startsOn: string | null;
+    endsOn: string | null;
+    orgName: string;
+  };
+  /** The season's other teams, in name order — the page's way sideways. */
+  otherTeams: {
+    name: string;
+    slug: string;
+    shortName: string | null;
+    color: string | null;
+    crestUrl: string | null;
+  }[];
   team: {
     id: string;
     name: string;
@@ -1122,11 +1143,17 @@ export async function publicTeam(slug: string, teamSlug: string): Promise<Public
       sport: competitions.sport,
       visibility: competitions.visibility,
       logoKey: competitions.logoUrl,
+      coverKey: competitions.coverUrl,
+      location: competitions.location,
+      startsOn: competitions.startsOn,
+      endsOn: competitions.endsOn,
+      orgName: organizations.name,
       unit: competitions.auctionUnit,
       auctionSource: competitions.auctionSource,
       listSquadsInSearch: competitions.listSquadsInSearch,
     })
     .from(competitions)
+    .innerJoin(organizations, eq(organizations.id, competitions.orgId))
     .where(eq(competitions.slug, slug))
     .limit(1);
   if (comp === undefined || comp.visibility !== "public") {
@@ -1281,6 +1308,23 @@ export async function publicTeam(slug: string, teamSlug: string): Promise<Public
     competitionSlug: slug,
     sport: comp.sport,
     competitionLogoKey: comp.logoKey,
+    season: {
+      coverUrl: comp.coverKey === null ? null : storage.readUrl(comp.coverKey),
+      logoUrl: comp.logoKey === null ? null : storage.readUrl(comp.logoKey),
+      location: comp.location,
+      startsOn: comp.startsOn,
+      endsOn: comp.endsOn,
+      orgName: comp.orgName,
+    },
+    otherTeams: teamRows
+      .filter((row) => row.id !== team.id)
+      .map((row) => ({
+        name: row.name,
+        slug: teamSlugOf(row),
+        shortName: row.shortName,
+        color: row.color,
+        crestUrl: row.crestKey === null ? null : storage.readUrl(row.crestKey),
+      })),
     team: {
       id: team.id,
       name: team.name,

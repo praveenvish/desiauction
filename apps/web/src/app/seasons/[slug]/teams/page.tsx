@@ -10,6 +10,8 @@ import { currentSession } from "../../../../server/auth/actions";
 import { rolesOf } from "../../../../server/roles/roles";
 import { AppointmentsPanel } from "./appointments-panel";
 import { OwnSquad } from "./own-squad";
+import { PublishByHand } from "./hand-entry";
+import { ResultsSheet } from "./results-sheet";
 import { SquadSheetsPanel } from "./squad-sheets-panel";
 import { TeamsPanel } from "./teams-panel";
 import "../../seasons.css";
@@ -25,7 +27,7 @@ export default async function TeamsPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ team?: string }>;
+  searchParams: Promise<{ team?: string; view?: string }>;
 }) {
   const [{ slug }, sp] = await Promise.all([params, searchParams]);
   const [view, appointments, squadSheets, session] = await Promise.all([
@@ -49,6 +51,37 @@ export default async function TeamsPage({
   const ownCard =
     owned === undefined ? undefined : view.teams.find((team) => team.id === owned.teamId);
   const selectedTeam = view.teams.find((team) => team.id === sp.team) ?? null;
+  // Typing an offline auction in: every player on one screen (?view=results).
+  if (
+    sp.view === "results" &&
+    view.handEntry === "open" &&
+    view.viewer.canSeeRoster &&
+    view.teams.length > 0
+  ) {
+    return (
+      <ToastProvider>
+        <main className="registrations-dash tm-page">
+          <div className="dash-stack tm-stack">
+            <ResultsSheet
+              slug={slug}
+              teams={view.teams.map((team) => ({
+                id: team.id,
+                name: team.name,
+                color: team.color,
+              }))}
+              roleLabels={Object.fromEntries(view.roles.map((role) => [role.key, role.label]))}
+            />
+            <PublishByHand
+              slug={slug}
+              teams={view.teams}
+              imported={view.auctionSource === "imported"}
+              inList
+            />
+          </div>
+        </main>
+      </ToastProvider>
+    );
+  }
   /*
    * TELL YOUR PLAYERS — announcing captains & icons, and sending squad sheets.
    * Only for whoever may set the roles (team.manage). While somebody is still

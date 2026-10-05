@@ -30,6 +30,7 @@ import { seasonDescription, seasonTitle } from "../../../server/seo/season-copy"
 import { JsonLd } from "../../../components/seo/json-ld";
 import { IconCalendar, IconMapPin, IconUsers } from "../../../components/marketing/icons";
 import {
+  HeroBanner,
   HeroFact,
   PageBody,
   PageHero,
@@ -295,9 +296,11 @@ export default async function PublicCompetitionPage({
       <PageHero
         size="compact"
         cover={view.coverUrl === null ? null : { src: view.coverUrl }}
-        /* No stock art without a cover: the same bat twelve times across the
-           site read as "no content yet". The copy takes the width instead. */
-        {...(view.coverUrl === null ? {} : { sport: view.sport })}
+        /* The banner the organizer uploaded, whole, where the sport's stock bat
+           used to sit in an empty frame — it read as a page still loading,
+           and the banner itself (behind it, 400ing) never showed. No cover,
+           no art: the copy takes the width. */
+        {...(view.coverUrl === null ? {} : { art: <HeroBanner src={view.coverUrl} /> })}
         status={
           <>
             {live ? <Badge tone="live">Live now</Badge> : null}

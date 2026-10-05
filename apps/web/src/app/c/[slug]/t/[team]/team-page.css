@@ -1,0 +1,649 @@
+/*
+ * THE PUBLIC SQUAD — `/c/[slug]/t/[team]`.
+ *
+ * Founder review (2026-10-05, "3 out of 10"): the page opened on a tall empty
+ * band, a full-width card holding one number, a grid of tall cards each with
+ * only a name, and a share box as wide as the page — "so much space" for so
+ * little. Now: the team's identity, its numbers and the season's banner in one
+ * band; the captain and icon introduced as cards; everyone else as one dense
+ * list; share and the season's other teams beside it on a laptop.
+ *
+ * `--team` is the team's own colour, set on <main>.
+ */
+
+/* ------------------------------------------------------------------ hero -- */
+
+.tp-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--surface);
+  color: var(--text-primary);
+  padding-block: clamp(var(--space-5), 3.5vw, var(--space-10));
+  padding-inline: clamp(var(--space-4), 5vw, var(--space-12));
+}
+
+/* No banner: the band is lit in the team's colour from the crest's side. */
+.tp-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(
+      ellipse 70% 120% at 0% 0%,
+      color-mix(in srgb, var(--team) 42%, transparent),
+      transparent 70%
+    ),
+    linear-gradient(180deg, var(--surface-raised), var(--surface));
+}
+
+/* With one: the banner, blurred, is the band's light — the team's colour still
+   rises from the left so the crest sits on its own ground. */
+.tp-hero-cover {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+}
+
+.tp-hero-cover img {
+  object-fit: cover;
+  filter: blur(32px) saturate(1.3);
+  transform: scale(1.15);
+}
+
+.tp-hero[data-cover]::before {
+  background:
+    radial-gradient(
+      ellipse 60% 110% at 0% 0%,
+      color-mix(in srgb, var(--team) 38%, transparent),
+      transparent 70%
+    ),
+    linear-gradient(
+      100deg,
+      var(--surface) 10%,
+      color-mix(in srgb, var(--surface) 78%, transparent) 55%,
+      color-mix(in srgb, var(--surface) 55%, transparent)
+    );
+}
+
+.tp-hero-inner {
+  display: grid;
+  gap: clamp(var(--space-5), 3vw, var(--space-8));
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  max-width: 1200px;
+  margin-inline: auto;
+}
+
+@media (min-width: 960px) {
+  .tp-hero-inner:has(.tp-hero-banner) {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
+  }
+}
+
+.tp-hero-main {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+/* The way back, as a quiet chip above the identity — not a large ghost
+   button under it taking a row of the band to itself. */
+.tp-back {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 0 var(--space-3) 0 var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 16%, transparent);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold, 600);
+  text-decoration: none;
+  backdrop-filter: blur(6px);
+}
+
+.tp-back:hover {
+  border-color: var(--accent-line);
+  color: var(--text-accent);
+}
+
+.tp-back:focus-visible,
+.tp-hero-banner:focus-visible,
+.tp-row:focus-visible,
+.tp-leader:focus-visible,
+.tp-team:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.tp-back-hint {
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.tp-identity {
+  display: flex;
+  align-items: center;
+  gap: clamp(var(--space-4), 2.5vw, var(--space-6));
+  min-width: 0;
+}
+
+/* The crest as a coin in the team's own colour. */
+.tp-crest {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: clamp(76px, 10vw, 120px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--team);
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--team) 35%, transparent),
+    0 18px 40px -16px color-mix(in srgb, var(--team) 80%, #000);
+  overflow: hidden;
+}
+
+.tp-crest > img {
+  width: 74%;
+  height: 74%;
+  object-fit: contain;
+}
+
+.tp-crest-mark {
+  font-size: clamp(26px, 3.4vw, 40px);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
+}
+
+.tp-identity-copy {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.tp-kicker {
+  margin: 0;
+  font-size: var(--text-xs-size, 0.75rem);
+  font-weight: var(--font-weight-semibold, 600);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-accent);
+}
+
+.tp-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.9rem, 4.6vw, 3.25rem);
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  color: var(--text-heading);
+}
+
+.tp-meta {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.tp-meta > li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tp-meta-strong {
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+/* The squad's numbers: one row of figures, hairlines between them. */
+.tp-facts {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  border: 1px solid color-mix(in srgb, var(--text-primary) 12%, transparent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface) 62%, transparent);
+  backdrop-filter: blur(8px);
+  overflow: hidden;
+}
+
+.tp-fact {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  display: grid;
+  gap: 2px;
+  padding: var(--space-3) var(--space-5);
+  /* Each cell draws its left and top rule; the strip's own border hides the
+     outer ones, so a wrapped row still reads as a grid. */
+  box-shadow:
+    -1px 0 0 color-mix(in srgb, var(--text-primary) 12%, transparent),
+    0 -1px 0 color-mix(in srgb, var(--text-primary) 12%, transparent);
+}
+
+.tp-fact > dt {
+  font-size: var(--text-xs-size, 0.75rem);
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tp-fact > dd {
+  margin: 0;
+  font-size: clamp(1.05rem, 1.6vw, 1.3rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The organizer's banner, whole, beside the team — and the way to the season. */
+.tp-hero-banner {
+  display: block;
+  border-radius: var(--radius-xl);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.tp-hero-banner:hover {
+  transform: translateY(-2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tp-hero-banner {
+    transition: none;
+  }
+
+  .tp-hero-banner:hover {
+    transform: none;
+  }
+}
+
+/* A phone opens on the team, not on the poster: the banner goes on top, short. */
+@media (max-width: 959px) {
+  .tp-hero-banner {
+    order: -1;
+  }
+
+  .tp-hero-banner .pk-hero-banner img {
+    max-height: 200px;
+  }
+}
+
+@media (max-width: 640px) {
+  .tp-back-hint {
+    display: none;
+  }
+
+  .tp-fact {
+    flex-basis: 33%;
+    padding: var(--space-3) var(--space-4);
+  }
+}
+
+/* ------------------------------------------------------------------ body -- */
+
+.tp-body {
+  display: grid;
+  gap: var(--space-8);
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding: clamp(var(--space-6), 4vw, var(--space-10)) clamp(var(--space-4), 5vw, var(--space-12))
+    clamp(var(--space-10), 6vw, var(--space-16));
+  box-sizing: content-box;
+}
+
+@media (min-width: 1024px) {
+  .tp-body {
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: var(--space-10);
+  }
+
+  .tp-aside {
+    position: sticky;
+    top: calc(var(--header-height, 64px) + var(--space-4));
+  }
+}
+
+.tp-main {
+  display: grid;
+  gap: var(--space-8);
+  min-width: 0;
+}
+
+.tp-section {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.tp-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.tp-h2 {
+  margin: 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  /* The text face: display is reserved for >=30px (type-scale.test.ts). */
+  font-family: var(--font-text);
+  font-weight: 700;
+  font-size: clamp(1.3rem, 2.2vw, 1.6rem);
+  line-height: 1.2;
+  color: var(--text-heading);
+}
+
+.tp-count {
+  font-family: var(--font-body, inherit);
+  font-size: var(--text-sm-size);
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+}
+
+.tp-h3 {
+  margin: 0;
+  font-size: var(--text-base-size, 1rem);
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.tp-empty {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.tp-roles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.tp-roles > li {
+  padding: 4px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.tp-roles b {
+  margin-left: 4px;
+  color: var(--text-heading);
+}
+
+/* --- Leading the side: the captain and the icon, introduced. -------------- */
+
+.tp-leaders {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+  gap: var(--space-3);
+}
+
+.tp-leader {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  height: 100%;
+  box-sizing: border-box;
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background:
+    linear-gradient(120deg, color-mix(in srgb, var(--team) 14%, transparent), transparent 60%),
+    var(--surface-raised);
+  color: inherit;
+  text-decoration: none;
+  overflow: hidden;
+}
+
+/* The team's colour as the card's spine. */
+.tp-leader::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 4px;
+  background: var(--team);
+}
+
+.tp-leader:hover {
+  border-color: color-mix(in srgb, var(--team) 55%, var(--border-subtle));
+}
+
+.tp-leader-who {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tp-leader-who > strong {
+  font-size: 1.125rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  color: var(--text-heading);
+}
+
+.tp-leader-sub {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.tp-leader-sub:empty {
+  display: none;
+}
+
+/* --- The squad: one list, hairlines, two columns on a laptop. ------------- */
+
+.tp-roster {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  column-gap: var(--space-6);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.tp-roster > li {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.tp-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 64px;
+  padding: var(--space-2) var(--space-2);
+  margin-inline: calc(-1 * var(--space-2));
+  border-radius: var(--radius-md);
+  color: inherit;
+  text-decoration: none;
+}
+
+.tp-row:hover {
+  background: var(--surface-sunken);
+}
+
+.tp-row-who {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.tp-row-who > strong {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.tp-row-who > span {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.tp-nowrap {
+  white-space: nowrap;
+}
+
+.tp-badge {
+  margin-left: var(--space-2);
+}
+
+.tp-row-price {
+  flex-shrink: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+}
+
+.tp-row-price:empty {
+  display: none;
+}
+
+.tp-signed {
+  font-weight: 400;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.tp-row-go {
+  flex-shrink: 0;
+  color: var(--text-tertiary, var(--text-secondary));
+  opacity: 0.6;
+}
+
+.tp-row:hover .tp-row-go {
+  opacity: 1;
+  color: var(--text-accent);
+}
+
+/* ----------------------------------------------------------------- aside -- */
+
+.tp-aside {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.tp-card {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+}
+
+/* The share sheet stacks in the column: its laptop layout puts the message and
+   the buttons side by side, which a 360px column cannot hold. */
+.tp-card .share-sheet {
+  display: flex;
+  align-items: stretch;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.tp-teams {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+
+.tp-teams > li + li {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.tp-team {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  padding: var(--space-1) var(--space-2);
+  margin-inline: calc(-1 * var(--space-2));
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.tp-team:hover {
+  background: var(--surface-sunken);
+}
+
+.tp-team:hover .tp-team-name {
+  color: var(--text-accent);
+}
+
+.tp-team-crest {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--other);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  overflow: hidden;
+}
+
+.tp-team-crest > img {
+  width: 78%;
+  height: 78%;
+  object-fit: contain;
+}
+
+.tp-team-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tp-team > svg {
+  flex: none;
+  color: var(--text-secondary);
+}

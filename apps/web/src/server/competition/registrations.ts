@@ -570,6 +570,12 @@ export interface RegistrationRow {
    * it. Null before the night, for a pre-signed player, and for an unsold one.
    */
   soldPrice: number | null;
+  /**
+   * What the organiser typed this player went for at an auction held outside
+   * the app (0105, `offline_price`, ×100 in the season's unit). Null = none
+   * typed. Only meaningful while results are being typed in.
+   */
+  handPrice?: number | null;
   // Icon (marquee) player: pre-assigned to their team, excluded from the auction.
   isIcon: boolean;
   // Retained from a prior season: pre-assigned and excluded the same way. The
@@ -1029,6 +1035,7 @@ export async function queryRegistrations(
       status: registrations.status,
       teamId: registrations.teamId,
       teamName: teams.name,
+      handPrice: registrations.offlinePrice,
       // The desk said "Sold" and nothing else (census 12): the price is one
       // lookup away, on the season's one non-abandoned auction.
       soldPrice: sql<number | null>`(

@@ -126,6 +126,12 @@ export async function placeByHandAction(
   slug: string,
   registrationId: string,
   teamId: string | null,
+  /**
+   * The results list's team dropdown names the destination outright — moving
+   * a player there is the choice, not an accident. Their price moves with
+   * them. The search box never passes it.
+   */
+  options: { move?: boolean } = {},
 ): Promise<HandResult> {
   const gate = await manageGate(slug);
   if (gate === null) {
@@ -152,7 +158,7 @@ export async function placeByHandAction(
           error: "Approve this player first — only approved players join a team.",
         };
       }
-      if (player.teamId !== null && player.teamId !== teamId) {
+      if (player.teamId !== null && player.teamId !== teamId && options.move !== true) {
         return {
           ok: false,
           error: `Already on ${player.teamName ?? "another team"}. Remove them there first.`,

@@ -23,6 +23,12 @@ export interface PlayerDeskContext {
   rosterLocked: boolean;
   /** The auction has been run (completed / reconciled): no team now means unsold. */
   auctionDone: boolean;
+  /**
+   * Results of an auction held outside the app are still being typed in
+   * (0105): no auction in the app, and the viewer is an organiser. The sheet
+   * then asks what the player went for, beside their team.
+   */
+  handEntry: boolean;
   bands: readonly string[];
   roles: readonly { key: string; label: string }[];
   rolesRequired: boolean;
@@ -34,13 +40,11 @@ export async function playerDeskContext(
   personId: string,
   competition: CompetitionSummary,
 ): Promise<PlayerDeskContext> {
-  const [canManageTeams, auction] = await Promise.all([
-    canCompetition(
-      db,
-      personId,
-      { orgId: competition.orgId, competitionId: competition.id },
-      "team.manage",
-    ),
+  const scope = { orgId: competition.orgId, competitionId: competition.id };
+  const [canManageTeams, canManage, auction] = await Promise.all([
+    canCompetition(db, personId, scope, "team.manage"),
+    // The hand-entry writers' own gate (`hand-results-actions.ts`).
+    canCompetition(db, personId, scope, "competition.manage"),
     auctionOf(db, competition.id),
   ]);
   const pack = sportPackFor(competition.sport);
@@ -50,6 +54,7 @@ export async function playerDeskContext(
     rosterLocked: auction !== null && auction.status !== "scheduled",
     auctionDone:
       auction !== null && (auction.status === "completed" || auction.status === "reconciled"),
+    handEntry: canManage && (auction === null || auction.status === "abandoned"),
     bands: Object.keys(auction?.config.basePriceBands ?? DEFAULT_AUCTION_CONFIG.basePriceBands),
     roles: pack.roles.values.map((value) => ({ key: value.key, label: value.label })),
     rolesRequired: pack.roles.required,
