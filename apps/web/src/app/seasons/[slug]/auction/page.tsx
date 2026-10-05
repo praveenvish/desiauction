@@ -167,11 +167,32 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
             <PracticeCard slug={slug} card={practice} />
           ) : null}
           {/* 0105: before any auction, the other road — it already happened. */}
-          {status === null && dashboard.viewer.canManage ? (
+          {(status === null || status === "abandoned") && dashboard.viewer.canManage ? (
             <p className="auc-hand-hint" data-testid="auction-hand-hint">
               Auction already held outside the app?{" "}
               <Link href={`/seasons/${slug}/teams`}>Add the results on the Teams tab</Link> to get
               posters and team cards.
+            </p>
+          ) : null}
+          {/* A night set up here but run somewhere else: hand entry opens once
+              the scheduled auction is aborted (an aborted auction is no
+              auction — team-workspace.ts), and this is the only place that
+              says so. */}
+          {status === "scheduled" && dashboard.viewer.canManage ? (
+            <p className="auc-hand-hint" data-testid="auction-hand-hint-scheduled">
+              Held the auction outside the app instead? Abort this auction at the bottom of the
+              page, then{" "}
+              <Link href={`/seasons/${slug}/teams`}>add the results on the Teams tab</Link>.
+            </p>
+          ) : null}
+          {/* Posters exist before the hammer too (the season poster and each
+              team's "meet the squad"), but every door to them used to open
+              only after a finished night. */}
+          {(status === null || status === "scheduled" || status === "abandoned") &&
+          dashboard.viewer.canPoster ? (
+            <p className="auc-hand-hint" data-testid="auction-posters-door">
+              <Link href={`/seasons/${slug}/posters`}>Make posters</Link> — the season poster and
+              each team&apos;s squad, ready to share before the auction.
             </p>
           ) : null}
           {dashboard.view?.auction.enteredByHand === true ? (

@@ -11,7 +11,7 @@ import {
   withTenantDb,
   type Db,
 } from "@desiauction/db";
-import { and, eq, isNotNull, sql } from "drizzle-orm";
+import { and, eq, isNotNull, ne, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
 import { currentSession } from "../auth/actions";
@@ -76,15 +76,21 @@ const CLOSED =
   "This season already has an auction in the app, so its results come from there and can't be typed in.";
 
 /**
- * Hand entry is open while the season has never had an auction in the app —
- * the Teams tab's own test. Publishing races "Create the auction" safely: the
+ * Hand entry is open while the season has no auction in the app, an aborted
+ * one aside — the Teams tab's own test. Publishing races "Create the auction" safely: the
  * season's one-real-auction index (0029) lets only one of them land.
  */
 async function handEntryOpen(db: Db, competitionId: string): Promise<boolean> {
   const [row] = await db
     .select({ id: auctions.id })
     .from(auctions)
-    .where(and(eq(auctions.competitionId, competitionId), eq(auctions.kind, "real")))
+    .where(
+      and(
+        eq(auctions.competitionId, competitionId),
+        eq(auctions.kind, "real"),
+        ne(auctions.status, "abandoned"),
+      ),
+    )
     .limit(1);
   return row === undefined;
 }

@@ -106,10 +106,7 @@ beforeAll(async () => {
     endsOn: "2026-11-30",
   });
   seasonId = season.id;
-  await owner
-    .update(competitions)
-    .set({ tournamentId })
-    .where(eq(competitions.id, seasonId));
+  await owner.update(competitions).set({ tournamentId }).where(eq(competitions.id, seasonId));
   teamId = newId();
   await owner.insert(teams).values({
     id: teamId,
