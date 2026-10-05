@@ -348,7 +348,9 @@
   display: inline-flex;
   align-items: baseline;
   gap: var(--space-3);
-  font-family: var(--font-display);
+  /* The text face: display is reserved for >=30px (type-scale.test.ts). */
+  font-family: var(--font-text);
+  font-weight: 700;
   font-size: clamp(1.3rem, 2.2vw, 1.6rem);
   line-height: 1.2;
   color: var(--text-heading);
