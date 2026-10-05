@@ -68,6 +68,58 @@ describe("useHoldGate", () => {
     expect(button).toHaveAttribute("data-holding", "false");
   });
 
+  // The harness holds for 1000ms (HoldButton above).
+  describe("frames starved — a busy device draws nothing during the hold", () => {
+    let clock = 0;
+    beforeEach(() => {
+      clock = 0;
+      vi.spyOn(performance, "now").mockImplementation(() => clock);
+      vi.stubGlobal("requestAnimationFrame", () => 0);
+    });
+
+    it("a full hold confirms on release, judged by the clock", () => {
+      const onConfirm = vi.fn();
+      render(<HoldButton onConfirm={onConfirm} />);
+      const button = screen.getByRole("button");
+      fireEvent.pointerDown(button);
+      clock = 1200;
+      fireEvent.pointerUp(button);
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+      expect(button).toHaveAttribute("data-holding", "false");
+    });
+
+    it("a short press released early still does nothing", () => {
+      const onConfirm = vi.fn();
+      render(<HoldButton onConfirm={onConfirm} />);
+      const button = screen.getByRole("button");
+      fireEvent.pointerDown(button);
+      clock = 300;
+      fireEvent.pointerUp(button);
+      expect(onConfirm).not.toHaveBeenCalled();
+    });
+
+    it("leaving the button never confirms, however long it was held", () => {
+      const onConfirm = vi.fn();
+      render(<HoldButton onConfirm={onConfirm} />);
+      const button = screen.getByRole("button");
+      fireEvent.pointerDown(button);
+      clock = 1200;
+      fireEvent.pointerLeave(button);
+      fireEvent.pointerUp(button);
+      expect(onConfirm).not.toHaveBeenCalled();
+    });
+
+    it("a full keyboard hold confirms on key release", () => {
+      const onConfirm = vi.fn();
+      render(<HoldButton onConfirm={onConfirm} />);
+      const button = screen.getByRole("button");
+      fireEvent.keyDown(button, { key: " " });
+      clock = 1100;
+      fireEvent.keyUp(button, { key: " " });
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("an early release aborts harmlessly and resets progress", () => {
     const onConfirm = vi.fn();
     render(<HoldButton onConfirm={onConfirm} />);

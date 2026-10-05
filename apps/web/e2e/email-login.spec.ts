@@ -93,7 +93,7 @@ test("a verified email is a second way into the same account", async ({ page }) 
   await page.getByTestId("email-login-send").click();
 
   await expect(page.getByTestId("email-login-code")).toBeVisible({ timeout: 20_000 });
-  await page.getByTestId("email-login-code").fill(await mailedCode(EMAIL));
+  await page.getByTestId("email-login-code").pressSequentially(await mailedCode(EMAIL));
   await page.getByTestId("email-login-verify").click();
 
   // The SAME account. Authorization keys on personId and cannot tell which
@@ -138,7 +138,7 @@ test("an address nobody owns creates the account it signs in to", async ({ page 
   await page.getByTestId("email-login-address").fill(fresh);
   await page.getByTestId("email-login-send").click();
   await expect(page.getByTestId("email-login-code")).toBeVisible({ timeout: 20_000 });
-  await page.getByTestId("email-login-code").fill(await mailedCode(fresh));
+  await page.getByTestId("email-login-code").pressSequentially(await mailedCode(fresh));
   await page.getByTestId("email-login-verify").click();
 
   // Nameless, so the door opens onto the name gate — never /home.
@@ -182,7 +182,7 @@ test("an email-anchored account is told to add a number before it can play", asy
   await page.getByTestId("email-login-address").fill(player);
   await page.getByTestId("email-login-send").click();
   await expect(page.getByTestId("email-login-code")).toBeVisible({ timeout: 20_000 });
-  await page.getByTestId("email-login-code").fill(await mailedCode(player));
+  await page.getByTestId("email-login-code").pressSequentially(await mailedCode(player));
   await page.getByTestId("email-login-verify").click();
   await expect(page).toHaveURL(/\/onboarding/, { timeout: 30_000 });
 

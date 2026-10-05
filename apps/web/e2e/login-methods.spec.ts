@@ -97,7 +97,7 @@ test("the email code step survives a reload, and a new address becomes an accoun
   await expect(page.getByTestId("email-login-code")).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId("email-login-sent")).toContainText(address);
 
-  await page.getByTestId("email-login-code").fill(await mailedCode(address));
+  await page.getByTestId("email-login-code").pressSequentially(await mailedCode(address));
   await page.getByTestId("email-login-verify").click();
   // A brand-new account has no name yet, so it lands on the name gate.
   await expect(page).toHaveURL(/\/onboarding/, { timeout: 30_000 });
