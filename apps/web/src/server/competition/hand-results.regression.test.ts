@@ -241,11 +241,15 @@ describe("RESULTS ENTERED BY HAND", () => {
       config,
       createdBy: owner,
     });
-    expect((await teamsWorkspace(db, other, { manage: true })).handEntry).toBeUndefined();
+    expect(
+      (await teamsWorkspace(db, other, { money: false, roster: false, manage: true })).handEntry,
+    ).toBeUndefined();
     await db
       .update(auctionsTable)
       .set({ status: "abandoned" })
       .where(eq(auctionsTable.id, auctionId));
-    expect((await teamsWorkspace(db, other, { manage: true })).handEntry).toBe("open");
+    expect(
+      (await teamsWorkspace(db, other, { money: false, roster: false, manage: true })).handEntry,
+    ).toBe("open");
   });
 });
