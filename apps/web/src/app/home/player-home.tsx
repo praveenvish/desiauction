@@ -25,7 +25,6 @@ import {
   myRegistrations,
   publicTeam,
   publicTopBuys,
-  teamSlugOf,
   type MyRegistration,
   type PublicTeam,
   type PublicTopBuy,
@@ -636,10 +635,10 @@ export async function PlayerHome({
       : heroKind(current, { played, upcoming: leadUpcoming.length });
   const moment = kind === "sold" || kind === "match" || kind === "squad" ? (lead ?? null) : null;
   const [team, topBuys] =
-    moment === null || moment.teamName === null
+    moment === null || moment.teamSlug === null
       ? [null, []]
       : await Promise.all([
-          publicTeam(moment.competitionSlug, teamSlugOf(moment.teamName)),
+          publicTeam(moment.competitionSlug, moment.teamSlug),
           publicTopBuys(moment.competitionSlug, 3),
         ]);
   const leadMatches =
