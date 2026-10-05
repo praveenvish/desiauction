@@ -104,7 +104,7 @@ Mon 5 Oct 2026 (posted early at the founder's request; the series went up togeth
 | Platform | Posted? | Link |
 |---|---|---|
 | YouTube Shorts | Yes, Public | https://youtube.com/shorts/4qjKREsA_qI |
-| Instagram | Pending: logged out in Chrome; waiting for the founder to sign in | — |
-| Facebook Page | Pending | — |
-| Threads | Pending: logged out in Chrome | — |
-| X | Pending | — |
+| Instagram | Yes (Reel), first comment posted (pin it from the phone; web has no Pin) | https://www.instagram.com/desiauction/reel/DeH4p4TiZ6c/ |
+| Facebook Page | Yes (Reel, Public) | https://www.facebook.com/reel/2630589974126976/ |
+| Threads | Yes (video, topic DesiAuction) | https://www.threads.com/@desiauction/post/DeH5qK1j_d6 |
+| X | Yes (video) | https://x.com/thedesiauction/status/2107183496687210960 |
