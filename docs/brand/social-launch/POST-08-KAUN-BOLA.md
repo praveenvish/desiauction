@@ -66,7 +66,7 @@ Posted early on Mon 5 Oct 2026 (IST): the founder moved the series up from the T
 | Platform | Posted? | Link |
 |---|---|---|
 | YouTube Shorts | Yes (Public) | https://youtube.com/shorts/wxjX_mjshdY (video ID `wxjX_mjshdY`) |
-| Instagram | No: logged out (login wall) | — |
-| Facebook Page | No: upload stalled at "Uploading Video" twice | — |
-| Threads | No: logged out (login wall) | — |
-| X | No: media stuck at "Preparing media..." | — |
+| Instagram | Yes (Reel, cover set, comment prompt posted; web has no Pin) | https://www.instagram.com/reel/DeHzdLSi_q4/ |
+| Facebook Page | Yes (Reel, Public) | https://www.facebook.com/reel/38904251282556667/ |
+| Threads | Yes (video, topic DesiAuction) | https://www.threads.com/@desiauction/post/DeHzxvID3hf |
+| X | Yes (video) | https://x.com/thedesiauction/status/2107171916373184758 |
