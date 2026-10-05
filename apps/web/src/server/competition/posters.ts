@@ -1489,7 +1489,14 @@ async function pickerFrom(gated: Gate): Promise<PosterPicker> {
         kinds.push("player");
       }
       if (teamRows.length > 0) {
-        kinds.push("team", "reveal");
+        // The squad sheet prints a purse, so it waits for the season's auction
+        // (in the app, or results entered by hand) — `teamPosterSource` refuses
+        // it until then. Offering it anyway was a preview that never loaded.
+        // "Meet the squad" draws no money and is there from the first team.
+        if (liveAuctionId !== null) {
+          kinds.push("team");
+        }
+        kinds.push("reveal");
       }
       if (gated.grant.organizer && sold) {
         kinds.push("top");

@@ -397,12 +397,7 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
                     by our own route at a fixed size, and next/image would
                     re-encode a PNG that is already exactly what the user is
                     about to download. */}
-                <img
-                  key={previewSrc}
-                  src={previewSrc}
-                  alt="Poster preview"
-                  className="poster-preview-image"
-                />
+                <StillPreview key={previewSrc} src={previewSrc} />
               </div>
             ) : (
               // Keyed by the URL: a new poster is a new panel, so its loading
@@ -476,6 +471,68 @@ function PreviewTabs({
  * cannot, the old real-time recording, which says so instead of appearing to
  * hang.
  */
+/**
+ * The poster, with its two other states said out loud.
+ *
+ * A plain <img> (the board's crest does the same): the poster is drawn by our
+ * own route at a fixed size, and next/image would re-encode a PNG that is
+ * already exactly what the user is about to download. But a bare <img> has no
+ * way to say "this one is refused" — the route answers a refusal with a sentence,
+ * and the image just never painted, which read as a poster stuck loading. So a
+ * failure asks the route again and shows its sentence.
+ */
+function StillPreview({ src }: { src: string }) {
+  const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
+  const [reason, setReason] = useState<string | null>(null);
+  const onError = () => {
+    setState("failed");
+    void fetch(src, { cache: "no-store" })
+      .then(async (response) =>
+        response.ok ? null : (await response.text()).slice(0, 300) || null,
+      )
+      .catch(() => null)
+      .then(setReason);
+  };
+  if (state === "failed") {
+    return (
+      <p className="st-note" role="alert" data-testid="poster-preview-failed">
+        {reason ?? "This poster could not be made. Try again in a moment."}
+      </p>
+    );
+  }
+  return (
+    <>
+      <img
+        src={src}
+        alt="Poster preview"
+        className="poster-preview-image"
+        data-state={state}
+        data-testid="poster-preview-image"
+        // A server-rendered image can settle before hydration attaches the
+        // handlers, and React never replays those events: read it on mount.
+        ref={(node) => {
+          if (node !== null && node.complete && state === "loading") {
+            if (node.naturalWidth > 0) {
+              setState("ready");
+            } else {
+              onError();
+            }
+          }
+        }}
+        onLoad={() => {
+          setState("ready");
+        }}
+        onError={onError}
+      />
+      {state === "loading" ? (
+        <p className="st-note" role="status">
+          Making the poster…
+        </p>
+      ) : null}
+    </>
+  );
+}
+
 function MotionPanel({ src, size }: { src: string; size: PosterSize }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const sceneRef = useRef<Scene | null>(null);
