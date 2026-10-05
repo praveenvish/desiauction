@@ -58,3 +58,15 @@ If a big cricket moment lands that day, the newsjack goes first and this slides 
 - No accusation of anyone: the joke is the situation.
 - Real screens with no AI imagery; the paper is drawn type and shapes. Music is our own score.
 - #DesiAuction appears on every network.
+
+## Posted
+
+Posted early on Mon 5 Oct 2026 (IST): the founder moved the series up from the Thu 8 Oct slot.
+
+| Platform | Posted? | Link |
+|---|---|---|
+| YouTube Shorts | Yes (Public) | https://youtube.com/shorts/wxjX_mjshdY (video ID `wxjX_mjshdY`) |
+| Instagram | No: logged out (login wall) | — |
+| Facebook Page | No: upload stalled at "Uploading Video" twice | — |
+| Threads | No: logged out (login wall) | — |
+| X | No: media stuck at "Preparing media..." | — |
