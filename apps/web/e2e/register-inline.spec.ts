@@ -166,13 +166,13 @@ test("the email door verifies inline, then the wizard collects the mobile", asyn
   await page.getByTestId("email-login-address").fill(address);
   await page.getByTestId("register-verify-cta").click();
   await expect(page.getByTestId("email-login-code")).toBeVisible({ timeout: 20_000 });
-  await page.getByTestId("email-login-code").fill(await latestOtp(address));
+  await page.getByTestId("email-login-code").pressSequentially(await latestOtp(address));
   await page.getByTestId("email-login-verify").click();
 
   await expect(page.getByTestId("register-step-mobile")).toBeVisible({ timeout: 30_000 });
   await page.getByLabel("Mobile number").fill(phone);
   await page.getByTestId("register-phone-send").click();
-  await page.getByLabel("Six-digit code").fill(await latestOtp(phone));
+  await page.getByLabel("Six-digit code").pressSequentially(await latestOtp(phone));
   await page.getByTestId("register-phone-confirm").click();
   await expect(page.getByTestId("register-step-profile")).toBeVisible({ timeout: 30_000 });
 

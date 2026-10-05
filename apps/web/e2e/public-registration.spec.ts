@@ -358,7 +358,7 @@ test("an email-only account adds its mobile in place and finishes — the share 
     await player.getByTestId("email-login-address").fill(address);
     await player.getByTestId("register-verify-cta").click();
     await expect(player.getByTestId("email-login-code")).toBeVisible({ timeout: 20_000 });
-    await player.getByTestId("email-login-code").fill(await latestOtp(address));
+    await player.getByTestId("email-login-code").pressSequentially(await latestOtp(address));
     await player.getByTestId("email-login-verify").click();
 
     // Back on the register page, not /onboarding or /account — ref and all.
@@ -369,7 +369,7 @@ test("an email-only account adds its mobile in place and finishes — the share 
     );
     await player.getByLabel("Mobile number").fill(LATE_PHONE);
     await player.getByTestId("register-phone-send").click();
-    await player.getByLabel("Six-digit code").fill(await latestOtp(LATE_PHONE));
+    await player.getByLabel("Six-digit code").pressSequentially(await latestOtp(LATE_PHONE));
     await player.getByTestId("register-phone-confirm").click();
 
     // The page re-reads the session and the wizard simply carries on.

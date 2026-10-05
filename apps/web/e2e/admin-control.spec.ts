@@ -88,7 +88,7 @@ test("a superadmin suspends, confirms it's them, lifts it, and gives a role", as
   await admin.getByTestId("admin-reason").fill("Reported for abusive messages in a club chat");
   await admin.getByTestId("admin-confirm").click();
   await expect(admin.getByRole("dialog", { name: "Confirm it's you" })).toBeVisible(COLD);
-  await admin.getByTestId("step-up-code").fill(await latestOtp(SUPER));
+  await admin.getByTestId("step-up-code").pressSequentially(await latestOtp(SUPER));
   await admin.getByTestId("step-up-confirm").click();
   await expect(admin.getByText(/is suspended and was signed out/)).toBeVisible(COLD);
   await expect(admin.getByTestId("admin-suspension")).toContainText(
