@@ -1063,6 +1063,11 @@ export interface PublicTeam {
   /** What the season's auction counts in (0091): "₹…" or "… pts". */
   unit: MoneyUnit;
   auctionStatus: string | null;
+  /**
+   * 0110: `imported` — the auction was held outside the app. Its placed
+   * players are shown as they are typed in, before any "Publish".
+   */
+  auctionSource: "app" | "imported";
 }
 
 /** The address segment for a team: its name, as a slug. */
@@ -1079,6 +1084,7 @@ export async function publicTeam(slug: string, teamSlug: string): Promise<Public
       visibility: competitions.visibility,
       logoKey: competitions.logoUrl,
       unit: competitions.auctionUnit,
+      auctionSource: competitions.auctionSource,
       listSquadsInSearch: competitions.listSquadsInSearch,
     })
     .from(competitions)
@@ -1104,7 +1110,12 @@ export async function publicTeam(slug: string, teamSlug: string): Promise<Public
     return null;
   }
   const [auction] = await systemDb
-    .select({ id: auctions.id, status: auctions.status, config: auctions.config })
+    .select({
+      id: auctions.id,
+      status: auctions.status,
+      config: auctions.config,
+      enteredByHand: auctions.enteredByHand,
+    })
     .from(auctions)
     .where(
       and(eq(auctions.competitionId, comp.id), ne(auctions.status, "abandoned"), isRealAuction()),
@@ -1162,6 +1173,36 @@ export async function publicTeam(slug: string, teamSlug: string): Promise<Public
           )
           .orderBy(desc(lots.soldPrice));
 
+  // Placed on this team by hand, and not sold in a lot:
+  //  * 0110 — an imported season before "Publish": every placed player, at the
+  //    price the organizer typed;
+  //  * after a hand-entered publish — the players placed WITHOUT a price, who
+  //    get no lot (`publishResultsByHand`) but are on the squad all the same
+  //    (the posters read them the same way).
+  // A player with a sold lot is `boughtRows`' and never listed here too.
+  const handPlaced =
+    auction === undefined ? comp.auctionSource === "imported" : auction.enteredByHand;
+  const placedRows = !handPlaced
+    ? []
+    : await systemDb
+        .select({ ...member, price: registrations.offlinePrice })
+        .from(registrations)
+        .innerJoin(people, eq(people.id, registrations.personId))
+        .where(
+          and(
+            eq(registrations.competitionId, comp.id),
+            eq(registrations.teamId, team.id),
+            eq(registrations.status, "approved"),
+            sql`not ${preSignedSql}`,
+            ...(auction === undefined
+              ? []
+              : [
+                  sql`not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.auctionId} = ${auction.id} and ${lots.status} = 'sold')`,
+                ]),
+          ),
+        )
+        .orderBy(sql`${registrations.offlinePrice} desc nulls last`, asc(shownName));
+
   const now = new Date();
   const photo = (row: {
     dateOfBirth: string | null;
@@ -1195,6 +1236,7 @@ export async function publicTeam(slug: string, teamSlug: string): Promise<Public
     ...boughtRows
       .filter((row) => !preSignedRows.some((pre) => pre.registrationId === row.registrationId))
       .map((row) => toMember(row, row.price, row.isCaptain ? ["captain"] : [])),
+    ...placedRows.map((row) => toMember(row, row.price, [])),
   ];
   return {
     competitionId: comp.id,
@@ -1213,10 +1255,11 @@ export async function publicTeam(slug: string, teamSlug: string): Promise<Public
       coachName: team.coachName,
     },
     members,
-    spentPaise: boughtRows.reduce((total, row) => total + (row.price ?? 0), 0),
+    spentPaise: [...boughtRows, ...placedRows].reduce((total, row) => total + (row.price ?? 0), 0),
     pursePaise: publicAuctionRules(auction?.config).pursePerTeam,
     unit: comp.unit,
     auctionStatus: auction?.status ?? null,
+    auctionSource: comp.auctionSource,
     squadListing: await publicSquadListing(comp.id, comp.listSquadsInSearch),
   };
 }

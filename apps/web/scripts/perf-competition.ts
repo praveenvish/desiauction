@@ -87,6 +87,7 @@ async function main(): Promise<void> {
     visibility: "private" as const,
     entryCategory: "open" as const,
     auctionUnit: "inr" as const,
+    auctionSource: "app" as const,
     sport: "cricket",
     location: "Local",
     startsOn: "2026-01-01",

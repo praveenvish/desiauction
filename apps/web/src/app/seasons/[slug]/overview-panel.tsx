@@ -1501,6 +1501,8 @@ export function OverviewPanel({
           // 0091: the unit is fixed once an auction exists (its purse was
           // typed in it). The server refuses too; this only says so first.
           unitLocked={view.auctionStatus !== null}
+          // 0110: fixed while a real auction stands; an aborted one frees it.
+          sourceLocked={view.auctionStatus !== null && view.auctionStatus !== "abandoned"}
           onClose={() => {
             setSettingsOpen(false);
           }}
@@ -1624,6 +1626,7 @@ function SeasonSettingsDialog({
   slug,
   competition,
   unitLocked,
+  sourceLocked,
   onClose,
   onSaved,
 }: {
@@ -1631,6 +1634,7 @@ function SeasonSettingsDialog({
   slug: string;
   competition: SeasonOverviewView["competition"];
   unitLocked: boolean;
+  sourceLocked: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -1640,6 +1644,7 @@ function SeasonSettingsDialog({
   const [endsOn, setEndsOn] = useState(competition.endsOn ?? "");
   const [entryCategory, setEntryCategory] = useState<string>(competition.entryCategory);
   const [auctionUnit, setAuctionUnit] = useState<string>(competition.auctionUnit);
+  const [auctionSource, setAuctionSource] = useState<string>(competition.auctionSource);
   const [error, setError] = useState<{ field: DetailsField; message: string } | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -1656,6 +1661,7 @@ function SeasonSettingsDialog({
         endsOn,
         entryCategory,
         ...(unitLocked ? {} : { auctionUnit }),
+        ...(sourceLocked ? {} : { auctionSource }),
       }),
       () => {
         setPending(false);
@@ -1771,6 +1777,27 @@ function SeasonSettingsDialog({
           {/* rupees-always: names the rupee unit itself */}
           <option value="inr">Rupees (₹) — real money</option>
           <option value="points">Points — no money changes hands</option>
+        </Select>
+        {/* 0110: where the auction happens. Imported seasons type their
+            results in on the Teams tab and show them publicly as they go. */}
+        <Select
+          label="Auction"
+          name="season-auction-source"
+          value={auctionSource}
+          disabled={sourceLocked}
+          onChange={(event) => {
+            setAuctionSource(event.target.value);
+          }}
+          help={
+            sourceLocked
+              ? "Fixed — this season already has an auction."
+              : "Imported: add each team's players on the Teams tab. Public squad pages show them as you go."
+          }
+          data-testid="season-auction-source"
+          {...errorFor("auctionSource")}
+        >
+          <option value="app">Run live on DesiAuction</option>
+          <option value="imported">Held elsewhere — import the results</option>
         </Select>
       </div>
     </Dialog>

@@ -160,11 +160,13 @@ export default async function PublicTeamPage({
         }
         /* "Our squad" spoke as the team, on a page anyone can land on from a
            forwarded link; the season's name says whose squad it is. */
-        lede={
-          team.team.coachName === null
-            ? `${team.competitionName} squad`
-            : `${team.competitionName} squad · Coach ${team.team.coachName}`
-        }
+        lede={[
+          `${team.competitionName} squad`,
+          ...(team.team.coachName === null ? [] : [`Coach ${team.team.coachName}`]),
+          // 0110: the night happened elsewhere — say so, so nobody looks for
+          // a live room or a replay.
+          ...(team.auctionSource === "imported" ? ["Auction held offline"] : []),
+        ].join(" · ")}
         actions={
           <ButtonLink href={`/c/${slug}`} variant="ghost" size="lg" className="team-page-back">
             <IconArrowLeft size={18} /> Back to {team.competitionName}
@@ -222,7 +224,7 @@ export default async function PublicTeamPage({
                     <span className="team-page-price">
                       {member.pricePaise !== null ? (
                         formatPrice(member.pricePaise, team.unit)
-                      ) : (
+                      ) : member.marks.length === 0 ? null : (
                         <span className="team-page-signed">
                           {member.marks.includes("retained") ? "Retained" : "Pre-signed"}
                         </span>

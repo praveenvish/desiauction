@@ -83,6 +83,7 @@ import {
   createTeam,
   holdBlocker,
   importSheetOf,
+  isAuctionSource,
   markImportSheetSynced,
   publishBlockers,
   setAuctionStart,
@@ -747,7 +748,8 @@ export async function setNoPhotoStyleAction(
   return { ok: true };
 }
 
-export type DetailsField = "name" | "startsOn" | "endsOn" | "location" | "auctionUnit" | "form";
+export type DetailsField =
+  "name" | "startsOn" | "endsOn" | "location" | "auctionUnit" | "auctionSource" | "form";
 
 /**
  * DA-11: give a season's name, dates and location a way to change.
@@ -767,6 +769,8 @@ export async function updateCompetitionDetailsAction(
     entryCategory?: string;
     /** 0091: "" or absent leaves the unit as it stands. */
     auctionUnit?: string;
+    /** 0110: "" or absent leaves where the auction happens as it stands. */
+    auctionSource?: string;
   },
 ): Promise<{ ok: boolean; error?: string; field?: DetailsField }> {
   const session = await requireSession();
@@ -794,9 +798,14 @@ export async function updateCompetitionDetailsAction(
   if (unit !== "" && !isMoneyUnit(unit)) {
     return { ok: false, error: "Choose rupees or points for the auction.", field: "form" };
   }
+  const source = input.auctionSource ?? "";
+  if (source !== "" && !isAuctionSource(source)) {
+    return { ok: false, error: "Choose where the auction happens.", field: "form" };
+  }
   const result = await inCompetitionOrg(session.personId, competition, (db) =>
     updateCompetitionDetails(db, competition, session.personId, {
       ...(isMoneyUnit(unit) ? { auctionUnit: unit } : {}),
+      ...(isAuctionSource(source) ? { auctionSource: source } : {}),
       name: input.name,
       location: input.location.trim() === "" ? null : input.location.trim(),
       startsOn: input.startsOn === "" ? null : input.startsOn,
@@ -818,9 +827,21 @@ export async function updateCompetitionDetailsAction(
           error: "The auction has been created in this unit — rupees or points can't change now.",
           field: "auctionUnit",
         };
+      case "source_locked":
+        return {
+          ok: false,
+          error:
+            "This season already has an auction — abort it first to switch where the auction happens.",
+          field: "auctionSource",
+        };
       default:
         return { ok: false, error: "The end date falls before the start date.", field: "endsOn" };
     }
+  }
+  // 0110: an imported season's public squads show placed players — the switch
+  // changes what the public pages say.
+  if (isAuctionSource(source) && source !== competition.auctionSource) {
+    revalidatePath(`/c/${competition.slug}`, "layout");
   }
   return { ok: true };
 }

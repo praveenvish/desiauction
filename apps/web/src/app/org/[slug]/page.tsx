@@ -291,6 +291,7 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
     visibility: edition.visibility,
     entryCategory: edition.entryCategory,
     auctionUnit: edition.auctionUnit,
+    auctionSource: edition.auctionSource,
     location: edition.location,
     startsOn: edition.startsOn,
     endsOn: edition.endsOn,

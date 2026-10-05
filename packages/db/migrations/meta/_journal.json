@@ -757,6 +757,13 @@
       "when": 1793030400000,
       "tag": "0108_move_tournament",
       "breakpoints": true
+    },
+    {
+      "idx": 108,
+      "version": "7",
+      "when": 1793203200000,
+      "tag": "0110_auction_source",
+      "breakpoints": true
     }
   ]
 }
