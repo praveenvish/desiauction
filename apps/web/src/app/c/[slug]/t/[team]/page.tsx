@@ -47,7 +47,8 @@ export async function generateMetadata({
     return { title: "Team" };
   }
   const facts = teamFacts(team);
-  const url = `${env.PUBLIC_BASE_URL}/c/${slug}/t/${teamSlug}`;
+  // The team's own address, even when an older shared link opened it.
+  const url = `${env.PUBLIC_BASE_URL}/c/${slug}/t/${team.team.slug}`;
   const description = teamShareMessage(
     { teamName: team.team.name, competitionName: team.competitionName, ...facts },
     "en",
@@ -246,7 +247,7 @@ export default async function PublicTeamPage({
             }
             messages={messages}
             unit={team.unit}
-            status={{ kind: "team", slug, team: teamSlug }}
+            status={{ kind: "team", slug, team: team.team.slug }}
           />
         </PageSection>
       </PageBody>

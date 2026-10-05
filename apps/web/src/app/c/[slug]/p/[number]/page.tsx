@@ -14,11 +14,7 @@ import { notFound } from "next/navigation";
 
 import { env } from "../../../../../env";
 import { preSignedWord, type PreSignedKind } from "../../../../../lib/pre-signed";
-import {
-  publicPlayer,
-  publicPlayerPoster,
-  teamSlugOf,
-} from "../../../../../server/competition/public";
+import { publicPlayer, publicPlayerPoster } from "../../../../../server/competition/public";
 import { linkCardAlt } from "../../../../seasons/[slug]/posters/poster-link";
 import {
   HeroFact,
@@ -319,9 +315,9 @@ export default async function PlayerProfilePage({
               </ButtonLink>
             ) : null}
             {/* A signed player's card leads to the squad they are part of. */}
-            {player.teamName !== null ? (
+            {player.teamSlug !== null ? (
               <ButtonLink
-                href={`/c/${slug}/t/${teamSlugOf(player.teamName)}`}
+                href={`/c/${slug}/t/${player.teamSlug}`}
                 variant="secondary"
                 size="lg"
                 data-testid="player-team-link"

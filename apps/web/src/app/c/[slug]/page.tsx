@@ -705,7 +705,7 @@ export default async function PublicCompetitionPage({
                   primaryColor: team.primaryColor,
                   logoUrl: team.logoUrl,
                   coachName: team.coachName,
-                  href: `/c/${view.slug}/t/${teamSlugOf(team.name)}`,
+                  href: `/c/${view.slug}/t/${teamSlugOf(team)}`,
                 }))}
               />
             )}

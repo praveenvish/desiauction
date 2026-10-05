@@ -35,7 +35,7 @@ import {
   updateCompetitionDetails,
   type CompetitionSummary,
 } from "./competitions";
-import { publicTeam, teamSlugOf } from "./public";
+import { publicTeam, teamForSlug, teamSlugOf } from "./public";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
@@ -73,7 +73,7 @@ async function seed(
 }
 
 const squad = async () => {
-  const team = await publicTeam(comp.slug, teamSlugOf(TEAM));
+  const team = await publicTeam(comp.slug, teamSlugOf({ id: teamId, name: TEAM }));
   if (team === null) throw new Error("team page missing");
   return team;
 };
@@ -131,12 +131,49 @@ afterAll(async () => {
   await handle.sql.end();
 });
 
+describe("TEAM ADDRESSES FOR NAMES IN ANY SCRIPT", () => {
+  const hindi = [
+    { id: "01M43JZP10YCKXFC88AAAAAA", name: "आशापुरा इलेवन" },
+    { id: "01M43JZP10YCKXFC88BBBBBB", name: "जय बजरंग बली" },
+    { id: "01M43JZP10YCKXFC88CCCCCC", name: "रघुनाथपुरा XI" },
+    { id: "01M43JZP10YCKXFC88DDDDDD", name: "विभम XI" },
+  ];
+
+  it("keeps an English name's address exactly as it was", () => {
+    expect(teamSlugOf({ id: "01M43JZP10YCKXFC88AAAAAA", name: "Malad Mavericks" })).toBe(
+      "malad-mavericks",
+    );
+  });
+
+  it("gives every Hindi-named team its own address", () => {
+    const slugs = hindi.map(teamSlugOf);
+    expect(slugs).toEqual(["team-aaaaaa", "team-bbbbbb", "xi-cccccc", "xi-dddddd"]);
+    expect(new Set(slugs).size).toBe(hindi.length);
+    for (const team of hindi) {
+      expect(teamForSlug(hindi, teamSlugOf(team))).toBe(team);
+    }
+  });
+
+  it("still opens a team from the address it was shared under before", () => {
+    expect(teamForSlug(hindi, "competition")).toBe(hindi[0]);
+    expect(teamForSlug(hindi, "xi")).toBe(hindi[2]);
+    expect(teamForSlug(hindi, "nobody")).toBeUndefined();
+  });
+});
+
 describe("AN AUCTION HELD ELSEWHERE (0110)", () => {
-  it("starts as an in-app season: only the pre-signed captain is public", async () => {
+  it("starts as an in-app season: everyone on the team is listed, no typed price", async () => {
     expect(comp.auctionSource).toBe("app");
     const team = await squad();
     expect(team.auctionSource).toBe("app");
-    expect(team.members.map((m) => m.registrationId)).toEqual([reg.captain]);
+    // The season page's squad cards list these same players; the team page
+    // agrees on who — but a typed price is not an in-app auction's result.
+    expect(team.members.map((m) => [m.registrationId, m.pricePaise])).toEqual([
+      [reg.captain, null],
+      [reg.priced, null],
+      [reg.free, null],
+    ]);
+    expect(team.spentPaise).toBe(0);
   });
 
   it("once imported, shows every placed player as typed, before any publish", async () => {
