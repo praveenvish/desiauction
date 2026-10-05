@@ -56,14 +56,14 @@ The paper act, in order:
 > Apne cricket WhatsApp group mein bhejo 👇
 > Demo auction · fictional players · points, not money
 >
-> #CricketAuction #LiveAuction #GullyCricket #TournamentOrganiser #DesiAuction
+> #KagazWaliBoli #CricketAuction #LiveAuction #GullyCricket #DesiAuction
 
-**YouTube Shorts:** `Ghar se auction dekhna = sirf shor 🔊 Ek link, sab live #Shorts #DesiAuction`
+**YouTube Shorts:** `Ghar se auction dekhna = sirf shor 🔊 Ek link, sab live #Shorts #KagazWaliBoli #DesiAuction`
 
 **Threads** (video, topic DesiAuction):
 > Ghar se auction dekhna = sirf shor 🔊 Ek link bhejo — koi account nahi, har bid live. desiauction.in #DesiAuction
 
-**X:** same as Threads + `#CricketAuction`.
+**X:** same as Threads + `#KagazWaliBoli` (two tags on X; more cuts reach).
 
 **Comment prompt** (pinned first comment):
 > Aapke yahan auction live dekhte hain ya bas WhatsApp pe "kaun kahan gaya" puchte hain? 👇

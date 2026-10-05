@@ -46,11 +46,11 @@ The animated paper (0.0–4.4 s), in order:
 > Sahi kaha? 👇
 > Demo auction · fictional players · points, not money
 >
-> #CricketAuction #GullyCricket #LocalCricket #TournamentOrganiser #DesiAuction
+> #KagazWaliBoli #CricketAuction #GullyCricket #CricketLovers #DesiAuction
 
-**YouTube Shorts:** `"Bolna kisi ne?… ek baar… ek baar…" 😴 #Shorts #DesiAuction`
+**YouTube Shorts:** `"Bolna kisi ne?… ek baar… ek baar…" 😴 #Shorts #KagazWaliBoli #DesiAuction`
 **Threads** (video, topic DesiAuction): "\"Bolna kisi ne?… ek baar… ek baar…\" 😴 DesiAuction mein ghadi chalti hai — zero pe SOLD. desiauction.in #DesiAuction"
-**X:** same as Threads + `#CricketAuction`.
+**X:** same as Threads + `#KagazWaliBoli` (two tags on X; more cuts reach).
 
 Comment prompt (pinned first comment): "Aapke auction mein sabse lamba 'ek baar… ek baar…' kitni der chala tha? 😂 👇"
 

@@ -35,10 +35,10 @@ The problem slides (2–6) are split like the reels: the problem on a paper top,
 > Kitni problems aapke yahan hoti hain? 1–5 likho 👇
 > Demo auction · fictional players
 >
-> #CricketAuction #TournamentOrganiser #GullyCricket #LocalCricket #DesiAuction
+> #KagazWaliBoli #CricketAuction #TournamentOrganiser #CricketTournament #DesiAuction
 
 **Threads** (images, topic DesiAuction): "Kagaz wali boli ki 5 problems — aapke auction mein kitni hain? 1–5 likho 👇 desiauction.in #DesiAuction"
-**X:** same as Threads + `#CricketAuction` (X takes 4 images: use slides 1, 2, 6, 8).
+**X:** same as Threads + `#KagazWaliBoli` (two tags on X; X takes 4 images: use slides 1, 2, 6, 8).
 **YouTube:** skip (no carousel format), or a Community post with slide 1 if the channel has it.
 
 Comment prompt (pinned first comment): "1, 2, 3, 4 ya 5 — aapke auction ki sabse badi problem kaunsi hai? 👇"

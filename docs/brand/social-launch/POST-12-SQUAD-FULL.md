@@ -51,14 +51,14 @@ and people are never named, shown or clipped.
 > Aapke auction ka sabse zyada tootne wala rule kaunsa hai? 👇
 > Demo auction · fictional players · points, not money
 >
-> #CricketAuction #TournamentOrganiser #GullyCricket #LocalCricket #DesiAuction
+> #KagazWaliBoli #CricketAuction #TournamentOrganiser #CricketTournament #DesiAuction
 
-**YouTube Shorts:** `"Do se zyada nahi le sakte bhai!!" 📢 Rule app mein #Shorts #DesiAuction`
+**YouTube Shorts:** `"Do se zyada nahi le sakte bhai!!" 📢 Rule app mein #Shorts #KagazWaliBoli #DesiAuction`
 
 **Threads** (video, topic DesiAuction):
 > "Do se zyada nahi le sakte bhai!!" 📢 DesiAuction mein squad full ho toh bid lagegi hi nahi. desiauction.in #DesiAuction
 
-**X:** same as Threads + `#CricketAuction`.
+**X:** same as Threads + `#KagazWaliBoli` (two tags on X; more cuts reach).
 
 **Comment prompt** (pinned first comment):
 > Aapke auction ka sabse zyada tootne wala rule kaunsa hai — squad size, purse, ya "ek player ek team"? 👇

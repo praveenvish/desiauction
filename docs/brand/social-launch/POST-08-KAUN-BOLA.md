@@ -36,11 +36,11 @@ The refusal on screen is the app's own sentence (`auction-copy.ts`, BELOW_CURREN
 > Aapke auction mein yeh jhagda kitni baar hua? 👇
 > Demo auction · fictional players
 >
-> #CricketAuction #GullyCricket #LocalCricket #TournamentOrganiser #DesiAuction
+> #KagazWaliBoli #CricketAuction #GullyCricket #TournamentOrganiser #DesiAuction
 
-**YouTube Shorts:** `Do takhti, ek number… kaun bola pehle? 😅 #Shorts #DesiAuction`
+**YouTube Shorts:** `Do takhti, ek number… kaun bola pehle? 😅 #Shorts #KagazWaliBoli #DesiAuction`
 **Threads** (video, topic DesiAuction): "Do takhti ek saath uthi. 50… 45… 46… kaun bola pehle? 😅 DesiAuction mein server batata hai. desiauction.in #DesiAuction"
-**X:** same as Threads + `#CricketAuction`.
+**X:** same as Threads + `#KagazWaliBoli` (two tags on X; more cuts reach).
 
 Comment prompt (pinned first comment): "Aapke auction mein 'kaun bola pehle' wala jhagda kitni baar hua? 1 baar, 5 baar, ya har saal? 👇"
 

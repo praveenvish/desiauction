@@ -46,11 +46,11 @@ The paper columns add up as written (945 / 955 / 945); the rewritten totals are 
 > Woh dost tag karo jo har saal auction ka hisaab rakhta hai 👇
 > Demo auction · fictional players · points, not money
 >
-> #CricketAuction #TournamentOrganiser #GullyCricket #LocalCricket #DesiAuction
+> #KagazWaliBoli #CricketAuction #TournamentOrganiser #GullyCricket #DesiAuction
 
-**YouTube Shorts:** `Auction ke 2 ghante baad… "kitne point bache?" 📒 #Shorts #DesiAuction`
+**YouTube Shorts:** `Auction ke 2 ghante baad… "kitne point bache?" 📒 #Shorts #KagazWaliBoli #DesiAuction`
 **Threads** (video, topic DesiAuction): "Auction ke 2 ghante baad: \"Bhai, kitne point bache?\" 📒 Har team ka purse, sabke saamne. desiauction.in #DesiAuction"
-**X:** same as Threads + `#CricketAuction`.
+**X:** same as Threads + `#KagazWaliBoli` (two tags on X; more cuts reach).
 
 Comment prompt (pinned first comment): "Aapke auction mein hisaab kaun rakhta hai — copy, calculator, ya koi ek bhai jo sab yaad rakhta hai? Tag karo 👇"
 
