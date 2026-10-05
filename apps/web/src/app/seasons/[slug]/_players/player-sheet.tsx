@@ -31,6 +31,8 @@ import {
 import type { PlayerDeskContext } from "../../../../server/competition/player-desk";
 import type { RegistrationEditInput } from "../../../../server/competition/registration-edit";
 import type { TimelineEntry } from "../../../../server/competition/registrations";
+import { useMoney, useMoneyUnit } from "../../../../components/money-unit";
+import { priceByHandAction } from "../../../../server/competition/hand-results-actions";
 import { PlayerPhotoUploader } from "../registrations/player-photo-uploader";
 import { SegmentSetting, SelectSetting, TextSetting } from "./fields";
 import {
@@ -800,6 +802,8 @@ function SquadTab({
   const onTeam = row.teamId !== null;
   const locked = desk.rosterLocked;
   const canEdit = desk.canManageTeams;
+  const unit = useMoneyUnit();
+  const money = useMoney();
   const teamName = (id: string | null) =>
     id === null ? null : (teams.find((team) => team.id === id)?.name ?? null);
 
@@ -840,7 +844,7 @@ function SquadTab({
     void setMarks({ [mark]: next }, `${name} ${PHRASE[mark][next ? 0 : 1]}`, { [mark]: !next });
   };
 
-  const status = squadStatus(row, locked);
+  const status = squadStatus(row, locked, desk.handEntry);
   const marksDisabledReason = !canEdit
     ? "Managing squads needs the team permission for this season."
     : null;
@@ -889,6 +893,30 @@ function SquadTab({
               return result;
             }}
           />
+          {/* 0105: the auction was held outside the app. The player's team is
+              chosen here, so what they went for is typed here too — the
+              desk had the team and no box for the points (founder, BPL-4). */}
+          {desk.handEntry && row.teamId !== null && !isPreSigned(row) ? (
+            <TextSetting
+              label={unit === "points" ? "Points they went for" : "Price they went for"}
+              value={row.handPrice == null ? "" : String(row.handPrice / 100)}
+              inputMode="numeric"
+              placeholder="Not given"
+              hint="Optional — shows on the squad page and posters once you publish the results."
+              testId="sheet-hand-price"
+              commit={async (value) => {
+                const typed = value.replace(/[^\d]/g, "");
+                return mutate(
+                  row,
+                  { handPrice: typed === "" ? null : Number(typed) * 100 },
+                  () => priceByHandAction(slug, row.id, typed),
+                  {
+                    success: `${name}: ${typed === "" ? "no price" : money.exact(Number(typed) * 100)}`,
+                  },
+                );
+              }}
+            />
+          ) : null}
         </div>
       </section>
 
@@ -942,6 +970,7 @@ function SquadTab({
 function squadStatus(
   row: Row,
   locked: boolean,
+  handEntry = false,
 ): { tone: "success" | "info" | "warning" | "danger" | "neutral"; text: ReactNode } {
   const kind = preSignedKind(row);
   const marks = [
@@ -962,6 +991,16 @@ function squadStatus(
       tone: "success",
       text: `Pre-signed to ${row.teamName ?? "their team"} as ${marks} — skips the auction.`,
     };
+  }
+  // Results typed in (0105): there is no pool to be "still in" — a team here
+  // IS what the auction decided, and no team means unsold at publish.
+  if (handEntry && row.status === "approved") {
+    return row.teamId !== null
+      ? { tone: "success", text: `Bought by ${row.teamName ?? "a team"}.` }
+      : {
+          tone: "info",
+          text: "Not on a team — marked unsold when you publish the results.",
+        };
   }
   if (row.teamId !== null) {
     return locked

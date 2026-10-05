@@ -2228,6 +2228,8 @@ export interface SquadCandidate {
   isIcon: boolean;
   isCaptain: boolean;
   isRetained: boolean;
+  /** Typed results (0105): what they went for, ×100. Null = none typed. */
+  handPrice: number | null;
 }
 
 /**
@@ -2261,6 +2263,7 @@ export async function squadCandidatesAction(slug: string): Promise<SquadCandidat
           isIcon: row.isIcon,
           isCaptain: row.isCaptain,
           isRetained: row.isRetained,
+          handPrice: row.handPrice ?? null,
         })),
       );
       if (page * result.pageSize >= result.total) {

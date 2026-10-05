@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Dialog, Field, PlayerImage, useToast } from "@desiauction/ui";
+import { Button, ButtonLink, Dialog, Field, PlayerImage, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 
@@ -317,7 +317,19 @@ function HandRow({
  * dialog is the review — every team, how many it bought and what it spent —
  * plus the one number publishing needs: the purse every team started with.
  */
-export function PublishByHand({ slug, teams }: { slug: string; teams: readonly TeamCard[] }) {
+export function PublishByHand({
+  slug,
+  teams,
+  imported = false,
+  inList = false,
+}: {
+  slug: string;
+  teams: readonly TeamCard[];
+  /** The season said its auction is held offline (0110): this IS the next step. */
+  imported?: boolean;
+  /** Drawn under the one-list results screen: the last step, said briefly. */
+  inList?: boolean;
+}) {
   const router = useRouter();
   const toast = useToast();
   const money = useMoney();
@@ -336,9 +348,13 @@ export function PublishByHand({ slug, teams }: { slug: string; teams: readonly T
       name: team.name,
       bought: bought.length,
       spent: bought.reduce((sum, row) => sum + (row.handPrice ?? 0), 0),
+      unpriced: bought.filter((row) => (row.handPrice ?? null) === null).length,
     };
   });
   const placed = rows.reduce((sum, row) => sum + row.bought, 0);
+  const unpriced = rows.reduce((sum, row) => sum + row.unpriced, 0);
+  const teamsDone = rows.filter((row) => row.bought > 0).length;
+  const unitWord = unit === "points" ? "points" : "price";
 
   const close = () => {
     setOpen(false);
@@ -365,21 +381,50 @@ export function PublishByHand({ slug, teams }: { slug: string; teams: readonly T
       aria-labelledby="tm-hand-title"
     >
       <span className="tm-next-text">
-        <strong id="tm-hand-title">Auction already done outside the app?</strong>
+        <strong id="tm-hand-title">
+          {inList
+            ? "Done typing? Publish the teams"
+            : imported
+              ? "Next: type in the auction results"
+              : "Auction already done outside the app?"}
+        </strong>
         <span>
-          Open each team and add the players it bought — {unit === "points" ? "points" : "price"}{" "}
-          optional. Then publish: posters and team cards turn on, and the teams lock.
+          {inList ? (
+            <>Posters and team cards turn on, and the teams lock — check the list above first.</>
+          ) : (
+            <>
+              Put every player on the team that bought them, with their {unitWord}, in one list. Or
+              open a team below to add its players one by one.
+            </>
+          )}
         </span>
+        {placed > 0 ? (
+          <span className="tm-hand-progress" data-testid="hand-progress">
+            {teamsDone} of {rows.length} teams have players · {placed} placed
+            {unpriced > 0 ? ` · ${String(unpriced)} without ${unitWord}` : ""}
+          </span>
+        ) : null}
       </span>
-      <Button
-        onClick={() => {
-          setOpen(true);
-        }}
-        disabled={placed === 0}
-        data-testid="hand-publish-open"
-      >
-        Publish teams
-      </Button>
+      <span className="tm-hand-actions">
+        {inList ? null : (
+          <ButtonLink
+            href={`/seasons/${slug}/teams?view=results`}
+            variant={placed === 0 ? "primary" : "secondary"}
+            data-testid="hand-open-list"
+          >
+            Type results in one list
+          </ButtonLink>
+        )}
+        <Button
+          onClick={() => {
+            setOpen(true);
+          }}
+          disabled={placed === 0}
+          data-testid="hand-publish-open"
+        >
+          Publish teams
+        </Button>
+      </span>
       <Dialog
         open={open}
         onClose={close}
