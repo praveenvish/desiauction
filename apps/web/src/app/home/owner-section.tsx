@@ -111,7 +111,7 @@ export async function OwnerSection({ team }: { team: OwnedTeam }) {
     // The whole squad, pre-signed included, from the read the season's public
     // team page publishes (null for a private season — the strip then shows
     // the night's buys, as before).
-    publicTeam(team.competitionSlug, teamSlugOf(team.teamName)),
+    publicTeam(team.competitionSlug, teamSlugOf({ id: team.teamId, name: team.teamName })),
     // After the night, the team's season — the owner's own team, from roles.
     over ? teamSeason(team.teamId, today) : Promise.resolve(null),
   ]);

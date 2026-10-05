@@ -287,6 +287,8 @@ export interface ShowcasePlayer {
   /** Why a `retained`-status player skipped the auction — the word to print. */
   preSignedAs: PreSignedKind | null;
   teamName: string | null;
+  /** The squad page this player belongs on (`teamSlugOf`); null with no team. */
+  teamSlug: string | null;
   /**
    * What the room paid, in the season's unit ×100 — null for anyone not sold
    * at auction (in the pool, pre-signed, passed). Public since the founder's
@@ -394,6 +396,10 @@ function toShowcasePlayer(r: ShowcaseRow, now: Date, sport: string): ShowcasePla
     status: r.preSigned ? "retained" : r.teamId === null ? "available" : "sold",
     preSignedAs: r.preSigned ? preSignedKind(r) : null,
     teamName: r.teamName,
+    teamSlug:
+      r.teamId === null || r.teamName === null
+        ? null
+        : teamSlugOf({ id: r.teamId, name: r.teamName }),
     // A pre-signed player's public outcome is the mark, not a price.
     soldPrice: r.preSigned ? null : (r.soldPrice ?? null),
   };
@@ -881,7 +887,8 @@ export async function myAuctionOutcome(
     // A "sold" with no team row to name is not a sentence we can finish.
     outcome: outcome === "sold" && team === undefined ? "pool" : outcome,
     teamName: team?.name ?? null,
-    teamSlug: team === undefined ? null : teamSlugOf(team.name),
+    teamSlug:
+      team === undefined || teamId === null ? null : teamSlugOf({ id: teamId, name: team.name }),
     teamId: team === undefined ? null : teamId,
     teamColor: team?.color ?? null,
     pricePaise: outcome === "sold" ? (lot?.soldPrice ?? null) : null,
@@ -1070,9 +1077,41 @@ export interface PublicTeam {
   auctionSource: "app" | "imported";
 }
 
-/** The address segment for a team: its name, as a slug. */
-export function teamSlugOf(name: string): string {
-  return slugifyName(name);
+/**
+ * The address segment for a team. A name in plain English letters is its own
+ * slug ("Malad Mavericks" → `malad-mavericks`), as it always was. Any other
+ * name — "आशापुरा इलेवन", "रघुनाथपुरा XI" — used to lose every letter and fall
+ * back to `competition` (or to the stray `xi`), so a season of Hindi-named
+ * teams gave all of them ONE address, which always opened the first team.
+ * Those names now carry a short tag from the team's own id, unique per season.
+ */
+export function teamSlugOf(team: { id: string; name: string }): string {
+  const base = team.name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+  // eslint-disable-next-line no-control-regex -- "anything outside ASCII"
+  if (base !== "" && !/[^\x00-\x7F]/.test(team.name)) {
+    return base;
+  }
+  const tag = team.id.slice(-6).toLowerCase();
+  return base === "" ? `team-${tag}` : `${base}-${tag}`;
+}
+
+/**
+ * Which team an address names: today's slug first, then the one it was shared
+ * under before (`slugifyName` alone), so a link already sent on WhatsApp or
+ * printed on a QR code still opens a team rather than a 404.
+ */
+export function teamForSlug<T extends { id: string; name: string }>(
+  rows: readonly T[],
+  slug: string,
+): T | undefined {
+  return (
+    rows.find((row) => teamSlugOf(row) === slug) ??
+    rows.find((row) => slugifyName(row.name) === slug)
+  );
 }
 
 export async function publicTeam(slug: string, teamSlug: string): Promise<PublicTeam | null> {
@@ -1105,7 +1144,7 @@ export async function publicTeam(slug: string, teamSlug: string): Promise<Public
     .from(teams)
     .where(eq(teams.competitionId, comp.id))
     .orderBy(asc(teams.name));
-  const team = teamRows.find((row) => teamSlugOf(row.name) === teamSlug);
+  const team = teamForSlug(teamRows, teamSlug);
   if (team === undefined) {
     return null;
   }
@@ -1173,35 +1212,33 @@ export async function publicTeam(slug: string, teamSlug: string): Promise<Public
           )
           .orderBy(desc(lots.soldPrice));
 
-  // Placed on this team by hand, and not sold in a lot:
-  //  * 0110 — an imported season before "Publish": every placed player, at the
-  //    price the organizer typed;
-  //  * after a hand-entered publish — the players placed WITHOUT a price, who
-  //    get no lot (`publishResultsByHand`) but are on the squad all the same
-  //    (the posters read them the same way).
-  // A player with a sold lot is `boughtRows`' and never listed here too.
+  // Everyone else on this team and not sold in a lot — the same players the
+  // season page's squad cards already list publicly (`publicShowcase` reads
+  // `registrations.team_id`), so the two pages can never disagree on a count.
+  // That covers players put on a team by hand or by the assign-team desk, and
+  // after a hand-entered publish the ones placed WITHOUT a price (no lot).
+  // A typed price is shown only where it IS the result: an imported season
+  // (0110) or a hand-entered auction.
   const handPlaced =
     auction === undefined ? comp.auctionSource === "imported" : auction.enteredByHand;
-  const placedRows = !handPlaced
-    ? []
-    : await systemDb
-        .select({ ...member, price: registrations.offlinePrice })
-        .from(registrations)
-        .innerJoin(people, eq(people.id, registrations.personId))
-        .where(
-          and(
-            eq(registrations.competitionId, comp.id),
-            eq(registrations.teamId, team.id),
-            eq(registrations.status, "approved"),
-            sql`not ${preSignedSql}`,
-            ...(auction === undefined
-              ? []
-              : [
-                  sql`not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.auctionId} = ${auction.id} and ${lots.status} = 'sold')`,
-                ]),
-          ),
-        )
-        .orderBy(sql`${registrations.offlinePrice} desc nulls last`, asc(shownName));
+  const placedRows = await systemDb
+    .select({ ...member, price: registrations.offlinePrice })
+    .from(registrations)
+    .innerJoin(people, eq(people.id, registrations.personId))
+    .where(
+      and(
+        eq(registrations.competitionId, comp.id),
+        eq(registrations.teamId, team.id),
+        eq(registrations.status, "approved"),
+        sql`not ${preSignedSql}`,
+        ...(auction === undefined
+          ? []
+          : [
+              sql`not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.auctionId} = ${auction.id} and ${lots.status} = 'sold')`,
+            ]),
+      ),
+    )
+    .orderBy(sql`${registrations.offlinePrice} desc nulls last`, asc(shownName));
 
   const now = new Date();
   const photo = (row: {
@@ -1236,7 +1273,7 @@ export async function publicTeam(slug: string, teamSlug: string): Promise<Public
     ...boughtRows
       .filter((row) => !preSignedRows.some((pre) => pre.registrationId === row.registrationId))
       .map((row) => toMember(row, row.price, row.isCaptain ? ["captain"] : [])),
-    ...placedRows.map((row) => toMember(row, row.price, [])),
+    ...placedRows.map((row) => toMember(row, handPlaced ? row.price : null, [])),
   ];
   return {
     competitionId: comp.id,
@@ -1247,7 +1284,8 @@ export async function publicTeam(slug: string, teamSlug: string): Promise<Public
     team: {
       id: team.id,
       name: team.name,
-      slug: teamSlug,
+      // The canonical address, even when an older link opened the page.
+      slug: teamSlugOf(team),
       shortName: team.shortName,
       color: team.color,
       crestKey: team.crestKey,
@@ -1255,7 +1293,10 @@ export async function publicTeam(slug: string, teamSlug: string): Promise<Public
       coachName: team.coachName,
     },
     members,
-    spentPaise: [...boughtRows, ...placedRows].reduce((total, row) => total + (row.price ?? 0), 0),
+    spentPaise: [...boughtRows, ...(handPlaced ? placedRows : [])].reduce(
+      (total, row) => total + (row.price ?? 0),
+      0,
+    ),
     pursePaise: publicAuctionRules(auction?.config).pursePerTeam,
     unit: comp.unit,
     auctionStatus: auction?.status ?? null,
@@ -1604,6 +1645,8 @@ export interface MyRegistration {
   auctionUnit: MoneyUnit;
   /** The team this person plays for — sold to, or named captain/icon of. */
   teamName: string | null;
+  /** That team's public page address (`teamSlugOf`); null with no team. */
+  teamSlug: string | null;
   /** That team's own colour, for its chip; null when the club set none. */
   teamColor: string | null;
 }
@@ -1635,6 +1678,7 @@ export const myRegistrations = cache(async function myRegistrations(
       auctionStatus: auctions.status,
       auctionUnit: competitions.auctionUnit,
       teamName: teams.name,
+      teamRowId: teams.id,
       teamColor: teams.primaryColor,
     })
     .from(registrations)
@@ -1684,6 +1728,10 @@ export const myRegistrations = cache(async function myRegistrations(
       ) !== null,
     auctionUnit: row.auctionUnit,
     teamName: row.teamName,
+    teamSlug:
+      row.teamRowId === null || row.teamName === null
+        ? null
+        : teamSlugOf({ id: row.teamRowId, name: row.teamName }),
     teamColor: row.teamColor,
     auction:
       row.lotStatus === "sold" && row.soldPrice !== null
@@ -1792,11 +1840,11 @@ async function indexableSquadSlugs(
   );
   if (allowed.length === 0) return result;
   const rows = await systemDb
-    .select({ competitionId: teams.competitionId, name: teams.name })
+    .select({ competitionId: teams.competitionId, id: teams.id, name: teams.name })
     .from(teams)
     .where(inArray(teams.competitionId, allowed));
   for (const row of rows) {
-    result.set(row.competitionId, [...(result.get(row.competitionId) ?? []), teamSlugOf(row.name)]);
+    result.set(row.competitionId, [...(result.get(row.competitionId) ?? []), teamSlugOf(row)]);
   }
   return result;
 }
