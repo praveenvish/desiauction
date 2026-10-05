@@ -41,6 +41,7 @@ export interface EditionRow {
   /** PI-1: the organizer-declared entry category. */
   entryCategory: "open" | "men" | "women" | "mixed";
   auctionUnit: "inr" | "points";
+  auctionSource: "app" | "imported";
   startsOn: string | null;
   endsOn: string | null;
   location: string | null;
@@ -82,6 +83,7 @@ async function editionsFor(
       visibility: competitions.visibility,
       entryCategory: competitions.entryCategory,
       auctionUnit: competitions.auctionUnit,
+      auctionSource: competitions.auctionSource,
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,
       location: competitions.location,
@@ -147,6 +149,7 @@ async function editionsFor(
       visibility: row.visibility,
       entryCategory: row.entryCategory,
       auctionUnit: row.auctionUnit,
+      auctionSource: row.auctionSource,
       startsOn: row.startsOn,
       endsOn: row.endsOn,
       location: row.location,

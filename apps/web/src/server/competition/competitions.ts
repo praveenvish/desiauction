@@ -25,7 +25,7 @@ import {
   writeSurvivingConstraint,
   type Db,
 } from "@desiauction/db";
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ne, sql } from "drizzle-orm";
 
 import { storage } from "../media";
 import { squadListingDecision, type SquadListing } from "../seo/squads";
@@ -77,6 +77,17 @@ export async function tournamentsOf(db: Db, orgId: string): Promise<TournamentSu
     .orderBy(tournaments.name);
 }
 
+/**
+ * WHERE A SEASON'S AUCTION HAPPENS (0110): `app` runs it live here; `imported`
+ * was held somewhere else and its results are typed in on the Teams tab.
+ */
+export const AUCTION_SOURCES = ["app", "imported"] as const;
+export type AuctionSource = (typeof AUCTION_SOURCES)[number];
+
+export function isAuctionSource(value: string): value is AuctionSource {
+  return (AUCTION_SOURCES as readonly string[]).includes(value);
+}
+
 export interface CompetitionSummary {
   id: string;
   orgId: string;
@@ -93,6 +104,8 @@ export interface CompetitionSummary {
   entryCategory: EntryCategory;
   /** 0091: rupees or points — how every amount reads, and whether money is owed. */
   auctionUnit: MoneyUnit;
+  /** 0110: run live here, or held elsewhere and typed in on the Teams tab. */
+  auctionSource: AuctionSource;
   location: string | null;
   startsOn: string | null;
   endsOn: string | null;
@@ -166,6 +179,7 @@ export async function createCompetition(
     status: "draft",
     entryCategory: "open",
     auctionUnit: input.auctionUnit ?? "inr",
+    auctionSource: "app",
     visibility: "private",
     location: input.location ?? null,
     startsOn: input.startsOn ?? null,
@@ -203,6 +217,7 @@ export async function competitionsForPerson(db: Db, personId: string): Promise<S
       visibility: competitions.visibility,
       entryCategory: competitions.entryCategory,
       auctionUnit: competitions.auctionUnit,
+      auctionSource: competitions.auctionSource,
       location: competitions.location,
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,
@@ -241,6 +256,7 @@ export async function competitionsOfTournament(
       visibility: competitions.visibility,
       entryCategory: competitions.entryCategory,
       auctionUnit: competitions.auctionUnit,
+      auctionSource: competitions.auctionSource,
       location: competitions.location,
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,
@@ -315,6 +331,7 @@ export async function resolveCompetition(
       visibility: competitions.visibility,
       entryCategory: competitions.entryCategory,
       auctionUnit: competitions.auctionUnit,
+      auctionSource: competitions.auctionSource,
       location: competitions.location,
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,
@@ -469,11 +486,13 @@ export interface CompetitionDetails {
   entryCategory?: EntryCategory;
   /** 0091: rupees or points. Absent = leave it; refused once an auction exists. */
   auctionUnit?: MoneyUnit;
+  /** 0110: in the app or imported. Absent = leave it; refused once an auction exists. */
+  auctionSource?: AuctionSource;
 }
 
 export type UpdateDetailsResult =
   | { ok: true; competition: CompetitionSummary }
-  | { ok: false; reason: "invalid_name" | "reversed_dates" | "unit_locked" };
+  | { ok: false; reason: "invalid_name" | "reversed_dates" | "unit_locked" | "source_locked" };
 
 /**
  * IS THE SEASON'S UNIT STILL OPEN TO CHANGE? (0091)
@@ -489,6 +508,28 @@ export async function auctionUnitLocked(db: Db, competitionId: string): Promise<
     .select({ id: auctions.id })
     .from(auctions)
     .where(and(eq(auctions.competitionId, competitionId), isRealAuction()))
+    .limit(1);
+  return row !== undefined;
+}
+
+/**
+ * IS WHERE THE AUCTION HAPPENS STILL OPEN TO CHANGE? (0110)
+ *
+ * Only while the season has no real auction, an aborted one aside (the same
+ * test hand entry uses). A live auction here and an imported one are two
+ * different records of the same night; once either exists, the answer is fixed.
+ */
+export async function auctionSourceLocked(db: Db, competitionId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: auctions.id })
+    .from(auctions)
+    .where(
+      and(
+        eq(auctions.competitionId, competitionId),
+        isRealAuction(),
+        ne(auctions.status, "abandoned"),
+      ),
+    )
     .limit(1);
   return row !== undefined;
 }
@@ -520,6 +561,11 @@ export async function updateCompetitionDetails(
   if (unitChanges && (await auctionUnitLocked(db, competition.id))) {
     return { ok: false, reason: "unit_locked" };
   }
+  const sourceChanges =
+    input.auctionSource !== undefined && input.auctionSource !== competition.auctionSource;
+  if (sourceChanges && (await auctionSourceLocked(db, competition.id))) {
+    return { ok: false, reason: "source_locked" };
+  }
   const next = {
     name: valid.value,
     location: input.location,
@@ -529,6 +575,7 @@ export async function updateCompetitionDetails(
     // a season is for is exactly as consequential as renaming it.
     entryCategory: input.entryCategory ?? competition.entryCategory,
     auctionUnit: input.auctionUnit ?? competition.auctionUnit,
+    auctionSource: input.auctionSource ?? competition.auctionSource,
   };
   await db.update(competitions).set(next).where(eq(competitions.id, competition.id));
   await db.insert(auditLog).values({
@@ -546,6 +593,7 @@ export async function updateCompetitionDetails(
         endsOn: competition.endsOn,
         entryCategory: competition.entryCategory,
         auctionUnit: competition.auctionUnit,
+        auctionSource: competition.auctionSource,
       },
       to: next,
     },

@@ -462,6 +462,15 @@ export async function createAuctionAction(
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
+  // 0110: a season whose auction was held elsewhere types its results in on
+  // the Teams tab; a second, live record of the same night is refused.
+  if (gate.competition.auctionSource === "imported") {
+    return {
+      ok: false,
+      error:
+        "This season's auction is held outside DesiAuction — add the results on the Teams tab, or switch it back in Season details.",
+    };
+  }
   let config: AuctionConfig;
   if (setup === undefined) {
     config = defaultAuctionConfigFor(gate.competition.auctionUnit);

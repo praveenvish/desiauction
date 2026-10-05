@@ -1029,6 +1029,16 @@ export const competitions = pgTable(
     auctionUnit: text("auction_unit", { enum: ["inr", "points"] })
       .notNull()
       .default("inr"),
+    /**
+     * WHERE THIS SEASON'S AUCTION HAPPENS (0110) — `app` (run live here) or
+     * `imported` (held somewhere else; the organizer copies the results in on
+     * the Teams tab). An imported season shows its placed players publicly as
+     * they are typed, and never creates an in-app auction. Fixed once the
+     * season has a (non-aborted) real auction.
+     */
+    auctionSource: text("auction_source", { enum: ["app", "imported"] })
+      .notNull()
+      .default("app"),
     /*
      * The Google Sheet this season's registrations keep arriving in (0093) —
      * the Form's linked responses sheet, picked once by the organizer so

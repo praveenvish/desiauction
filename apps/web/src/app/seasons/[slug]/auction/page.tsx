@@ -85,6 +85,11 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
   // "Go live" leads to a room that is actually open. Before that there is
   // nothing to watch, and after it there is nothing to bid on.
   const inProgress = status === "live" || status === "paused";
+  // 0110: declared in Season details — the night happens somewhere else, so
+  // there is no room to set up here, only results to type in.
+  const imported =
+    dashboard.competition.auctionSource === "imported" &&
+    (status === null || status === "abandoned");
   const rows = table?.standings.rows ?? [];
   const standing = rows.some((row) => row.played > 0)
     ? Object.fromEntries(
@@ -167,7 +172,9 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
             <PracticeCard slug={slug} card={practice} />
           ) : null}
           {/* 0105: before any auction, the other road — it already happened. */}
-          {(status === null || status === "abandoned") && dashboard.viewer.canManage ? (
+          {(status === null || status === "abandoned") &&
+          !imported &&
+          dashboard.viewer.canManage ? (
             <p className="auc-hand-hint" data-testid="auction-hand-hint">
               Auction already held outside the app?{" "}
               <Link href={`/seasons/${slug}/teams`}>Add the results on the Teams tab</Link> to get
@@ -195,7 +202,21 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
               each team&apos;s squad, ready to share before the auction.
             </p>
           ) : null}
-          {dashboard.view?.auction.enteredByHand === true ? (
+          {imported ? (
+            <SectionCard
+              icon={<IconGavel />}
+              title="Auction held outside DesiAuction"
+              description="Add each team's players and prices on the Teams tab. The public squad pages show them as you go; publish when every team is complete to finish the season's results. To run the auction here instead, change it in Season details."
+              data-testid="auction-imported"
+            >
+              <span className="date-row">
+                <ButtonLink href={`/seasons/${slug}/teams`} size="sm">
+                  <IconUser size={16} />
+                  Add results on the Teams tab
+                </ButtonLink>
+              </span>
+            </SectionCard>
+          ) : dashboard.view?.auction.enteredByHand === true ? (
             /* No room ran, so there is no bidding to review — just what was
                typed in, and where it is used. */
             <SectionCard
