@@ -1,6 +1,6 @@
 # Post 12 — "Do se zyada nahi le sakte bhai!" · series *Kagaz wali boli* 5/6 · Mon 12 Oct 2026
 
-> Series plan approved by the founder 2026-10-05; Reel built, **awaiting final approval** (scheduling it needs the founder's OK on the finished reel).
+> Series plan approved by the founder 2026-10-05; finished reel **approved by the founder 2026-10-05** ("approved 5 and 6, schedule both"); scheduled as task `post-12-squad-full`, Mon 12 Oct 19:30 IST.
 > Plan: [`SERIES-KAGAZ-WALI-BOLI.md`](SERIES-KAGAZ-WALI-BOLI.md). Rules: [`SOCIAL_CONTENT_PLAN.md`](../../operations/SOCIAL_CONTENT_PLAN.md) §1a, §1b.
 
 **Why this:** in the paper auction we studied, a rule was enforced by shouting from the
