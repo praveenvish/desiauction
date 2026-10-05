@@ -16,7 +16,9 @@ import {
   type ClubRole,
   type DeskResult,
 } from "./club";
+import { createClubAsOperator } from "./create-club";
 import { operatorFor, type OperatorRefusal } from "./guard";
+import { moveDesk, moveTournament, type MoveDesk } from "./move-tournament";
 
 /*
  * THE CLUB ROLES DESK'S BUTTONS (AC-1.3). Superadmin only (`platform.grant`):
@@ -166,4 +168,66 @@ export async function adminClubDesk(slug: string): Promise<ClubDesk | null> {
     .where(eq(organizations.slug, slug))
     .limit(1);
   return org === undefined ? null : clubDesk(systemDb, org.id);
+}
+
+/**
+ * Move a tournament (every season under it) or a one-off season to another
+ * club. Superadmin, reason, step-up — then the database's own move function.
+ */
+export async function moveTournamentAction(input: {
+  slug: string;
+  subjectKind: string;
+  subjectId: string;
+  targetSlug: string;
+  reason: string;
+}): Promise<ClubDeskResult & { targetSlug?: string }> {
+  const gate = await operatorFor("platform.grant", { reason: input.reason });
+  if (!gate.ok) {
+    return gate;
+  }
+  if (input.subjectKind !== "tournament" && input.subjectKind !== "season") {
+    return { ok: false, error: "Pick a tournament or season to move." };
+  }
+  return moveTournament(systemDb, {
+    operator: gate.operator.personId,
+    slug: input.slug,
+    subjectKind: input.subjectKind,
+    subjectId: input.subjectId,
+    targetSlug: input.targetSlug,
+    reason: gate.operator.reason,
+  });
+}
+
+/** Start a club from /admin/orgs; the operator owns it, like any organizer. */
+export async function createClubAction(input: {
+  name: string;
+  reason: string;
+}): Promise<ClubDeskResult & { slug?: string }> {
+  const gate = await operatorFor("platform.grant", { reason: input.reason });
+  if (!gate.ok) {
+    return gate;
+  }
+  return createClubAsOperator({
+    operator: gate.operator.personId,
+    name: input.name,
+    reason: gate.operator.reason,
+  });
+}
+
+/** The move desk's read — null for anyone but a superadmin. */
+export async function adminMoveDesk(slug: string): Promise<MoveDesk | null> {
+  if ((await platformGrantGate()) === null) {
+    return null;
+  }
+  const [org] = await systemDb
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(eq(organizations.slug, slug))
+    .limit(1);
+  return org === undefined ? null : moveDesk(systemDb, org.id);
+}
+
+/** Whether this viewer may start clubs from /admin/orgs. */
+export async function canCreateClubFromAdmin(): Promise<boolean> {
+  return (await platformGrantGate()) !== null;
 }
