@@ -761,6 +761,13 @@
     {
       "idx": 108,
       "version": "7",
+      "when": 1793116800000,
+      "tag": "0109_move_single_season",
+      "breakpoints": true
+    },
+    {
+      "idx": 109,
+      "version": "7",
       "when": 1793203200000,
       "tag": "0110_auction_source",
       "breakpoints": true
