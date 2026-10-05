@@ -186,7 +186,17 @@ test("founder demo: org → competition → approve → team roster → venue �
     .first()
     .click();
   await expect(page.getByTestId("assign-team-row")).toBeVisible();
+  // The table updates optimistically; the SERVER has the team only once the
+  // save's server action answers. Navigating before that aborted the save in
+  // Firefox, and the team's roster below was empty (nightly, 2026-10-05). The
+  // field's "Saved" mark fades after 1.6s, so wait on the response itself.
+  const saved = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response.request().headers()["next-action"] !== undefined,
+  );
   await page.getByTestId("sheet-team").selectOption({ label: "Malad Mavericks" });
+  expect((await saved).ok()).toBe(true);
   await expect(page.getByTestId("reg-table")).toContainText("Malad Mavericks");
 
   // Team roster shows the assignment (URL-addressed, server-rendered) — open
