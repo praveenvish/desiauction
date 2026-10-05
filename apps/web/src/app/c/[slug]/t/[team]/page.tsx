@@ -1,25 +1,37 @@
 import { cache, type CSSProperties, type ReactNode } from "react";
-import { formatAmount, paise, roleLabelIn, sportPackFor, type MoneyUnit } from "@desiauction/core";
-import { ButtonLink, IconArrowLeft, PlayerImage, RosterMark } from "@desiauction/ui";
+import {
+  formatAmount,
+  monogramOf,
+  paise,
+  roleLabelIn,
+  sportPackFor,
+  type MoneyUnit,
+} from "@desiauction/core";
+import {
+  IconArrowLeft,
+  IconCalendar,
+  IconChevronRight,
+  IconPin,
+  PlayerImage,
+  RosterMark,
+} from "@desiauction/ui";
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { env } from "../../../../../env";
 import { teamShareMessage } from "../../../../../lib/share-message";
 import { teamFacts } from "../../../../../lib/team-facts";
-import { publicTeam } from "../../../../../server/competition/public";
-import {
-  PageBody,
-  PageHero,
-  PageSection,
-  StatStrip,
-  type Stat,
-} from "../../../../../components/public/public-kit";
+import { servedAsStored } from "../../../../../lib/stored-image";
+import { publicTeam, type PublicTeamMember } from "../../../../../server/competition/public";
+import { HeroBanner } from "../../../../../components/public/public-kit";
 import { CrestImage } from "../../../../../components/team/crest-image";
+import { formatDateRange } from "../../../format";
 import { ShareSheet } from "../../../share-sheet";
 import "../../../../marketing.css";
 import "../../../directory.css";
+import "./team-page.css";
 
 /**
  * THE PUBLIC SQUAD — `/c/[slug]/t/[team]`.
@@ -105,18 +117,50 @@ export default async function PublicTeamPage({
   const facts = teamFacts(team);
   const colour = team.team.color ?? "var(--accent)";
   const pack = sportPackFor(team.sport);
-  const stats: Stat[] = [
-    { value: String(facts.playerCount), label: facts.playerCount === 1 ? "Player" : "Players" },
-    ...(facts.spentLabel === null ? [] : [{ value: facts.spentLabel, label: "Spent" }]),
+  const cover = team.season.coverUrl;
+
+  // The two players a squad is introduced by. Shown once, as cards, and not
+  // again in the list under them.
+  const isLeader = (member: PublicTeamMember) =>
+    member.marks.includes("captain") || member.marks.includes("icon");
+  const leaders = team.members
+    .filter(isLeader)
+    .sort((a, b) => Number(b.marks.includes("captain")) - Number(a.marks.includes("captain")));
+  const roster = team.members.filter((member) => !isLeader(member));
+
+  // What the list is made of, when the season records roles — counted over
+  // the same players as the heading beside it. A season whose roles were
+  // never collected (an imported sheet) says nothing rather than "15 · Unknown".
+  const roleCounts = new Map<string, number>();
+  for (const member of roster) {
+    const label = roleLabelIn(pack, member.role);
+    if (label !== "") {
+      roleCounts.set(label, (roleCounts.get(label) ?? 0) + 1);
+    }
+  }
+
+  // The squad's numbers, inside the hero rather than in a card of their own:
+  // a full-width box holding one figure was most of the old page's first
+  // screen. Each one only when it is real — an offline night has no spend.
+  const heroFacts: { label: string; value: string }[] = [
+    { label: facts.playerCount === 1 ? "Player" : "Players", value: String(facts.playerCount) },
+    ...(facts.spentLabel === null ? [] : [{ label: "Spent", value: facts.spentLabel }]),
     ...(facts.remainingLabel === null
       ? []
-      : [{ value: facts.remainingLabel, label: "Purse left" }]),
+      : [{ label: "Purse left", value: facts.remainingLabel }]),
     ...(facts.topBuy === null
       ? []
-      : // A figure like the three before it, so no divider of its own: the
-        // strip drew one rule before the last tile only (review r2, r3).
-        [{ value: facts.topBuy.priceLabel, label: `Top buy · ${facts.topBuy.name}` }]),
+      : [{ label: `Top buy · ${facts.topBuy.name}`, value: facts.topBuy.priceLabel }]),
+    ...(team.team.coachName === null ? [] : [{ label: "Coach", value: team.team.coachName }]),
   ];
+  // One figure is not a strip — it was the old page's whole first screen. An
+  // offline night has a head count and nothing else: it joins the meta line.
+  const showFacts = heroFacts.length > 1;
+  const dates =
+    team.season.startsOn === null && team.season.endsOn === null
+      ? null
+      : formatDateRange(team.season.startsOn, team.season.endsOn);
+
   const messages = {
     en: teamShareMessage(
       { teamName: team.team.name, competitionName: team.competitionName, ...facts },
@@ -128,131 +172,288 @@ export default async function PublicTeamPage({
     ),
   };
   const crestFallback = (
-    <span className="team-page-crest-mark" aria-hidden="true">
+    <span className="tp-crest-mark" aria-hidden="true">
       {facts.teamMonogram}
     </span>
   );
+  const playerHref = (member: PublicTeamMember) =>
+    `/c/${slug}/p/${encodeURIComponent(member.number)}`;
 
   return (
-    <main className="public-page mk">
-      {/* No `sport`: the crest rides the title, and the sport's stock glyph
-          would take the right half back as decoration. */}
-      <PageHero
-        eyebrow={<Link href={`/c/${slug}`}>{team.competitionName}</Link>}
-        /* THE CREST BESIDE THE NAME (round 5): a 220px disc filled the hero's
-           right half with decoration and no information; at 96px beside the
-           title it identifies the team the way the player page's avatar does. */
-        title={
-          <span className="player-title team-page-title">
-            <span className="team-page-crest" style={{ "--team": colour } as CSSProperties}>
-              {team.team.crestUrl === null ? (
-                crestFallback
-              ) : (
-                <CrestImage
-                  src={team.team.crestUrl}
-                  fallback={crestFallback}
-                  width={160}
-                  height={160}
-                />
-              )}
-            </span>
-            <span>{team.team.name}</span>
-          </span>
-        }
-        /* "Our squad" spoke as the team, on a page anyone can land on from a
-           forwarded link; the season's name says whose squad it is. */
-        lede={[
-          `${team.competitionName} squad`,
-          ...(team.team.coachName === null ? [] : [`Coach ${team.team.coachName}`]),
-          // 0110: the night happened elsewhere — say so, so nobody looks for
-          // a live room or a replay.
-          ...(team.auctionSource === "imported" ? ["Auction held offline"] : []),
-        ].join(" · ")}
-        actions={
-          <ButtonLink href={`/c/${slug}`} variant="ghost" size="lg" className="team-page-back">
-            <IconArrowLeft size={18} /> Back to {team.competitionName}
-          </ButtonLink>
-        }
-      />
+    <main className="public-page mk tp" style={{ "--team": colour } as CSSProperties}>
+      <header
+        className="tp-hero"
+        data-theme="floodlight"
+        data-cover={cover === null ? undefined : ""}
+      >
+        {/* The season's banner, blurred, as the band's light; drawn whole and
+            sharp beside the team on a laptop. Without one the band takes the
+            team's own colour. */}
+        {cover === null ? null : (
+          <div className="tp-hero-cover" aria-hidden>
+            <Image
+              src={cover}
+              unoptimized={servedAsStored(cover)}
+              alt=""
+              fill
+              sizes="100vw"
+              priority
+            />
+          </div>
+        )}
+        <div className="tp-hero-inner">
+          <div className="tp-hero-main">
+            <Link href={`/c/${slug}`} className="tp-back">
+              <IconArrowLeft size={16} />
+              <span>
+                {team.competitionName}
+                <span className="tp-back-hint"> · all teams</span>
+              </span>
+            </Link>
 
-      <PageBody>
-        {stats.length > 0 ? (
-          <StatStrip label={`${team.team.name} — squad totals`} stats={stats} />
-        ) : null}
+            <div className="tp-identity">
+              <span className="tp-crest">
+                {team.team.crestUrl === null ? (
+                  crestFallback
+                ) : (
+                  <CrestImage
+                    src={team.team.crestUrl}
+                    fallback={crestFallback}
+                    width={160}
+                    height={160}
+                  />
+                )}
+              </span>
+              <div className="tp-identity-copy">
+                <p className="tp-kicker">
+                  {pack.label} squad · {team.competitionName}
+                </p>
+                <h1 className="tp-name">{team.team.name}</h1>
+                <ul className="tp-meta">
+                  {showFacts ? null : (
+                    <li className="tp-meta-strong">
+                      {facts.playerCount} {facts.playerCount === 1 ? "player" : "players"}
+                    </li>
+                  )}
+                  <li>By {team.season.orgName}</li>
+                  {team.season.location === null ? null : (
+                    <li>
+                      <IconPin size={15} aria-hidden /> {team.season.location}
+                    </li>
+                  )}
+                  {dates === null ? null : (
+                    <li>
+                      <IconCalendar size={15} aria-hidden /> {dates}
+                    </li>
+                  )}
+                  {/* 0110: the night happened elsewhere — say so, so nobody
+                      looks for a live room or a replay. */}
+                  {team.auctionSource === "imported" ? <li>Auction held offline</li> : null}
+                </ul>
+              </div>
+            </div>
 
-        <PageSection headingId="squad-heading" title="Squad">
-          {team.members.length === 0 ? (
-            <p className="team-page-empty">
-              The squad is announced after the auction. Share this page — it fills in as players are
-              signed.
-            </p>
-          ) : (
-            <ul className="team-page-squad" data-testid="team-squad">
-              {team.members.map((member) => (
-                <li key={member.registrationId}>
-                  <Link
-                    href={`/c/${slug}/p/${encodeURIComponent(member.number)}`}
-                    className="team-page-player"
-                  >
-                    <span className="team-page-face">
-                      <PlayerImage
-                        name={member.name}
-                        seed={member.registrationId}
-                        size="md"
-                        shape="round"
-                        src={member.photoUrl}
-                        decorative
-                      />
-                    </span>
-                    <span className="team-page-who">
-                      <strong>
-                        <NameWithBadge
-                          name={member.name}
-                          badge={
-                            /* The role on the sheet, as a badge after the name
-                               — not in the price slot, where gold italics
-                               read as a price. */
-                            member.marks.includes("captain") ? (
-                              <RosterMark kind="captain" className="team-page-badge" />
-                            ) : member.marks.includes("icon") ? (
-                              <RosterMark kind="icon" className="team-page-badge" />
-                            ) : null
-                          }
-                        />
-                      </strong>
-                      <span>{roleLabelIn(pack, member.role)}</span>
-                    </span>
-                    <span className="team-page-price">
-                      {member.pricePaise !== null ? (
-                        formatPrice(member.pricePaise, team.unit)
-                      ) : member.marks.length === 0 ? null : (
-                        <span className="team-page-signed">
-                          {member.marks.includes("retained") ? "Retained" : "Pre-signed"}
-                        </span>
-                      )}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            {showFacts ? (
+              <dl className="tp-facts" aria-label={`${team.team.name} — squad totals`}>
+                {heroFacts.map((fact) => (
+                  <div key={fact.label} className="tp-fact">
+                    <dt>{fact.label}</dt>
+                    <dd>{fact.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
+          </div>
+
+          {cover === null ? null : (
+            <Link href={`/c/${slug}`} className="tp-hero-banner" aria-label={team.competitionName}>
+              <HeroBanner src={cover} />
+            </Link>
           )}
-        </PageSection>
+        </div>
+      </header>
 
-        <PageSection headingId="share-heading" title="Share">
-          <ShareSheet
-            title={team.team.name}
-            surface="team"
-            outcome={
-              facts.playerCount === 0 ? "empty" : facts.spentLabel === null ? "signed" : "bought"
-            }
-            messages={messages}
-            unit={team.unit}
-            status={{ kind: "team", slug, team: team.team.slug }}
-          />
-        </PageSection>
-      </PageBody>
+      <div className="tp-body">
+        <div className="tp-main" data-testid="team-squad">
+          {team.members.length === 0 ? (
+            <section className="tp-section" aria-labelledby="squad-heading">
+              <h2 id="squad-heading" className="tp-h2">
+                Squad
+              </h2>
+              <p className="tp-empty">
+                The squad is announced after the auction. Share this page — it fills in as players
+                are signed.
+              </p>
+            </section>
+          ) : (
+            <>
+              {leaders.length === 0 ? null : (
+                <section className="tp-section" aria-labelledby="leaders-heading">
+                  <h2 id="leaders-heading" className="tp-h2">
+                    Leading the side
+                  </h2>
+                  <ul className="tp-leaders">
+                    {leaders.map((member) => (
+                      <li key={member.registrationId}>
+                        <Link href={playerHref(member)} className="tp-leader">
+                          <PlayerImage
+                            name={member.name}
+                            seed={member.registrationId}
+                            size="lg"
+                            shape="round"
+                            src={member.photoUrl}
+                            decorative
+                          />
+                          <span className="tp-leader-who">
+                            <RosterMark
+                              kind={member.marks.includes("captain") ? "captain" : "icon"}
+                            />
+                            <strong>{member.name}</strong>
+                            <span className="tp-leader-sub">
+                              {[
+                                roleLabelIn(pack, member.role),
+                                member.pricePaise === null
+                                  ? signedLabel(member)
+                                  : formatPrice(member.pricePaise, team.unit),
+                              ]
+                                .filter((part) => part !== "")
+                                .join(" · ")}
+                            </span>
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              {roster.length === 0 ? null : (
+                <section className="tp-section" aria-labelledby="squad-heading">
+                  <div className="tp-section-head">
+                    <h2 id="squad-heading" className="tp-h2">
+                      {leaders.length === 0 ? "Squad" : "The rest of the squad"}
+                      <span className="tp-count">{roster.length}</span>
+                    </h2>
+                    {roleCounts.size === 0 ? null : (
+                      <ul className="tp-roles" aria-label="Squad by role">
+                        {[...roleCounts].map(([label, count]) => (
+                          <li key={label}>
+                            {label} <b>{count}</b>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <ol className="tp-roster">
+                    {roster.map((member) => (
+                      <li key={member.registrationId}>
+                        <Link href={playerHref(member)} className="tp-row">
+                          <PlayerImage
+                            name={member.name}
+                            seed={member.registrationId}
+                            size="md"
+                            shape="round"
+                            src={member.photoUrl}
+                            decorative
+                          />
+                          <span className="tp-row-who">
+                            <strong>
+                              <NameWithBadge
+                                name={member.name}
+                                badge={
+                                  member.marks.includes("retained") ? (
+                                    <RosterMark kind="retained" className="tp-badge" />
+                                  ) : null
+                                }
+                              />
+                            </strong>
+                            {member.role === null ? null : (
+                              <span>{roleLabelIn(pack, member.role)}</span>
+                            )}
+                          </span>
+                          <span className="tp-row-price">
+                            {member.pricePaise !== null ? (
+                              formatPrice(member.pricePaise, team.unit)
+                            ) : member.marks.length === 0 ? null : (
+                              <span className="tp-signed">{signedLabel(member)}</span>
+                            )}
+                          </span>
+                          <IconChevronRight size={16} className="tp-row-go" aria-hidden />
+                        </Link>
+                      </li>
+                    ))}
+                  </ol>
+                </section>
+              )}
+            </>
+          )}
+        </div>
+
+        <aside className="tp-aside">
+          <section className="tp-card" aria-labelledby="share-heading">
+            <h2 id="share-heading" className="tp-h3">
+              Share this squad
+            </h2>
+            <ShareSheet
+              title={team.team.name}
+              surface="team"
+              outcome={
+                facts.playerCount === 0 ? "empty" : facts.spentLabel === null ? "signed" : "bought"
+              }
+              messages={messages}
+              unit={team.unit}
+              status={{ kind: "team", slug, team: team.team.slug }}
+            />
+          </section>
+
+          {team.otherTeams.length === 0 ? null : (
+            <nav className="tp-card" aria-labelledby="teams-heading">
+              <h2 id="teams-heading" className="tp-h3">
+                Other teams in {team.competitionName}
+              </h2>
+              <ul className="tp-teams">
+                {team.otherTeams.map((other) => {
+                  const mark = monogramOf(other.name);
+                  return (
+                    <li key={other.slug}>
+                      <Link
+                        href={`/c/${slug}/t/${other.slug}`}
+                        className="tp-team"
+                        style={{ "--other": other.color ?? "var(--accent)" } as CSSProperties}
+                      >
+                        <span className="tp-team-crest" aria-hidden>
+                          {other.crestUrl === null ? (
+                            mark
+                          ) : (
+                            <CrestImage
+                              src={other.crestUrl}
+                              fallback={mark}
+                              width={64}
+                              height={64}
+                            />
+                          )}
+                        </span>
+                        <span className="tp-team-name">{other.name}</span>
+                        <IconChevronRight size={16} aria-hidden />
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </nav>
+          )}
+        </aside>
+      </div>
     </main>
   );
+}
+
+/** "Retained" or "Pre-signed" — a player on the squad before the bidding. */
+function signedLabel(member: PublicTeamMember): string {
+  if (member.marks.includes("retained")) {
+    return "Retained";
+  }
+  return member.marks.length === 0 ? "" : "Pre-signed";
 }
 
 /** A player's price in the season's own unit — "₹12,500" or "1,250 pts". */
@@ -275,7 +476,7 @@ function NameWithBadge({ name, badge }: { name: string; badge: ReactNode }) {
   return (
     <>
       {head}
-      <span className="team-page-nowrap">
+      <span className="tp-nowrap">
         {last}
         {badge}
       </span>

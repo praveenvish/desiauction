@@ -7,6 +7,7 @@ import { cache } from "react";
 import { LANDING } from "../../content/marketing";
 import { publicCompetitionsDirectory, type DirectoryEntry } from "../../server/competition/public";
 import { formatDateRange } from "../../app/c/format";
+import { servedAsStored } from "../../lib/stored-image";
 import { thumbInitials } from "../public/tournament-card";
 import styles from "../../app/home.module.css";
 import { Glyph, type GlyphName } from "./home/glyphs";
@@ -160,7 +161,13 @@ export async function LiveProof() {
                 {featured.logoUrl === null || featured.logoUrl === "" ? (
                   thumbInitials(featured.name)
                 ) : (
-                  <Image src={featured.logoUrl} alt="" width={110} height={110} />
+                  <Image
+                    src={featured.logoUrl}
+                    unoptimized={servedAsStored(featured.logoUrl)}
+                    alt=""
+                    width={110}
+                    height={110}
+                  />
                 )}
               </span>
             </div>
