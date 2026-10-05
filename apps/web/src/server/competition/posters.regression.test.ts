@@ -688,6 +688,17 @@ describe("PRE-AUCTION SNAPSHOT — the teams before the night", () => {
     });
   });
 
+  it("offers 'Meet the squad' but not the squad sheet until the season has an auction", async () => {
+    // The squad sheet prints a purse and refuses without an auction; offering
+    // it anyway was a preview that never loaded (BPL4, 2026-10-05).
+    const picker = await posterPickerFor(organizer, early.slug);
+    expect("ok" in picker).toBe(false);
+    if (!("ok" in picker)) {
+      expect(picker.kinds).toContain("reveal");
+      expect(picker.kinds).not.toContain("team");
+    }
+  });
+
   it("draws every team with its captain and icons before an auction exists, and no money", async () => {
     const season = await seasonPosterFor(organizer, early.slug, { ...REQUEST, prices: true });
     expect(season.ok).toBe(true);
