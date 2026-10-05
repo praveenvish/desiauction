@@ -3,8 +3,9 @@ import { notFound } from "next/navigation";
 
 import { adminOrganization, adminOrganizationExists } from "../../../../server/admin/actions";
 import { platformAdminPageGate } from "../../../../server/admin/authz";
-import { adminClubDesk } from "../../../../server/platform-ops/club-actions";
+import { adminClubDesk, adminMoveDesk } from "../../../../server/platform-ops/club-actions";
 import { ClubDeskPanel } from "./club-desk-panel";
+import { MoveTournamentPanel } from "./move-tournament-panel";
 import { OrgDetailPanel } from "./org-detail-panel";
 import "../../../seasons/seasons.css";
 import "../../admin.css";
@@ -46,7 +47,11 @@ export default async function AdminOrgPage({ params }: { params: Promise<{ slug:
 }
 
 async function Detail({ slug }: { slug: string }) {
-  const [detail, desk] = await Promise.all([adminOrganization(slug), adminClubDesk(slug)]);
+  const [detail, desk, move] = await Promise.all([
+    adminOrganization(slug),
+    adminClubDesk(slug),
+    adminMoveDesk(slug),
+  ]);
   if (detail === null) {
     notFound();
   }
@@ -64,6 +69,9 @@ async function Detail({ slug }: { slug: string }) {
             name: member.name,
           }))}
         />
+      )}
+      {move === null ? null : (
+        <MoveTournamentPanel slug={slug} clubName={detail.org.name} desk={move} />
       )}
     </>
   );

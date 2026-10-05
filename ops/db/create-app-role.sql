@@ -290,4 +290,11 @@ revoke all on sessions, otp_codes, otp_inbox, passkey_credentials,
 -- reads them.
 revoke all on platform_invites from desiauction_engine, desiauction_runner;
 
+-- 0108: moving a tournament between clubs. The one cross-club write, so it is
+-- a SECURITY DEFINER function that checks the superadmin grant itself; only
+-- the web tier may call it, nobody else (PUBLIC's default EXECUTE is revoked).
+revoke all on function platform_move_tournament(char, char, char, text, char, char) from public;
+grant execute on function platform_move_tournament(char, char, char, text, char, char)
+  to desiauction_app;
+
 \echo 'roles ready: desiauction_app (nobypassrls) · desiauction_system (bypassrls, least-privilege)'

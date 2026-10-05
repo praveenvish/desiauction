@@ -35,6 +35,7 @@ import { env } from "../../env";
 import { createOrg } from "../orgs/orgs";
 import { createCompetition, createTeam, type CompetitionSummary } from "./competitions";
 import { ownedTeamIdsOn } from "./team-ownership";
+import { teamsWorkspace } from "./team-workspace";
 import { playerPosterFor, seasonPosterFor, teamPosterFor } from "./posters";
 import { auctionHoldsRoster, rosterAuction } from "./registration-aggregate";
 
@@ -221,5 +222,34 @@ describe("RESULTS ENTERED BY HAND", () => {
     expect(
       await publishResultsByHand(db, empty, owner, { ...config, pursePerTeam: paise(1000 * 100) }),
     ).toEqual({ ok: false, reason: "nobody_placed" });
+  });
+
+  it("opens hand entry once a scheduled auction is aborted, and not before", async () => {
+    const other = await createCompetition(db, orgId, owner, {
+      sport: "cricket",
+      name: `Hand Aborted ${RUN}`,
+      location: "Pune",
+      startsOn: "2026-10-01",
+      endsOn: "2026-10-30",
+    });
+    const auctionId = newId();
+    await db.insert(auctionsTable).values({
+      id: auctionId,
+      orgId,
+      competitionId: other.id,
+      name: "Set up, then held elsewhere",
+      config,
+      createdBy: owner,
+    });
+    expect(
+      (await teamsWorkspace(db, other, { money: false, roster: false, manage: true })).handEntry,
+    ).toBeUndefined();
+    await db
+      .update(auctionsTable)
+      .set({ status: "abandoned" })
+      .where(eq(auctionsTable.id, auctionId));
+    expect(
+      (await teamsWorkspace(db, other, { money: false, roster: false, manage: true })).handEntry,
+    ).toBe("open");
   });
 });

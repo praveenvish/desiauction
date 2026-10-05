@@ -38,6 +38,8 @@ const PINNED_BY_ID: Record<string, string> = {
   "server/auction/owner-plan.ts": "by the plan gate's auction id (real)",
   "server/orgs/organizer-notify.ts": "by an owner invite's auction id; practices have no invites",
   "server/competition/captain-lock.ts": "by the roster auction id (registration-aggregate, real)",
+  "server/platform-ops/move-tournament.ts":
+    "a running PRACTICE blocks a club move too — every kind on purpose",
 };
 
 function sourceFiles(dir: string): string[] {

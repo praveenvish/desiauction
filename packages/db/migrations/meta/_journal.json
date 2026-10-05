@@ -750,6 +750,13 @@
       "when": 1792944000000,
       "tag": "0107_no_photo_style",
       "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1793030400000,
+      "tag": "0108_move_tournament",
+      "breakpoints": true
     }
   ]
 }

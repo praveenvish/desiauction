@@ -8,7 +8,7 @@ import {
   registrations,
   type Db,
 } from "@desiauction/db";
-import { and, asc, eq, isNotNull, isNull } from "drizzle-orm";
+import { and, asc, eq, isNotNull, isNull, ne } from "drizzle-orm";
 
 import { personLabel } from "../../lib/person-label";
 import { resolvedLots, rulesOf } from "../auction/live-summary";
@@ -213,7 +213,17 @@ export async function teamsWorkspace(
         enteredByHand: auctions.enteredByHand,
       })
       .from(auctions)
-      .where(and(eq(auctions.competitionId, competition.id), isRealAuction()))
+      // An aborted auction is no auction: the one-real-auction index (0029)
+      // and `publishResultsByHand` both ignore it, and so must the Teams tab —
+      // otherwise aborting a scheduled night to type the results in instead
+      // left hand entry shut for good.
+      .where(
+        and(
+          eq(auctions.competitionId, competition.id),
+          isRealAuction(),
+          ne(auctions.status, "abandoned"),
+        ),
+      )
       .limit(1),
     // Everyone approved and placed on a squad. The names and phones are read
     // here but only LEAVE this function when `options.roster` says they may.
