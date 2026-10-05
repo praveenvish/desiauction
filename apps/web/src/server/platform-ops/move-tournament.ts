@@ -7,7 +7,8 @@ import {
   tournaments,
   type Db,
 } from "@desiauction/db";
-import { and, asc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
+import { slugifyName } from "@desiauction/core";
+import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
 
 import { inOrg } from "../tenant";
 import type { DeskResult } from "./club";
@@ -25,9 +26,10 @@ import type { DeskResult } from "./club";
  * under it, and writes an audit row into BOTH clubs. It is called from the
  * old club's boundary on the APP role, so `app.person_id` is the operator.
  *
- * The unit is the tournament (BPL, with every edition), not one season: a
- * season moved alone would leave its tournament row in the old club. A
- * one-off season with no tournament moves on its own.
+ * Two units: the tournament (BPL, with every edition), or ONE season (0109).
+ * A season of a tournament moving alone leaves the tournament and its other
+ * editions behind and joins the same-named tournament in the new club,
+ * created there if the new club has none.
  */
 
 export interface MoveSubject {
@@ -35,6 +37,8 @@ export interface MoveSubject {
   readonly id: string;
   readonly name: string;
   readonly seasons: readonly string[];
+  /** For a season: the tournament it belongs to now, or null for a one-off. */
+  readonly partOf: string | null;
   /** Why it can't move now, in the desk's words; null when it can. */
   readonly blocked: string | null;
 }
@@ -103,15 +107,19 @@ export async function moveDesk(system: Db, orgId: string): Promise<MoveDesk> {
       id: tournament.id,
       name: tournament.name,
       seasons: seasons.map((row) => row.name),
+      partOf: null,
       blocked: blockedFor(seasons.map((row) => row.id)),
     };
   });
-  for (const season of seasonRows.filter((row) => row.tournamentId === null)) {
+  const tournamentName = new Map(tournamentRows.map((row) => [row.id, row.name]));
+  for (const season of seasonRows) {
     subjects.push({
       kind: "season",
       id: season.id,
       name: season.name,
       seasons: [season.name],
+      partOf:
+        season.tournamentId === null ? null : (tournamentName.get(season.tournamentId) ?? null),
       blocked: blockedFor([season.id]),
     });
   }
@@ -127,7 +135,7 @@ const REFUSALS: Record<string, string> = {
   move_one_subject: "Pick one tournament or season to move.",
   move_target_missing: "That club no longer exists.",
   move_subject_missing: "That tournament no longer exists.",
-  move_season_has_tournament: "This season belongs to a tournament. Move the tournament instead.",
+  move_needs_tournament_id: "The new club needs a tournament for this season. Try again.",
   move_split_subject: "This tournament's seasons are in different clubs, so it can't move as one.",
   move_same_club: "It's already in that club.",
   move_auction_running: RUNNING,
@@ -151,6 +159,7 @@ interface Counts {
   teams: number;
   registrations: number;
   membersAdded: number;
+  tournamentCreated: boolean;
 }
 
 export async function moveTournament(
@@ -191,22 +200,32 @@ export async function moveTournament(
       : await system
           .select({ id: competitions.id })
           .from(competitions)
-          .where(
-            and(
-              eq(competitions.id, input.subjectId),
-              eq(competitions.orgId, source.id),
-              isNull(competitions.tournamentId),
-            ),
-          );
+          .where(and(eq(competitions.id, input.subjectId), eq(competitions.orgId, source.id)));
   if (owned.length === 0) {
     return { ok: false, error: "That isn't in this club any more. Reload the page." };
   }
   const tournamentId = input.subjectKind === "tournament" ? input.subjectId : null;
   const competitionId = input.subjectKind === "season" ? input.subjectId : null;
+  // A season leaving its tournament may need that tournament re-made in the
+  // new club. The id and slug are minted here like every tournament's
+  // (createTournament); the function uses them only if the club has none.
+  const [home] =
+    competitionId === null
+      ? []
+      : await system
+          .select({ name: tournaments.name })
+          .from(competitions)
+          .innerJoin(tournaments, eq(tournaments.id, competitions.tournamentId))
+          .where(eq(competitions.id, competitionId));
+  const newTournamentId = home === undefined ? null : newId();
+  const newTournamentSlug =
+    home === undefined || newTournamentId === null
+      ? null
+      : `${slugifyName(home.name)}-${newTournamentId.slice(-4).toLowerCase()}`;
   try {
     const counts = await inOrg(input.operator, source.id, async (tx) => {
       const [row] = await tx.execute<{ moved: Counts } & Record<string, unknown>>(
-        sql`select platform_move_tournament(${tournamentId}, ${competitionId}, ${target.id}, ${input.reason}, ${newId()}, ${newId()}) as moved`,
+        sql`select platform_move_tournament(${tournamentId}, ${competitionId}, ${target.id}, ${input.reason}, ${newId()}, ${newId()}, ${newTournamentId}, ${newTournamentSlug}) as moved`,
       );
       if (row === undefined) {
         throw new Error("move_returned_nothing");
@@ -214,9 +233,15 @@ export async function moveTournament(
       return row.moved;
     });
     const seasons = counts.seasons === 1 ? "1 season" : `${String(counts.seasons)} seasons`;
+    const joined =
+      home === undefined
+        ? ""
+        : counts.tournamentCreated
+          ? ` ${home.name} was created in ${target.name} for it.`
+          : ` It joined ${target.name}'s ${home.name}.`;
     return {
       ok: true,
-      message: `Moved to ${target.name}: ${seasons}, ${String(counts.teams)} teams, ${String(counts.registrations)} registrations. ${String(counts.membersAdded)} people were added to ${target.name} so they keep access.`,
+      message: `Moved to ${target.name}: ${seasons}, ${String(counts.teams)} teams, ${String(counts.registrations)} registrations. ${String(counts.membersAdded)} people were added to ${target.name} so they keep access.${joined}`,
       targetSlug: target.slug,
     };
   } catch (error) {
