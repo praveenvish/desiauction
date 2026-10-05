@@ -8,14 +8,14 @@ import type {
 import type { ReactElement } from "react";
 
 import { mix, withAlpha } from "./poster-color";
-import { DISPLAY, FIGURES } from "./poster-fonts";
+import { renderSquadPoster } from "./poster-squad";
+import { FIGURES } from "./poster-fonts";
 import { withoutHiddenEffects } from "./poster-strip";
 import {
   Footer,
   Frame,
   Header,
   MOTION_BANDS,
-  Stat,
   TeamChip,
   TitleBlock,
   Tile,
@@ -28,16 +28,13 @@ import {
 } from "./poster-kit";
 import {
   contentWidth,
-  faceType,
   fitHeadline,
   fitName,
   fitRankRows,
   fitSeasonGrid,
-  fitTiles,
   metricsFor,
   seasonFaceNameSize,
   sheetBody,
-  type TileFit,
 } from "./poster-layout";
 
 /**
@@ -104,403 +101,15 @@ function Badges({ ctx, row, size }: { ctx: PosterContext; row: TeamPosterRow; si
 }
 
 /**
- * ONE PLAYER, WITH THEIR FACE ON.
- *
- * The founder's second note: the squad poster was a table of names, and the
- * squad poster is the one an owner posts. A face, their marks, their role, and
- * — when the money is in sight — what the franchise paid.
- */
-function FaceCard({
-  ctx,
-  row,
-  fit,
-  prices,
-  teamColor,
-}: {
-  ctx: PosterContext;
-  row: TeamPosterRow;
-  fit: TileFit;
-  prices: boolean;
-  teamColor: string | null;
-}) {
-  const { skin } = ctx;
-  const { palette } = skin;
-  const type = faceType(fit.cellWidth, prices);
-  const name = fitName(row.name, row.shortName, fit.cellWidth - 6, type.nameSize, 14);
-  const badgeSize = Math.max(11, Math.round(type.nameSize * 0.62));
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        width: fit.cellWidth,
-        height: fit.cellHeight,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          position: "relative",
-          width: fit.photoWidth,
-          height: fit.photoHeight,
-        }}
-      >
-        <Tile
-          ctx={ctx}
-          layer="items"
-          face
-          src={row.photoUrl}
-          monogram={row.monogram}
-          width={fit.photoWidth}
-          height={fit.photoHeight}
-          radius={Math.round(fit.photoWidth * 0.14)}
-          fontSize={Math.round(fit.photoWidth * 0.34)}
-          ring={ringFor(ctx, teamColor)}
-          ringWidth={teamColor === null ? undefined : 3}
-        />
-        {shown(ctx, "items") ? <Badges ctx={ctx} row={row} size={badgeSize} /> : null}
-      </div>
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          width: fit.cellWidth,
-          paddingTop: 8,
-          ...vis(ctx, "items"),
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            color: palette.heading,
-            fontSize: name.size,
-            fontWeight: 700,
-            maxWidth: fit.cellWidth,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {name.text}
-        </div>
-        <div
-          style={{
-            display: "flex",
-            marginTop: 3,
-            color: palette.muted,
-            fontSize: type.roleSize,
-            letterSpacing: 1.2,
-            textTransform: "uppercase",
-          }}
-        >
-          {row.roleLine}
-        </div>
-        {prices ? (
-          <div
-            style={{
-              display: "flex",
-              marginTop: 4,
-              color: row.priceLabel === null ? palette.muted : palette.accent,
-              fontSize: type.priceSize,
-              fontWeight: 700,
-            }}
-          >
-            {/* An em dash, not a zero. A pre-signed icon has no price, and a ₹0
-                next to their name would read as a player nobody paid for. */}
-            {row.priceLabel ?? "—"}
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-/** The "+7 more" tile: a squad bigger than the grid still says how much bigger. */
-function OverflowCard({ ctx, fit, count }: { ctx: PosterContext; fit: TileFit; count: number }) {
-  const { skin } = ctx;
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        width: fit.cellWidth,
-        height: fit.cellHeight,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: fit.photoWidth,
-          height: fit.photoHeight,
-          borderRadius: Math.round(fit.photoWidth * 0.14),
-          border: `2px dashed ${skin.palette.border}`,
-          color: skin.palette.body,
-          fontSize: Math.round(fit.photoWidth * 0.22),
-          fontWeight: 700,
-          ...vis(ctx, "items"),
-        }}
-      >
-        {`+${String(count)}`}
-      </div>
-    </div>
-  );
-}
-
-function FaceGrid({
-  ctx,
-  rows,
-  fit,
-  prices,
-  teamColor,
-  height,
-}: {
-  ctx: PosterContext;
-  rows: readonly TeamPosterRow[];
-  fit: TileFit;
-  prices: boolean;
-  teamColor: string | null;
-  height: number;
-}) {
-  const drawn = rows.slice(0, fit.shown);
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexWrap: "wrap",
-        /*
-         * The FITTED width, not the frame's. Flex-wrap packs by cell width, and
-         * a cell is wider than its photo when the photo was capped — so a grid
-         * fitted as 2x2 wrapped as 3 + 1 on a real squad, with one face
-         * stranded in the middle of the poster. Holding the container to the
-         * grid's own width makes the render agree with the arithmetic.
-         */
-        width: fit.gridWidth,
-        height,
-        alignItems: "center",
-        alignContent: "center",
-        justifyContent: "center",
-        gap: fit.gap,
-      }}
-    >
-      {drawn.map((row, index) => (
-        <FaceCard
-          key={`${row.name}-${String(index)}`}
-          ctx={ctx}
-          row={row}
-          fit={fit}
-          prices={prices}
-          teamColor={teamColor}
-        />
-      ))}
-      {fit.overflow > 0 ? <OverflowCard ctx={ctx} fit={fit} count={fit.overflow} /> : null}
-    </div>
-  );
-}
-
-/** Crest, name and the two people a squad belongs to besides its players. */
-function SquadHero({
-  ctx,
-  model,
-  height,
-}: {
-  ctx: PosterContext;
-  model: TeamPoster;
-  height: number;
-}) {
-  const { metrics, skin } = ctx;
-  const { palette } = skin;
-  const room = contentWidth(metrics) - height - 28;
-  const lines = [
-    model.coachName === null ? null : `Coach · ${model.coachName}`,
-    model.captainName === null ? null : `Captain · ${model.captainName}`,
-  ].filter((line): line is string => line !== null);
-  return (
-    <div style={{ display: "flex", width: "100%", height, alignItems: "center", gap: 28 }}>
-      <Tile
-        ctx={ctx}
-        layer="hero"
-        src={model.teamCrestUrl}
-        monogram={model.teamMonogram}
-        width={height}
-        height={height}
-        radius={Math.round(height * 0.24)}
-        fontSize={Math.round(height * 0.4)}
-        fit="contain"
-        ring={ringFor(ctx, model.teamColor)}
-        ringWidth={model.teamColor === null ? undefined : 5}
-        round
-      />
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        <div
-          style={{
-            display: "flex",
-            color: palette.heading,
-            // The v3 headline voice: the condensed heavy face, in capitals. It
-            // runs narrower than the sans the fit assumes, so the fit is safe.
-            fontFamily: DISPLAY,
-            fontSize: Math.round(
-              fitHeadline(model.teamName, room, metrics.teamNameMax, metrics.teamNameMin) * 1.12,
-            ),
-            fontWeight: 800,
-            lineHeight: 0.95,
-            textTransform: "uppercase",
-            ...vis(ctx, "hero"),
-          }}
-        >
-          {model.teamName}
-        </div>
-        {lines.length === 0 ? null : (
-          <div
-            style={{
-              display: "flex",
-              color: palette.body,
-              fontSize: metrics.subSize,
-              letterSpacing: 1,
-              ...vis(ctx, "hero"),
-            }}
-          >
-            {lines.join("   ·   ")}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/**
- * THE SQUAD SHEET — faces, marks, roles and (when the money is in sight) what
- * each of them cost, with the spend and the purse left underneath.
+ * THE SQUAD SHEET and MEET THE SQUAD — one layout (`poster-squad.tsx`), with
+ * and without the money.
  */
 export function renderTeamPoster(model: TeamPoster, options: PosterRenderOptions) {
-  const ctx = contextFor(options, model.teamColor);
-  const { metrics, skin } = ctx;
-  const heroHeight = metrics.heroCrest;
-  const prices = options.prices;
-  const bands = prices ? [heroHeight, metrics.statHeight] : [heroHeight];
-  const band = sheetBody(metrics, bands);
-  const fit = fitTiles(model.rows.length, contentWidth(metrics), band, {
-    gap: Math.round(metrics.gap * 0.7),
-    aspect: 1.15,
-    label: (cell) => faceType(cell, prices).labelHeight,
-    maxCell: 300,
-    minPhoto: 84,
-  });
-  return (
-    <Frame ctx={ctx}>
-      <Header
-        ctx={ctx}
-        competitionName={model.competitionName}
-        competitionLogoUrl={model.competitionLogoUrl}
-        chip={model.squadLabel}
-      />
-      <SquadHero ctx={ctx} model={model} height={heroHeight} />
-      <FaceGrid
-        ctx={ctx}
-        rows={model.rows}
-        fit={fit}
-        prices={prices}
-        teamColor={model.teamColor}
-        height={band}
-      />
-      {prices ? (
-        // Two equal halves, not two tiles sized to their own numbers: a franchise
-        // that spent a crore and has ten rupees left would otherwise get a wide
-        // box and a narrow one, and the narrow one is the number that matters.
-        <div style={{ display: "flex", width: "100%", gap: 24 }}>
-          <Stat ctx={ctx} label="Spent" value={model.spentLabel} tone={skin.palette.money} />
-          <Stat
-            ctx={ctx}
-            label="Purse left"
-            value={model.remainingLabel}
-            tone={skin.palette.accent}
-          />
-        </div>
-      ) : null}
-      <Footer ctx={ctx} />
-    </Frame>
-  );
+  return renderSquadPoster(model, options, "sheet");
 }
 
-/**
- * MEET THE SQUAD — the same roster, announced rather than accounted for.
- *
- * No money, bigger faces, and the team's name as the headline: this is the one
- * an owner posts the morning after, into a group that does not care what
- * anybody cost.
- */
 export function renderRevealPoster(model: TeamPoster, options: PosterRenderOptions) {
-  const ctx = contextFor(options, model.teamColor);
-  const { metrics } = ctx;
-  const heroHeight = Math.round(metrics.heroCrest * 1.35);
-  const band = sheetBody(metrics, [heroHeight]);
-  const fit = fitTiles(model.rows.length, contentWidth(metrics), band, {
-    gap: Math.round(metrics.gap * 0.8),
-    aspect: 1.15,
-    label: (cell) => faceType(cell, false).labelHeight,
-    maxCell: 340,
-    minPhoto: 90,
-  });
-  const sub = [
-    model.coachName === null ? null : `Coach · ${model.coachName}`,
-    model.captainName === null ? null : `Captain · ${model.captainName}`,
-  ]
-    .filter((line): line is string => line !== null)
-    .join("   ·   ");
-  return (
-    <Frame ctx={ctx}>
-      <Header
-        ctx={ctx}
-        competitionName={model.competitionName}
-        competitionLogoUrl={model.competitionLogoUrl}
-        chip={model.squadLabel}
-      />
-      <div
-        style={{
-          display: "flex",
-          width: "100%",
-          height: heroHeight,
-          alignItems: "center",
-          gap: 28,
-        }}
-      >
-        <div style={{ display: "flex", flexGrow: 1, flexDirection: "column" }}>
-          <TitleBlock
-            ctx={ctx}
-            kicker="Meet the squad"
-            title={model.teamName}
-            sub={sub === "" ? null : sub}
-          />
-        </div>
-        <Tile
-          ctx={ctx}
-          layer="hero"
-          src={model.teamCrestUrl}
-          monogram={model.teamMonogram}
-          width={heroHeight}
-          height={heroHeight}
-          radius={Math.round(heroHeight * 0.24)}
-          fontSize={Math.round(heroHeight * 0.36)}
-          fit="contain"
-          ring={ringFor(ctx, model.teamColor)}
-          ringWidth={model.teamColor === null ? undefined : 5}
-        />
-      </div>
-      <FaceGrid
-        ctx={ctx}
-        rows={model.rows}
-        fit={fit}
-        prices={false}
-        teamColor={model.teamColor}
-        height={band}
-      />
-      <Footer ctx={ctx} />
-    </Frame>
-  );
+  return renderSquadPoster(model, options, "reveal");
 }
 
 // --- Top buys ---------------------------------------------------------------

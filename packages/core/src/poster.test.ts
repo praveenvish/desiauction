@@ -23,6 +23,8 @@ import {
   type TeamPosterInput,
   type TeamPosterMember,
   type TopBuyInput,
+  roleTagOf,
+  squadSpotlight,
 } from "./poster";
 
 const PLAYER: PlayerPosterInput = {
@@ -527,5 +529,70 @@ describe("player poster — a points season's pool card", () => {
     });
     expect(p.basePriceLabel).toBe("50 pts");
     expect(p.basePriceLabel).not.toContain("₹");
+  });
+});
+
+describe("squadSpotlight — who gets a big card on the squad sheet", () => {
+  const member = (
+    name: string,
+    marks: ("captain" | "icon" | "retained")[],
+    price: number | null,
+  ) => ({
+    name,
+    role: "batter",
+    pricePaise: price,
+    marks,
+    photoUrl: null,
+  });
+  const poster = (members: ReturnType<typeof member>[]) =>
+    buildTeamPoster({
+      teamName: "Tigers",
+      teamCrestUrl: null,
+      competitionName: "BPL-4",
+      competitionLogoUrl: null,
+      members,
+      spentPaise: 0,
+      pursePaise: 0,
+      unit: "inr",
+    });
+
+  it("the captain and icons first, then the top buy", () => {
+    const { rows, topBuyLabel } = poster([
+      member("Buy A", [], 900000),
+      member("Cap", ["captain"], null),
+      member("Icon", ["icon"], null),
+      member("Buy B", [], 500000),
+    ]);
+    const { spotlight, rest } = squadSpotlight(rows, { prices: true });
+    expect(spotlight.map((card) => [card.row.name, card.badge])).toEqual([
+      ["Cap", "CAPTAIN"],
+      ["Icon", "ICON"],
+      ["Buy A", "TOP BUY"],
+    ]);
+    expect(rest.map((row) => row.name)).toEqual(["Buy B"]);
+    expect(topBuyLabel).toContain("9,000");
+  });
+
+  it("without prices the filled card carries no TOP BUY badge", () => {
+    const { rows } = poster([member("Cap", ["captain"], null), member("Buy A", [], 900000)]);
+    const { spotlight } = squadSpotlight(rows, { prices: false });
+    expect(spotlight.map((card) => card.badge)).toEqual(["CAPTAIN", null]);
+  });
+
+  it("a pre-auction squad is its captain and icon, and nothing else", () => {
+    const { rows, topBuyLabel } = poster([
+      member("Cap", ["captain"], null),
+      member("Icon", ["icon"], null),
+    ]);
+    const { spotlight, rest } = squadSpotlight(rows, { prices: true });
+    expect(spotlight).toHaveLength(2);
+    expect(rest).toEqual([]);
+    expect(topBuyLabel).toBeNull();
+  });
+
+  it("role tags fit a list row", () => {
+    expect(roleTagOf("all_rounder")).toBe("AR");
+    expect(roleTagOf("wicket_keeper")).toBe("WK");
+    expect(roleTagOf(null)).toBe("");
   });
 });

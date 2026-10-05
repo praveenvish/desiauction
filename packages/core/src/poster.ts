@@ -390,6 +390,10 @@ export interface TeamPosterRow {
   /** Every mark, for a face tile: "C" and "ICON" can both apply. */
   badges: readonly string[];
   isCaptain: boolean;
+  /** Pre-signed as an icon or retained — a spotlight card, not a list row. */
+  isMarked: boolean;
+  /** Short role for a list row: BAT, BOWL, AR, WK — or the role's first word. */
+  roleTag: string;
   photoUrl: string | null;
 }
 
@@ -407,6 +411,8 @@ export interface TeamPoster {
   squadLabel: string;
   spentLabel: string;
   remainingLabel: string;
+  /** The costliest buy's price, for the stats strip; null before any sale. */
+  topBuyLabel: string | null;
 }
 
 const BADGE: Record<PosterMark, string> = {
@@ -444,8 +450,72 @@ function rowOf(member: TeamPosterMember, unit: MoneyUnit): TeamPosterRow {
     markerLabel: primary === null ? null : BADGE[primary],
     badges: marks.map((mark) => BADGE[mark]),
     isCaptain: marks.includes("captain"),
+    isMarked: marks.length > 0,
+    roleTag: roleTagOf(member.role),
     photoUrl: member.photoUrl,
   };
+}
+
+const ROLE_TAG: Record<string, string> = {
+  batter: "BAT",
+  bowler: "BOWL",
+  all_rounder: "AR",
+  wicket_keeper: "WK",
+};
+
+/** A role in four letters or fewer, for a list row with no room for "All-rounder". */
+export function roleTagOf(role: string | null): string {
+  if (role === null || role.trim() === "") {
+    return "";
+  }
+  return ROLE_TAG[role] ?? roleLabel(role).split(/[\s-]/)[0]?.slice(0, 4).toUpperCase() ?? "";
+}
+
+export interface SpotlightCard {
+  readonly row: TeamPosterRow;
+  /** CAPTAIN, ICON, RETAINED, TOP BUY — or none, for a card filled by price alone. */
+  readonly badge: string | null;
+}
+
+/**
+ * WHO GETS A BIG CARD on the squad sheet: the players a team is known by.
+ *
+ * The captain, then icons, then retained players — the ones named before the
+ * night — up to three. A squad with fewer than three of those fills the row
+ * from its purchases, priciest first (the order rows arrive in), and the first
+ * of those is the TOP BUY when the money is on the poster. Everyone else is a
+ * list row, in the order they came. Pure, so the choice is tested, not eyeballed.
+ */
+export function squadSpotlight(
+  rows: readonly TeamPosterRow[],
+  options: { readonly prices: boolean; readonly max?: number },
+): { spotlight: SpotlightCard[]; rest: TeamPosterRow[] } {
+  const max = options.max ?? 3;
+  const spotlight: SpotlightCard[] = [];
+  for (const row of rows) {
+    if (spotlight.length >= max) {
+      break;
+    }
+    if (row.isMarked) {
+      spotlight.push({
+        row,
+        badge: row.isCaptain ? "CAPTAIN" : row.badges.includes("ICON") ? "ICON" : "RETAINED",
+      });
+    }
+  }
+  let topBuyGiven = false;
+  for (const row of rows) {
+    if (spotlight.length >= max) {
+      break;
+    }
+    if (!row.isMarked) {
+      const top: boolean = options.prices && row.priceLabel !== null && !topBuyGiven;
+      topBuyGiven ||= top;
+      spotlight.push({ row, badge: top ? "TOP BUY" : null });
+    }
+  }
+  const chosen = new Set(spotlight.map((card) => card.row));
+  return { spotlight, rest: rows.filter((row) => !chosen.has(row)) };
 }
 
 /**
@@ -483,7 +553,15 @@ export function buildTeamPoster(input: TeamPosterInput): TeamPoster {
     squadLabel: `${String(input.members.length)} player${input.members.length === 1 ? "" : "s"}`,
     spentLabel: formatAmount(paise(input.spentPaise), input.unit),
     remainingLabel: formatAmount(paise(remaining), input.unit),
+    topBuyLabel: topBuyOf(input.members, input.unit),
   };
+}
+
+function topBuyOf(members: readonly TeamPosterMember[], unit: MoneyUnit): string | null {
+  const prices = members
+    .map((member) => member.pricePaise)
+    .filter((price): price is number => price !== null && price > 0);
+  return prices.length === 0 ? null : formatAmount(paise(Math.max(...prices)), unit);
 }
 
 // --- Top buys ---------------------------------------------------------------

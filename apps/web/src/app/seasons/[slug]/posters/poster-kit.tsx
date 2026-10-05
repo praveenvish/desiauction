@@ -1,4 +1,10 @@
-import { monogramOf, type PosterKind, type PosterSize, type PosterTheme } from "@desiauction/core";
+import {
+  hasDevanagari,
+  monogramOf,
+  type PosterKind,
+  type PosterSize,
+  type PosterTheme,
+} from "@desiauction/core";
 import { silhouetteDataUri, type NoPhotoStyle } from "@desiauction/ui";
 import type { ReactNode } from "react";
 
@@ -249,11 +255,18 @@ export function Tile({
       {!shown(ctx, layer) ? (
         monogram
       ) : src === null && face && ctx.options.noPhoto === "silhouette" ? (
-        // Fills the tile, shoulders on its bottom edge, like a cropped photo.
+        // Square, never stretched to the tile's shape, standing on its bottom
+        // edge — shoulders cut by the frame, like a cropped photo.
         <img
-          src={silhouetteFor(ctx, ring === null ? palette.accent : skin.palette.heading)}
-          width={width}
-          height={height}
+          style={{ alignSelf: "flex-end" }}
+          // The figure in the team's own light rather than flat white: it reads as
+          // that team's player, and a real photo beside it still stands out.
+          src={silhouetteFor(
+            ctx,
+            ring === null ? palette.accent : mix(ring, skin.palette.heading, 0.6),
+          )}
+          width={Math.min(width, height)}
+          height={Math.min(width, height)}
           alt=""
         />
       ) : src === null ? (
@@ -768,7 +781,10 @@ export function TitleBlock({
           color: palette.heading,
           fontSize: size,
           fontWeight: 700,
-          lineHeight: 1.02,
+          // A Devanagari title carries marks above its headline (ओ's sign, a
+          // reph) that Latin capitals never have; at 1.02 they rose into the
+          // kicker over it.
+          lineHeight: hasDevanagari(title) ? 1.3 : 1.02,
           ...vis(ctx, layer),
         }}
       >
