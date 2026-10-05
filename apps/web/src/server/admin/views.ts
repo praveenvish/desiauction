@@ -884,6 +884,16 @@ export interface OrgCompetitionRow {
   readonly caseStatus: string | null;
   /** DesiAuction has taken the season's public page down (0072). */
   readonly held: boolean;
+  /** The tournament this season is an edition of; null for a one-off season. */
+  readonly tournamentId: string | null;
+  readonly tournamentName: string | null;
+  readonly startsOn: string | null;
+  readonly endsOn: string | null;
+  readonly teamCount: number;
+  /** Approved players. */
+  readonly playerCount: number;
+  /** Registrations waiting for the organizer's review. */
+  readonly pendingCount: number;
 }
 
 export interface OrgDetail {
@@ -942,6 +952,15 @@ export async function organizationDetail(db: Db, slug: string): Promise<OrgDetai
         caseStatus: sql<
           string | null
         >`(select sc.status from settlement_cases sc where sc.competition_id = competitions.id and sc.status <> 'voided' limit 1)`,
+        tournamentId: competitions.tournamentId,
+        tournamentName: sql<
+          string | null
+        >`(select t.name from tournaments t where t.id = competitions.tournament_id)`,
+        startsOn: competitions.startsOn,
+        endsOn: competitions.endsOn,
+        teamCount: sql<number>`(select count(*)::int from teams tm where tm.competition_id = competitions.id)`,
+        playerCount: sql<number>`(select count(*)::int from registrations r where r.competition_id = competitions.id and r.status = 'approved')`,
+        pendingCount: sql<number>`(select count(*)::int from registrations r where r.competition_id = competitions.id and r.status = 'submitted')`,
       })
       .from(competitions)
       .where(eq(competitions.orgId, org.id))

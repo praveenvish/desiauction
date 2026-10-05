@@ -4,8 +4,7 @@ import { notFound } from "next/navigation";
 import { adminOrganization, adminOrganizationExists } from "../../../../server/admin/actions";
 import { platformAdminPageGate } from "../../../../server/admin/authz";
 import { adminClubDesk, adminMoveDesk } from "../../../../server/platform-ops/club-actions";
-import { ClubDeskPanel } from "./club-desk-panel";
-import { MoveTournamentPanel } from "./move-tournament-panel";
+import { OrgDesk } from "./org-desk";
 import { OrgDetailPanel } from "./org-detail-panel";
 import "../../../seasons/seasons.css";
 import "../../admin.css";
@@ -55,24 +54,20 @@ async function Detail({ slug }: { slug: string }) {
   if (detail === null) {
     notFound();
   }
+  const panel = <OrgDetailPanel detail={detail} desk={desk} move={move} />;
+  // AC-1.3: a superadmin's controls sit on the rows they act on. Without the
+  // desk (a read-only admin) the same page renders with no buttons.
+  if (desk === null) {
+    return panel;
+  }
   return (
-    <>
-      <OrgDetailPanel detail={detail} />
-      {/* AC-1.3: the superadmin's controls for a stuck club. */}
-      {desk === null ? null : (
-        <ClubDeskPanel
-          slug={slug}
-          clubName={detail.org.name}
-          desk={desk}
-          members={detail.members.map((member) => ({
-            personId: member.personId,
-            name: member.name,
-          }))}
-        />
-      )}
-      {move === null ? null : (
-        <MoveTournamentPanel slug={slug} clubName={detail.org.name} desk={move} />
-      )}
-    </>
+    <OrgDesk
+      slug={slug}
+      clubName={detail.org.name}
+      members={detail.members.map((member) => ({ personId: member.personId, name: member.name }))}
+      clubs={move?.clubs ?? []}
+    >
+      {panel}
+    </OrgDesk>
   );
 }
