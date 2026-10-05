@@ -1,6 +1,6 @@
 # Post 10 — "Bolna kisi ne?" · series *Kagaz wali boli* 3/6 · Sat 10 Oct 2026
 
-> Series plan approved by the founder 2026-10-05; Reel built, awaiting final approval.
+> Series plan approved by the founder 2026-10-05; finished reel approved 2026-10-05. On 2026-10-05 the founder asked for the whole series to be posted **now** instead of on its schedule (its scheduled task is disabled).
 > Plan: [`SERIES-KAGAZ-WALI-BOLI.md`](SERIES-KAGAZ-WALI-BOLI.md).
 > Rules: [`SOCIAL_CONTENT_PLAN.md`](../../operations/SOCIAL_CONTENT_PLAN.md) §1a, §1b.
 
@@ -70,3 +70,15 @@ If a big cricket moment lands that day, the newsjack goes first and this slides 
 - **People and places:** no real person, face, place or league. No one is mocked: the joke is the dead air.
 - **Imagery and music:** real screens, no AI imagery. The music is our own score.
 - **Hashtag:** #DesiAuction on every network.
+
+## Posted
+
+Mon 5 Oct 2026 (posted early at the founder's request; the series went up together).
+
+| Platform | Posted? | Link |
+|---|---|---|
+| YouTube Shorts | Yes, Public | https://youtube.com/shorts/em07wRiMuOo |
+| Instagram | Pending: logged out in Chrome; waiting for the founder to sign in | — |
+| Facebook Page | Pending | — |
+| Threads | Pending: logged out in Chrome | — |
+| X | Pending | — |

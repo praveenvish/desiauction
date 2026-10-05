@@ -1,6 +1,6 @@
 # Post 09 — "Bhai, kitne point bache?" · series *Kagaz wali boli* 2/6 · Fri 9 Oct 2026
 
-> Series plan approved by the founder 2026-10-05; Reel built, awaiting final approval.
+> Series plan approved by the founder 2026-10-05; finished reel approved 2026-10-05. On 2026-10-05 the founder asked for the whole series to be posted **now** instead of on its schedule (its scheduled task is disabled).
 > Plan: [`SERIES-KAGAZ-WALI-BOLI.md`](SERIES-KAGAZ-WALI-BOLI.md).
 > Rules: [`SOCIAL_CONTENT_PLAN.md`](../../operations/SOCIAL_CONTENT_PLAN.md) §1a, §1b.
 
@@ -66,3 +66,15 @@ If a big cricket moment lands that day, the newsjack goes first and this slides 
 - **People and places:** no real person, face, place or league; the paper says "TEAM A/B/C".
 - **Imagery and music:** real screens, no AI imagery; our own score.
 - **Hashtag:** #DesiAuction on every network.
+
+## Posted
+
+Mon 5 Oct 2026 (posted early at the founder's request; the series went up together).
+
+| Platform | Posted? | Link |
+|---|---|---|
+| YouTube Shorts | Yes, Public | https://youtube.com/shorts/SaZHtV6V8PY |
+| Instagram | Pending: logged out in Chrome; waiting for the founder to sign in | — |
+| Facebook Page | Pending | — |
+| Threads | Pending: logged out in Chrome | — |
+| X | Pending | — |

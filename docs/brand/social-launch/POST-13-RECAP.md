@@ -1,6 +1,6 @@
 # Post 13 — "Kagaz wali boli vs DesiAuction" (carousel) · series *Kagaz wali boli* 6/6 · Tue 13 Oct 2026
 
-> Series plan approved by the founder 2026-10-05; finished slides **approved by the founder 2026-10-05** ("approved 5 and 6, schedule both"); scheduled as task `post-13-recap-carousel`, Tue 13 Oct 19:30 IST.
+> Series plan approved by the founder 2026-10-05; finished slides approved 2026-10-05. On 2026-10-05 the founder asked for the whole series to be posted **now** (its scheduled task is disabled).
 > Plan: [`SERIES-KAGAZ-WALI-BOLI.md`](SERIES-KAGAZ-WALI-BOLI.md). Rules: [`SOCIAL_CONTENT_PLAN.md`](../../operations/SOCIAL_CONTENT_PLAN.md) §1a, §1b.
 
 **Why this:** the recap and the CTA. It is the save-and-share piece of the series (carousels carry saves, §3). It closes on the practice-auction offer, in the site's own words.

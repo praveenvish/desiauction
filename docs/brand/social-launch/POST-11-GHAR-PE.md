@@ -1,6 +1,6 @@
 # Post 11 — "Ghar pe dekhne walon ka haal" · series *Kagaz wali boli* 4/6 · Sun 11 Oct 2026
 
-> Series plan approved by the founder 2026-10-05; Reel built, awaiting final approval.
+> Series plan approved by the founder 2026-10-05; finished reel approved 2026-10-05. On 2026-10-05 the founder asked for the whole series to be posted **now** instead of on its schedule (its scheduled task is disabled).
 > Plan: [`SERIES-KAGAZ-WALI-BOLI.md`](SERIES-KAGAZ-WALI-BOLI.md).
 > Rules: [`SOCIAL_CONTENT_PLAN.md`](../../operations/SOCIAL_CONTENT_PLAN.md) §1a, §1b.
 
@@ -96,3 +96,15 @@ day (§1b rule 1).
 - No IPL, BCCI, betting words or competitor names.
 - Real screens and no AI imagery. The score is our own.
 - #DesiAuction is on every network.
+
+## Posted
+
+Mon 5 Oct 2026 (posted early at the founder's request; the series went up together).
+
+| Platform | Posted? | Link |
+|---|---|---|
+| YouTube Shorts | Yes, Public | https://youtube.com/shorts/4qjKREsA_qI |
+| Instagram | Pending: logged out in Chrome; waiting for the founder to sign in | — |
+| Facebook Page | Pending | — |
+| Threads | Pending: logged out in Chrome | — |
+| X | Pending | — |

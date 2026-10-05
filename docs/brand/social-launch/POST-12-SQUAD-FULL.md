@@ -1,6 +1,6 @@
 # Post 12 — "Do se zyada nahi le sakte bhai!" · series *Kagaz wali boli* 5/6 · Mon 12 Oct 2026
 
-> Series plan approved by the founder 2026-10-05; finished reel **approved by the founder 2026-10-05** ("approved 5 and 6, schedule both"); scheduled as task `post-12-squad-full`, Mon 12 Oct 19:30 IST.
+> Series plan approved by the founder 2026-10-05; finished reel approved 2026-10-05. On 2026-10-05 the founder asked for the whole series to be posted **now** instead of on its schedule (its scheduled task is disabled).
 > Plan: [`SERIES-KAGAZ-WALI-BOLI.md`](SERIES-KAGAZ-WALI-BOLI.md). Rules: [`SOCIAL_CONTENT_PLAN.md`](../../operations/SOCIAL_CONTENT_PLAN.md) §1a, §1b.
 
 **Why this:** in the paper auction we studied, a rule was enforced by shouting from the
@@ -87,3 +87,15 @@ Mon 12 Oct, **7:30 pm IST** on Instagram, Facebook, YouTube Shorts, Threads and 
 
 **Hashtag**
 - #DesiAuction appears on every network.
+
+## Posted
+
+Mon 5 Oct 2026 (posted early at the founder's request; the series went up together).
+
+| Platform | Posted? | Link |
+|---|---|---|
+| YouTube Shorts | Yes, Public | https://youtube.com/shorts/XjvkStTHco8 |
+| Instagram | Pending: logged out in Chrome; waiting for the founder to sign in | — |
+| Facebook Page | Pending | — |
+| Threads | Pending: logged out in Chrome | — |
+| X | Pending | — |
