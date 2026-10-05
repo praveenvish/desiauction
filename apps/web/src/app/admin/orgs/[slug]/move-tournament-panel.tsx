@@ -11,7 +11,8 @@ import type { MoveDesk, MoveSubject } from "../../../../server/platform-ops/move
 /*
  * MOVE TO ANOTHER CLUB — the superadmin's control for a tournament that was
  * started in the wrong club. A tournament moves with every season under it;
- * a one-off season moves alone. The database refuses while an auction is
+ * one season can also move alone (0109), leaving its tournament and the other
+ * editions behind. The database refuses while an auction is
  * running or when the seasons hold money records, and the row says so before
  * anyone presses anything.
  */
@@ -106,8 +107,10 @@ export function MoveTournamentPanel({
                   {" "}
                   · {row.seasons.length === 0 ? "no seasons yet" : row.seasons.join(", ")}
                 </span>
-              ) : (
+              ) : row.partOf === null ? (
                 <span className="admin-meta"> · one-off season</span>
+              ) : (
+                <span className="admin-meta"> · season of {row.partOf}</span>
               )}{" "}
               {row.blocked === null ? (
                 <Button
@@ -152,9 +155,13 @@ export function MoveTournamentPanel({
         {subject === null ? null : (
           <>
             <p>
-              {subject.kind === "tournament" && subject.seasons.length > 0
-                ? `Every season moves with it: ${subject.seasons.join(", ")}.`
-                : "This season moves on its own."}{" "}
+              {subject.kind === "tournament"
+                ? subject.seasons.length > 0
+                  ? `Every season moves with it: ${subject.seasons.join(", ")}.`
+                  : "It has no seasons yet."
+                : subject.partOf === null
+                  ? "This season moves on its own."
+                  : `Only this season moves. ${subject.partOf} and its other seasons stay in ${clubName}; in the new club this season joins its ${subject.partOf}, which is created there if it doesn't exist.`}{" "}
               Team owners and auctioneers become members of the new club so they keep access.
               Franchise and ground links from {clubName} are cleared, since those stay behind.
             </p>

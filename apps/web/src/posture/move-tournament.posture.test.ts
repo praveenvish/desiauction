@@ -279,4 +279,82 @@ describe("moving a tournament to another club under the production roles", () =>
       );
     expect(owns).toHaveLength(1);
   });
+
+  it("moves ONE season of a tournament; the tournament and its other seasons stay", async () => {
+    const leagueId = newId();
+    await owner.insert(tournaments).values({
+      id: leagueId,
+      orgId: fromId,
+      sport: "cricket",
+      name: `Split League ${RUN}`,
+      slug: `split-league-${RUN}-${leagueId.slice(-4).toLowerCase()}`,
+      createdBy: founder,
+    });
+    const season = async (name: string): Promise<string> => {
+      const made = await createCompetition(owner, fromId, founder, {
+        name,
+        sport: "cricket",
+        location: "Pune",
+        startsOn: "2026-10-01",
+        endsOn: "2026-11-30",
+      });
+      await owner
+        .update(competitions)
+        .set({ tournamentId: leagueId })
+        .where(eq(competitions.id, made.id));
+      return made.id;
+    };
+    const older = await season(`Split One ${RUN}`);
+    const fourth = await season(`Split Four ${RUN}`);
+    const fifth = await season(`Split Five ${RUN}`);
+
+    const desked = await desk.adminMoveDesk(fromSlug);
+    const row = desked?.subjects.find((subject) => subject.id === fourth);
+    expect(row).toMatchObject({ kind: "season", partOf: `Split League ${RUN}`, blocked: null });
+
+    const moved = await desk.moveTournamentAction({
+      slug: fromSlug,
+      subjectKind: "season",
+      subjectId: fourth,
+      targetSlug: toSlug,
+      reason: REASON,
+    });
+    expect(moved).toMatchObject({ ok: true });
+    expect(moved.ok ? moved.message : "").toMatch(/was created in/);
+
+    const where = async (id: string) => {
+      const [found] = await owner
+        .select({ orgId: competitions.orgId, tournamentId: competitions.tournamentId })
+        .from(competitions)
+        .where(eq(competitions.id, id));
+      return found;
+    };
+    const [league] = await owner
+      .select({ orgId: tournaments.orgId })
+      .from(tournaments)
+      .where(eq(tournaments.id, leagueId));
+    expect(league?.orgId).toBe(fromId);
+    expect(await where(older)).toEqual({ orgId: fromId, tournamentId: leagueId });
+
+    const after = await where(fourth);
+    expect(after?.orgId).toBe(toId);
+    expect(after?.tournamentId).not.toBe(leagueId);
+    const [made] = await owner
+      .select({ orgId: tournaments.orgId, name: tournaments.name })
+      .from(tournaments)
+      .where(eq(tournaments.id, after?.tournamentId ?? ""));
+    expect(made).toEqual({ orgId: toId, name: `Split League ${RUN}` });
+
+    // The next edition joins the same tournament in the new club, not a third.
+    const again = await desk.moveTournamentAction({
+      slug: fromSlug,
+      subjectKind: "season",
+      subjectId: fifth,
+      targetSlug: toSlug,
+      reason: REASON,
+    });
+    expect(again).toMatchObject({ ok: true });
+    expect(again.ok ? again.message : "").toMatch(/joined/);
+    expect((await where(fifth))?.tournamentId).toBe(after?.tournamentId);
+  });
 });
