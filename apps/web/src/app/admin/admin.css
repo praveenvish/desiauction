@@ -3504,3 +3504,370 @@ details[open] > summary .admin-health-caret {
   margin: 0 0 var(--space-1);
   font-size: var(--text-md-size, 1rem);
 }
+
+/* --- The club page (/admin/orgs/[slug]) — founder redesign 2026-10-06 ------- */
+
+.og-lede {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-4);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.og-lede b {
+  color: var(--text-heading);
+  font-weight: 600;
+}
+
+.og-link {
+  color: var(--text-heading);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.og-link:hover {
+  color: var(--text-accent);
+  text-decoration: underline;
+}
+
+.og-quiet {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.og-warn {
+  color: var(--danger-text, #b42318);
+}
+
+.og-ok {
+  color: var(--success-text, var(--text-accent));
+  font-weight: 600;
+}
+
+.og-flag {
+  color: var(--warning-text, #9a6700);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* The tournaments lead; people and activity ride beside them on a laptop. */
+.og-layout {
+  display: grid;
+  gap: var(--space-5);
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+@media (min-width: 1180px) {
+  .og-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  }
+}
+
+/* --- Tournaments and their seasons --------------------------------------- */
+
+.og-tournaments {
+  display: grid;
+}
+
+.og-tournament + .og-tournament {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.og-tournament-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-4) var(--space-5) var(--space-2);
+}
+
+.og-tournament-head h3 {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.og-tournament-head .og-quiet {
+  font-size: var(--text-sm-size);
+}
+
+.og-move,
+.og-move-blocked {
+  margin-inline-start: auto;
+  font-size: var(--text-sm-size);
+}
+
+.og-seasons {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--space-3) var(--space-3);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.og-season {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.og-season-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.og-season-name {
+  font-weight: 700;
+  color: var(--text-heading);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+a.og-season-name:hover {
+  color: var(--text-accent);
+  text-decoration: underline;
+}
+
+.og-pills {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Five facts in one row on a laptop, a two-column grid on a phone. */
+.og-facts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(150px, 1.6fr) repeat(4, minmax(72px, 1fr));
+  gap: var(--space-2) var(--space-4);
+}
+
+.og-facts > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.og-facts dt {
+  font-size: var(--text-xs-size, 0.75rem);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.og-facts dd {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+}
+
+.og-season-desk {
+  display: grid;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--border-subtle);
+}
+
+.og-desk-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  min-height: 36px;
+  font-size: var(--text-sm-size);
+}
+
+.og-desk-label {
+  min-width: 96px;
+  color: var(--text-secondary);
+}
+
+.og-desk-value {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.og-desk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.og-owners summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.og-owners ul {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.og-owners li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+/* --- People & access ------------------------------------------------------ */
+
+/* A grid of compact cards across the page's width: a column of seven tall
+   rows beside two seasons left the page half empty. */
+.og-people {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-3);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  gap: var(--space-2);
+}
+
+.og-person {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.og-avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface-raised));
+  color: var(--text-heading);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.og-person-main {
+  flex: 1;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.og-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.og-person-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-3);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.og-person-actions {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.og-past {
+  padding: var(--space-2) var(--space-5) var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.og-past summary {
+  cursor: pointer;
+}
+
+.og-past ul {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+/* --- Activity ------------------------------------------------------------- */
+
+.og-activity {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.og-activity li {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-2) var(--space-5);
+}
+
+.og-activity li + li {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.og-activity-what {
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.og-activity-meta {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+@media (max-width: 640px) {
+  .og-person {
+    flex-wrap: wrap;
+  }
+
+  .og-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .og-facts > div:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .og-person-actions {
+    width: 100%;
+    justify-content: flex-start;
+    padding-left: calc(36px + var(--space-3));
+  }
+
+  .og-tournament-head {
+    padding-inline: var(--space-4);
+  }
+
+  .og-seasons {
+    padding-inline: var(--space-2);
+  }
+
+  .og-activity li {
+    padding-inline: var(--space-4);
+  }
+}
