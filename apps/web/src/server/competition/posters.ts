@@ -425,6 +425,7 @@ async function playerPosterFrom(
           isCaptain: registrations.isCaptain,
           isRetained: registrations.isRetained,
           preSignedTeamId: registrations.teamId,
+          offlinePrice: registrations.offlinePrice,
         })
         .from(registrations)
         .innerJoin(people, eq(people.id, registrations.personId))
@@ -487,8 +488,11 @@ async function playerPosterFrom(
           : null;
       // Results entered by hand (0105): placed on a team with no price typed,
       // so no lot — but bought all the same.
-      const placedByHand =
-        !preSigned && seasonAuction?.enteredByHand === true && row.preSignedTeamId !== null;
+      // Before Publish, a season declared as held offline (0110) counts its
+      // placed players as bought too — see `handPlacedIn`.
+      const handPlaced =
+        lot === undefined && (await handPlacedIn(db, gated.competition.id, seasonAuction));
+      const placedByHand = !preSigned && handPlaced && row.preSignedTeamId !== null;
       const teamId = preSigned || placedByHand ? row.preSignedTeamId : (lot?.buyerTeamId ?? null);
       const team =
         teamId === null
@@ -552,7 +556,8 @@ async function playerPosterFrom(
         role: row.role ?? "",
         photoKey,
         outcome,
-        pricePaise: outcome === "sold" ? (lot?.soldPrice ?? null) : null,
+        pricePaise:
+          outcome === "sold" ? (lot?.soldPrice ?? (placedByHand ? row.offlinePrice : null)) : null,
         basePricePaise: outcome === "pool" ? (lot?.basePrice ?? null) : null,
         lotNumber: lot?.lotNumber ?? null,
         jerseyNumber: row.jerseyNumber,
@@ -683,13 +688,15 @@ async function teamPosterFrom(
         return null;
       }
       const auction = await liveAuction(db, gated.competition.id);
+      const handPlaced = await handPlacedIn(db, gated.competition.id, auction);
       // "Meet the squad" draws no money, so before an auction exists it is the
       // captain and icons the organizer has already named. The squad sheet
-      // prints a purse, and an invented one is fiction — it still waits.
-      if (auction === null && request.kind !== "reveal") {
+      // prints a purse, and an invented one is fiction — it waits, unless the
+      // results are being typed in for a season run offline.
+      if (auction === null && !handPlaced && request.kind !== "reveal") {
         return null;
       }
-      const squad = await squadOf(db, gated.competition.id, auction, teamId);
+      const squad = await squadOf(db, gated.competition.id, auction, teamId, handPlaced);
 
       await recordPosterGenerated(db, gated, {
         action: "team.poster_generated",
@@ -710,7 +717,9 @@ async function teamPosterFrom(
         coachName: team.coachName,
         members: squad.members,
         spentPaise: squad.spentPaise,
-        pursePaise: auction === null ? 0 : pursePerTeamOf(auction.config),
+        // No purse is known until results are published: "left" is then
+        // zero rather than a number nobody set.
+        pursePaise: auction === null ? squad.spentPaise : pursePerTeamOf(auction.config),
       };
     },
   );
@@ -796,15 +805,45 @@ async function liveAuction(
 }
 
 /**
+ * ARE THIS SEASON'S RESULTS TYPED IN BY HAND?
+ *
+ * After "Publish teams" the hand-entered auction says so (`enteredByHand`).
+ * Before it, a season declared as held offline (0110) is already typing its
+ * results in: every player placed on a team IS bought, with the price typed
+ * beside them. The public squad page has read it this way all along
+ * (`publicTeam`'s `handPlaced`); the posters waited for Publish, so a BPL-4
+ * squad poster showed only its captain and icon and every placed player's
+ * card said "In the pool — bid for me" (founder, 2026-10-06).
+ */
+async function handPlacedIn(
+  db: Db,
+  competitionId: string,
+  auction: { enteredByHand: boolean } | null,
+): Promise<boolean> {
+  if (auction !== null) {
+    return auction.enteredByHand;
+  }
+  const [row] = await db
+    .select({ source: competitions.auctionSource })
+    .from(competitions)
+    .where(eq(competitions.id, competitionId))
+    .limit(1);
+  return row?.source === "imported";
+}
+
+/**
  * BEFORE OR AFTER THE NIGHT.
  *
  * Before the room opens, a season sheet is the snapshot an organizer posts to
  * build up to auction night — the teams and the captains and icons they
  * already have — and "Season results" over it would be a false headline.
  */
-function seasonStageOf(auction: { status: string; enteredByHand: boolean } | null): SeasonStage {
-  // Results typed in after a night held elsewhere (0105) are always "after".
-  if (auction?.enteredByHand === true) {
+function seasonStageOf(
+  auction: { status: string; enteredByHand: boolean } | null,
+  handPlaced: boolean,
+): SeasonStage {
+  // Results typed in after a night held elsewhere (0105, 0110) are "after".
+  if (handPlaced) {
     return "after";
   }
   // `scheduled` is an auction created but not opened: no lot has come up yet.
@@ -832,6 +871,8 @@ async function squadOf(
   competitionId: string,
   auction: { id: string; enteredByHand: boolean } | null,
   teamId: string,
+  /** Results typed in by hand (`handPlacedIn`): every placed player counts. */
+  handPlaced: boolean,
 ): Promise<{ members: SquadRow[]; spentPaise: number }> {
   const auctionId = auction?.id ?? null;
   const preSigned = await db
@@ -846,6 +887,7 @@ async function squadOf(
       isIcon: registrations.isIcon,
       isCaptain: registrations.isCaptain,
       isRetained: registrations.isRetained,
+      offlinePrice: registrations.offlinePrice,
     })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
@@ -854,7 +896,7 @@ async function squadOf(
         eq(registrations.competitionId, competitionId),
         eq(registrations.teamId, teamId),
         eq(registrations.status, "approved"),
-        auction?.enteredByHand === true ? sql`true` : preSignedSql,
+        handPlaced ? sql`true` : preSignedSql,
         // A captain named after the night was bought — the `bought` list below
         // carries them with their price.
         auctionId === null
@@ -865,15 +907,30 @@ async function squadOf(
     .orderBy(asc(shownName));
 
   if (auctionId === null) {
+    // No auction row: the pre-signed players, and — while results are typed
+    // in for a season run offline — everyone placed, at the price typed.
+    const signed = preSigned.filter((row) => isPreSigned(row));
+    const placed = preSigned
+      .filter((row) => !isPreSigned(row))
+      .sort((a, b) => (b.offlinePrice ?? -1) - (a.offlinePrice ?? -1));
     return {
-      members: preSigned.map((row): SquadRow => ({
-        name: row.name ?? UNNAMED,
-        role: row.role ?? "",
-        pricePaise: null,
-        marks: marksOf(row),
-        photoKey: posterPhotoKey(row),
-      })),
-      spentPaise: 0,
+      members: [
+        ...signed.map((row): SquadRow => ({
+          name: row.name ?? UNNAMED,
+          role: row.role ?? "",
+          pricePaise: null,
+          marks: marksOf(row),
+          photoKey: posterPhotoKey(row),
+        })),
+        ...placed.map((row): SquadRow => ({
+          name: row.name ?? UNNAMED,
+          role: row.role ?? "",
+          pricePaise: row.offlinePrice,
+          marks: [],
+          photoKey: posterPhotoKey(row),
+        })),
+      ],
+      spentPaise: placed.reduce((total, row) => total + (row.offlinePrice ?? 0), 0),
     };
   }
 
@@ -1014,32 +1071,63 @@ async function topBuysPosterFrom(
     { personId: gated.personId, orgId: gated.competition.orgId },
     async (db) => {
       const auction = await liveAuction(db, gated.competition.id);
-      if (auction === null) {
+      const handPlaced = await handPlacedIn(db, gated.competition.id, auction);
+      if (auction === null && !handPlaced) {
         return null;
       }
-      const rows = await db
-        .select({
-          name: shownName,
-          role: registrations.role,
-          photoKey: shownPhotoKey,
-          photoConsentAt: shownPhotoConsentAt,
-          dateOfBirth: registrations.dateOfBirth,
-          adultConfirmedAt: registrations.adultConfirmedAt,
-          price: lots.soldPrice,
-          teamName: teams.name,
-          teamColor: teams.primaryColor,
-          teamCrestKey: teams.logoUrl,
-        })
-        .from(lots)
-        .innerJoin(paddles, eq(paddles.id, lots.soldToPaddleId))
-        .innerJoin(teams, eq(teams.id, paddles.teamId))
-        .innerJoin(registrations, eq(registrations.id, lots.registrationId))
-        .innerJoin(people, eq(people.id, registrations.personId))
-        .where(and(eq(lots.auctionId, auction.id), eq(lots.status, "sold")))
-        .orderBy(desc(lots.soldPrice), asc(registrations.registrationNumber))
-        // The biggest list the studio offers, so the query never reads a
-        // season's whole sale sheet to print three rows of it.
-        .limit(Math.max(...TOP_BUY_COUNTS));
+      const rows =
+        auction === null
+          ? // Typed in for a season run offline, not yet published: the
+            // prices sit on the registrations (`offline_price`).
+            await db
+              .select({
+                name: shownName,
+                role: registrations.role,
+                photoKey: shownPhotoKey,
+                photoConsentAt: shownPhotoConsentAt,
+                dateOfBirth: registrations.dateOfBirth,
+                adultConfirmedAt: registrations.adultConfirmedAt,
+                price: registrations.offlinePrice,
+                teamName: teams.name,
+                teamColor: teams.primaryColor,
+                teamCrestKey: teams.logoUrl,
+              })
+              .from(registrations)
+              .innerJoin(teams, eq(teams.id, registrations.teamId))
+              .innerJoin(people, eq(people.id, registrations.personId))
+              .where(
+                and(
+                  eq(registrations.competitionId, gated.competition.id),
+                  eq(registrations.status, "approved"),
+                  sql`${registrations.offlinePrice} is not null`,
+                  sql`not ${preSignedSql}`,
+                ),
+              )
+              .orderBy(desc(registrations.offlinePrice), asc(registrations.registrationNumber))
+              .limit(Math.max(...TOP_BUY_COUNTS))
+          : await db
+              .select({
+                name: shownName,
+                role: registrations.role,
+                photoKey: shownPhotoKey,
+                photoConsentAt: shownPhotoConsentAt,
+                dateOfBirth: registrations.dateOfBirth,
+                adultConfirmedAt: registrations.adultConfirmedAt,
+                price: lots.soldPrice,
+                teamName: teams.name,
+                teamColor: teams.primaryColor,
+                teamCrestKey: teams.logoUrl,
+              })
+              .from(lots)
+              .innerJoin(paddles, eq(paddles.id, lots.soldToPaddleId))
+              .innerJoin(teams, eq(teams.id, paddles.teamId))
+              .innerJoin(registrations, eq(registrations.id, lots.registrationId))
+              .innerJoin(people, eq(people.id, registrations.personId))
+              .where(and(eq(lots.auctionId, auction.id), eq(lots.status, "sold")))
+              .orderBy(desc(lots.soldPrice), asc(registrations.registrationNumber))
+              // The biggest list the studio offers, so the query never reads a
+              // season's whole sale sheet to print three rows of it.
+              .limit(Math.max(...TOP_BUY_COUNTS));
       if (rows.length === 0) {
         return null;
       }
@@ -1128,7 +1216,8 @@ async function seasonPosterFrom(
       // No auction yet is not a refusal: the pre-auction snapshot is exactly
       // the teams with the captains and icons already named.
       const auction = await liveAuction(db, gated.competition.id);
-      const stage = seasonStageOf(auction);
+      const handPlaced = await handPlacedIn(db, gated.competition.id, auction);
+      const stage = seasonStageOf(auction, handPlaced);
       const franchises = await db
         .select({
           id: teams.id,
@@ -1144,7 +1233,7 @@ async function seasonPosterFrom(
         return null;
       }
       const squads = await Promise.all(
-        franchises.map((team) => squadOf(db, gated.competition.id, auction, team.id)),
+        franchises.map((team) => squadOf(db, gated.competition.id, auction, team.id, handPlaced)),
       );
 
       await recordPosterGenerated(db, gated, {
@@ -1398,7 +1487,7 @@ async function pickerFrom(gated: Gate): Promise<PosterPicker> {
        * auction nobody ran to the end.
        */
       const [live] = await db
-        .select({ id: auctions.id })
+        .select({ id: auctions.id, enteredByHand: auctions.enteredByHand })
         .from(auctions)
         .where(
           and(
@@ -1409,6 +1498,7 @@ async function pickerFrom(gated: Gate): Promise<PosterPicker> {
         )
         .limit(1);
       const liveAuctionId = live?.id ?? null;
+      const handPlaced = await handPlacedIn(db, gated.competition.id, live ?? null);
       /*
        * The narrowing is a PREDICATE, not a filter applied to the results.
        * Reading every registration in the season and then dropping the ones
@@ -1430,6 +1520,7 @@ async function pickerFrom(gated: Gate): Promise<PosterPicker> {
                 name: shownName,
                 number: registrations.registrationNumber,
                 soldPrice: lots.soldPrice,
+                offlinePrice: registrations.offlinePrice,
                 teamName: teams.name,
                 rosterTeamName: rosterTeam.name,
               })
@@ -1467,7 +1558,7 @@ async function pickerFrom(gated: Gate): Promise<PosterPicker> {
                * the query had been doing the opposite.
                */
               .orderBy(
-                sql`${lots.soldPrice} desc nulls last`,
+                sql`coalesce(${lots.soldPrice}, ${registrations.offlinePrice}) desc nulls last`,
                 asc(registrations.registrationNumber),
               ),
         mine !== undefined && mine.teams.length === 0
@@ -1483,7 +1574,12 @@ async function pickerFrom(gated: Gate): Promise<PosterPicker> {
               )
               .orderBy(asc(teams.name)),
       ]);
-      const sold = playerRows.some((row) => row.soldPrice !== null);
+      // A price typed for a season run offline is a sale too (`handPlacedIn`).
+      const sold = playerRows.some(
+        (row) =>
+          row.soldPrice !== null ||
+          (handPlaced && row.offlinePrice !== null && row.rosterTeamName !== null),
+      );
       const kinds: PosterKind[] = [];
       if (playerRows.length > 0) {
         kinds.push("player");
@@ -1493,7 +1589,7 @@ async function pickerFrom(gated: Gate): Promise<PosterPicker> {
         // (in the app, or results entered by hand) — `teamPosterSource` refuses
         // it until then. Offering it anyway was a preview that never loaded.
         // "Meet the squad" draws no money and is there from the first team.
-        if (liveAuctionId !== null) {
+        if (liveAuctionId !== null || handPlaced) {
           kinds.push("team");
         }
         kinds.push("reveal");

@@ -18,6 +18,10 @@ import { practiceCardView } from "../../../../server/auction/practice-actions";
 import { appointmentsPanelView } from "../../../../server/competition/appointment-actions";
 import { requireOnboarded } from "../../../../server/auth/onboarding-gate";
 import { standingsView } from "../../../../server/competition/fixture-actions";
+import { teamsWorkspaceView } from "../../../../server/competition/actions";
+import { PublishByHand } from "../teams/hand-entry";
+import { ResultsSheet } from "../teams/results-sheet";
+import "../teams/teams.css";
 import { AuctionPanel } from "./auction-panel";
 import { AuctioneerPanel } from "./auctioneer-panel";
 import { PracticeCard } from "./practice-card";
@@ -90,6 +94,18 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
   const imported =
     dashboard.competition.auctionSource === "imported" &&
     (status === null || status === "abandoned");
+  // A season run offline types its results in HERE: the Auction tab used to
+  // say "go to the Teams tab", a dead end on the one tab named for the job
+  // (founder, 2026-10-06). The same list as Teams → "Type results in one list".
+  const resultsDesk =
+    imported && dashboard.viewer.canManage ? await teamsWorkspaceView(slug) : null;
+  const typing =
+    resultsDesk !== null &&
+    resultsDesk.handEntry === "open" &&
+    resultsDesk.viewer.canSeeRoster &&
+    resultsDesk.teams.length > 0
+      ? resultsDesk
+      : null;
   const rows = table?.standings.rows ?? [];
   const standing = rows.some((row) => row.played > 0)
     ? Object.fromEntries(
@@ -196,13 +212,34 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
               team's "meet the squad"), but every door to them used to open
               only after a finished night. */}
           {(status === null || status === "scheduled" || status === "abandoned") &&
+          !imported &&
           dashboard.viewer.canPoster ? (
             <p className="auc-hand-hint" data-testid="auction-posters-door">
               <Link href={`/seasons/${slug}/posters`}>Make posters</Link> — the season poster and
               each team&apos;s squad, ready to share before the auction.
             </p>
           ) : null}
-          {imported ? (
+          {typing !== null ? (
+            <>
+              <ResultsSheet
+                slug={slug}
+                teams={typing.teams.map((team) => ({
+                  id: team.id,
+                  name: team.name,
+                  color: team.color,
+                }))}
+                roleLabels={Object.fromEntries(typing.roles.map((role) => [role.key, role.label]))}
+                heading="Auction results"
+              />
+              <PublishByHand slug={slug} teams={typing.teams} imported inList />
+              {dashboard.viewer.canPoster ? (
+                <p className="auc-hand-hint" data-testid="auction-posters-door">
+                  <Link href={`/seasons/${slug}/posters`}>Make posters</Link> — squad posters and
+                  player cards update as you type the results in.
+                </p>
+              ) : null}
+            </>
+          ) : imported ? (
             <SectionCard
               icon={<IconGavel />}
               title="Auction held outside DesiAuction"

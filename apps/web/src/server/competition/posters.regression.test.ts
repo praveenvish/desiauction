@@ -762,6 +762,89 @@ describe("PRE-AUCTION SNAPSHOT — the teams before the night", () => {
   });
 });
 
+describe("OFFLINE SEASON — results typed in count before Publish", () => {
+  // BPL-4 (founder, 2026-10-06): every player was on a team, but the squad
+  // poster showed only the captain and icon, and each placed player's card
+  // said "In the pool — bid for me", because the posters waited for Publish
+  // while the public squad page did not.
+  let offline = { id: "", slug: "" };
+  const hawks = { teamId: "" };
+  let placedId = "";
+
+  beforeAll(async () => {
+    const competition = await createCompetition(db, org.id, organizer, {
+      sport: "cricket",
+      name: `Offline Cup ${RUN}`,
+    });
+    offline = { id: competition.id, slug: competition.slug };
+    await db
+      .update(competitionsTable)
+      .set({ auctionSource: "imported" })
+      .where(eq(competitionsTable.id, offline.id));
+    const created = await createTeam(db, org.id, offline.id, organizer, "Hawks");
+    if (!created.ok) {
+      throw new Error("team setup failed");
+    }
+    hawks.teamId = created.team.id;
+    const rows: [string, string, Record<string, unknown>][] = [
+      ["Hawks Captain", "21", { isCaptain: true }],
+      ["Hawks Bought", "22", { offlinePrice: 450_000 }],
+      ["Hawks Unpriced", "23", {}],
+    ];
+    for (const [name, suffix, extra] of rows) {
+      const id = newId();
+      if (name === "Hawks Bought") {
+        placedId = id;
+      }
+      await db.insert(registrationsTable).values({
+        id,
+        orgId: org.id,
+        competitionId: offline.id,
+        personId: await person(name, suffix),
+        role: "batter",
+        status: "approved",
+        registrationNumber: registrationNumber(id),
+        teamId: hawks.teamId,
+        ...extra,
+      });
+    }
+  });
+
+  it("puts every placed player on the squad sheet, priced as typed", async () => {
+    const sheet = await teamPosterFor(organizer, offline.slug, hawks.teamId, REQUEST);
+    expect(sheet.ok).toBe(true);
+    if (!sheet.ok) {
+      return;
+    }
+    expect(
+      sheet.input.members.map((member) => [member.name, member.pricePaise, member.marks]),
+    ).toEqual([
+      ["Hawks Captain", null, ["captain"]],
+      ["Hawks Bought", 450_000, []],
+      ["Hawks Unpriced", null, []],
+    ]);
+    expect(sheet.input.spentPaise).toBe(450_000);
+  });
+
+  it("gives a placed player a SOLD card for their team, not IN THE POOL", async () => {
+    const card = await playerPosterFor(organizer, offline.slug, placedId, REQUEST);
+    expect(card.ok).toBe(true);
+    if (card.ok) {
+      expect(card.input.outcome).toBe("sold");
+      expect(card.input.pricePaise).toBe(450_000);
+      expect(card.input.teamName).toBe("Hawks");
+    }
+  });
+
+  it("offers the squad sheet and top buys in the studio", async () => {
+    const picker = await posterPickerFor(organizer, offline.slug);
+    expect("ok" in picker).toBe(false);
+    if (!("ok" in picker)) {
+      expect(picker.kinds).toEqual(expect.arrayContaining(["team", "top", "season"]));
+    }
+  });
+});
+
 describe("SQUAD FACES — the same two rules as the player card", () => {
   it("puts consented adult faces on the sheet and withholds everyone else's", async () => {
     await db

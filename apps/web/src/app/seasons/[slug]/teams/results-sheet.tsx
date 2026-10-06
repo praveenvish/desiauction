@@ -72,10 +72,16 @@ export function ResultsSheet({
   slug,
   teams,
   roleLabels,
+  heading,
 }: {
   slug: string;
   teams: readonly Team[];
   roleLabels: Record<string, string>;
+  /**
+   * Drawn as the Auction tab's own content (a season run offline) rather than
+   * as a screen reached from Teams: no way back to a page it did not come from.
+   */
+  heading?: string;
 }) {
   const router = useRouter();
   const [, startRefresh] = useTransition();
@@ -158,12 +164,14 @@ export function ResultsSheet({
 
   return (
     <section className="rs" aria-labelledby="rs-title" data-testid="results-sheet">
-      <Link href={`/seasons/${slug}/teams`} className="rs-back">
-        <IconArrowLeft size={16} aria-hidden /> All teams
-      </Link>
+      {heading === undefined ? (
+        <Link href={`/seasons/${slug}/teams`} className="rs-back">
+          <IconArrowLeft size={16} aria-hidden /> All teams
+        </Link>
+      ) : null}
       <header className="rs-head">
         <div>
-          <h2 id="rs-title">Auction results</h2>
+          <h2 id="rs-title">{heading ?? "Auction results"}</h2>
           <p>
             Every player in one list. Pick the team that bought them and type the {unitWord}.
             Everything saves as you go. Keyboard: name → Enter → team → Enter → {unitWord} → Enter.
