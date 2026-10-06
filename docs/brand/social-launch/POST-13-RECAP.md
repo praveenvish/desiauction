@@ -54,3 +54,15 @@ Tue 13 Oct, **7:30 pm IST** on Instagram, Facebook, Threads and X.
 - **Imagery:** real screens, no AI imagery.
 - **Labels:** each slide carries its demo label.
 - **Tag:** #DesiAuction on every network.
+
+## Posted
+
+Posted Tue 6 Oct 2026, about 9:00 am IST, on the founder's "post the whole series now" (5 Oct).
+
+| Network | Posted? | Link |
+|---|---|---|
+| Instagram | yes (8-slide carousel, 4:5; prompt posted as first comment, **pin it from the phone**, since web has no Pin) | https://www.instagram.com/p/DeI0fwsCU1m/ |
+| Facebook Page | yes (8-photo post with the link line, Page only, no boost) | https://www.facebook.com/thedesiauction/posts/pfbid0skqpwEdnLvS1ayKRcZwWTu7sV1wJiXQ8efTJq5LS3z8j6ZceoFT8MNf5U8U8A7myl |
+| Threads | yes (8 images, topic DesiAuction) | https://www.threads.com/@desiauction/post/DeI1E_KE5mv |
+| X | yes (slides 1, 2, 6, 8) | https://x.com/thedesiauction/status/2107314002909073837 |
+| YouTube | n/a (no carousel format) | — |
