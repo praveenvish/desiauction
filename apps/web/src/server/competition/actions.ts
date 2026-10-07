@@ -114,6 +114,7 @@ import {
   addNote,
   assignTeam,
   auctionHoldsRoster,
+  seasonRosterLocked,
   confirmAdults,
   rosterAuction,
   setRegistrationMarks,
@@ -942,10 +943,10 @@ export async function createTeamAction(
   // settlement sealed. A fifth team appearing after the hammer fell left the
   // season permanently inconsistent — five teams against a four-team auction
   // and a four-team reconciled case — and with no delete, unfixable.
-  const auction = await inCompetitionOrg(session.personId, competition, (db) =>
-    auctionOf(db, competition.id),
+  const teamsLocked = await inCompetitionOrg(session.personId, competition, (db) =>
+    seasonRosterLocked(db, competition.id),
   );
-  if (auction !== null && auction.status !== "scheduled") {
+  if (teamsLocked) {
     return {
       ok: false,
       error: "The auction has started — the teams are locked for this season.",
@@ -1341,10 +1342,7 @@ async function auctionLocksRoster(
   // than a member (withdrawing themselves) that is still correct: the server
   // resolved the season from the public link and opens its org's boundary to
   // read one fact about it, exactly as `submitRegistration` does to write.
-  const auction = await inCompetitionOrg(personId, competition, (db) =>
-    auctionOf(db, competition.id),
-  );
-  return auction !== null && auction.status !== "scheduled";
+  return inCompetitionOrg(personId, competition, (db) => seasonRosterLocked(db, competition.id));
 }
 
 const ROSTER_LOCKED = "The auction has started — squads are set by the auction now, not by hand.";
@@ -2467,10 +2465,10 @@ export async function updateTeamAction(
   } catch {
     return { ok: false, error: "You can't manage teams here." };
   }
-  const auction = await inCompetitionOrg(session.personId, competition, (db) =>
-    auctionOf(db, competition.id),
+  const teamsLocked = await inCompetitionOrg(session.personId, competition, (db) =>
+    seasonRosterLocked(db, competition.id),
   );
-  if (auction !== null && auction.status !== "scheduled") {
+  if (teamsLocked) {
     return {
       ok: false,
       error: "The auction has started — the teams are locked for this season.",

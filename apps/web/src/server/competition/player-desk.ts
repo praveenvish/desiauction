@@ -3,6 +3,7 @@ import { auctionOf } from "@desiauction/auction";
 import type { Db } from "@desiauction/db";
 
 import { canCompetition } from "./authz";
+import { seasonRosterLocked } from "./registration-aggregate";
 import type { CompetitionSummary } from "./competitions";
 
 /**
@@ -47,11 +48,13 @@ export async function playerDeskContext(
     canCompetition(db, personId, scope, "competition.manage"),
     auctionOf(db, competition.id),
   ]);
+  // The shared rule: an auction aborted before it opened locks nothing.
+  const rosterLocked = await seasonRosterLocked(db, competition.id);
   const pack = sportPackFor(competition.sport);
   return {
     canManageTeams,
     auctionExists: auction !== null && auction.status !== "abandoned",
-    rosterLocked: auction !== null && auction.status !== "scheduled",
+    rosterLocked,
     auctionDone:
       auction !== null && (auction.status === "completed" || auction.status === "reconciled"),
     handEntry: canManage && (auction === null || auction.status === "abandoned"),

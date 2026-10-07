@@ -107,9 +107,17 @@ const LEAVES_THE_SQUAD = {
 export async function rosterAuction(
   db: Db,
   competitionId: string,
-): Promise<{ id: string; status: string } | null> {
+): Promise<{ id: string; status: string; everOpened: boolean } | null> {
   const [row] = await db
-    .select({ id: auctions.id, status: auctions.status })
+    .select({
+      id: auctions.id,
+      status: auctions.status,
+      // Did the room ever open? An auction aborted while still scheduled
+      // never drew the pool and sold nobody (`auctionHoldsRoster`).
+      // Spelled out as "auctions"."id": interpolated, the column prints bare
+      // ("id"), which inside the subquery binds to the EVENT's own id.
+      everOpened: sql<boolean>`exists (select 1 from auction_events e where e.auction_id = "auctions"."id" and e.type = 'AuctionOpened')`,
+    })
     .from(auctions)
     .where(and(eq(auctions.competitionId, competitionId), isRealAuction()))
     .orderBy(desc(auctions.createdAt))
@@ -118,9 +126,27 @@ export async function rosterAuction(
   return row ?? null;
 }
 
-/** The roster belongs to the auction once it has left `scheduled` (P2-3, DA-04). */
-export function auctionHoldsRoster(auction: { status: string } | null): boolean {
-  return auction !== null && auction.status !== "scheduled";
+/**
+ * The roster belongs to the auction once it has left `scheduled` (P2-3, DA-04)
+ * — unless it left by being ABORTED BEFORE IT EVER OPENED. That auction drew no
+ * pool, sold nobody and holds no money: it is the one a club abandons to type
+ * in the results of a night held offline, and it locked their own team sheet
+ * against them (founder, BPL-4, 2026-10-07). An auction aborted mid-night,
+ * with sales and possibly a settlement case, still holds the roster.
+ * `everOpened` omitted is read as "it opened" — the safe default.
+ */
+export function auctionHoldsRoster(
+  auction: { status: string; everOpened?: boolean } | null,
+): boolean {
+  if (auction === null || auction.status === "scheduled") {
+    return false;
+  }
+  return !(auction.status === "abandoned" && auction.everOpened === false);
+}
+
+/** Is this season's roster locked by its auction? One read, the shared rule. */
+export async function seasonRosterLocked(db: Db, competitionId: string): Promise<boolean> {
+  return auctionHoldsRoster(await rosterAuction(db, competitionId));
 }
 
 /**

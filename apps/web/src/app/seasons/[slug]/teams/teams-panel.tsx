@@ -218,6 +218,7 @@ function TeamGrid({
           slug={slug}
           teams={view.teams}
           imported={view.auctionSource === "imported"}
+          suggestedPurse={view.suggestedPurse ?? null}
         />
       ) : null}
       {view.handEntry === "published" ? (
