@@ -76,6 +76,7 @@ export default async function TeamsPage({
               teams={view.teams}
               imported={view.auctionSource === "imported"}
               inList
+              suggestedPurse={view.suggestedPurse ?? null}
             />
           </div>
         </main>

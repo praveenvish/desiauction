@@ -14,13 +14,18 @@ import {
   type FeatureDenial,
   type MachineEdge,
 } from "@desiauction/core";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { withTenantDb, type Db } from "@desiauction/db";
 
 import { currentSession } from "../auth/actions";
 import { canCompetition, requireCompetitionCapability } from "../competition/authz";
-import { auctionStartOf, type CompetitionSummary } from "../competition/competitions";
+import {
+  auctionStartOf,
+  updateCompetitionDetails,
+  type CompetitionSummary,
+} from "../competition/competitions";
 import { resolveMemberCompetition } from "../competition/resolve";
 import { ownedTeamIdsOn } from "../competition/posters";
 import { dbHandle } from "../db";
@@ -853,4 +858,86 @@ export async function setAuctionFeatureAction(
     });
     return { ok: true };
   });
+}
+
+/**
+ * "THE AUCTION WAS HELD OFFLINE" — one step from an auction set up here to
+ * results typed in by hand (founder, BPL-4, 2026-10-07: "this use case comes
+ * up many times").
+ *
+ * A club creates the auction in the app, then runs the night in a hall with a
+ * whiteboard. The way out used to be an "Abort" at the bottom of the setup
+ * page (type ABORT, give a reason), then Season details, then the Teams tab —
+ * and the abort locked their own roster behind it. This does the three things
+ * the club means, in order, and nothing else:
+ *
+ * 1. ends the real auction, only while it is still SCHEDULED — one that has
+ *    opened has a room's results, and those are never overwritten by hand;
+ * 2. ends the practice, which belongs to the night that is no longer coming;
+ * 3. marks the season "held elsewhere" (0110), which opens the results list.
+ *
+ * Teams, players, captains and icons are untouched: an auction aborted before
+ * it opened holds no roster (`auctionHoldsRoster`). The season's organisers
+ * only — not the appointed auctioneer.
+ */
+export async function switchToOfflineResultsAction(
+  slug: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const gate = await manageGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error };
+  }
+  const { personId, competition } = gate;
+  const auction = await inCompetitionOrg(personId, competition, (db) =>
+    requireAuction(db, competition.id),
+  );
+  if (auction !== null && auction.status !== "scheduled" && auction.status !== "abandoned") {
+    return {
+      ok: false,
+      error:
+        "This auction has already started in the app — its results come from the room, not from a list typed in.",
+    };
+  }
+  if (auction !== null && auction.status === "scheduled") {
+    const ack = await sendEngineCommand({
+      auctionId: auction.id,
+      type: "AbortAuction",
+      actor: personId,
+      conduct: true,
+      manage: true,
+      payload: { reason: "Auction held offline — results entered by hand" },
+    });
+    if (!ack.accepted && ack.reason !== "illegal_transition") {
+      return {
+        ok: false,
+        error: "We couldn't end the scheduled auction. Try again in a moment.",
+      };
+    }
+  }
+  const practice = await inCompetitionOrg(personId, competition, (db) =>
+    practiceOf(db, competition.id),
+  );
+  if (practice !== null) {
+    await endPractice(practice.id, personId);
+  }
+  if (competition.auctionSource !== "imported") {
+    const updated = await inCompetitionOrg(personId, competition, (db) =>
+      updateCompetitionDetails(db, competition, personId, {
+        name: competition.name,
+        location: competition.location,
+        startsOn: competition.startsOn,
+        endsOn: competition.endsOn,
+        auctionSource: "imported",
+      }),
+    );
+    if (!updated.ok) {
+      return {
+        ok: false,
+        error:
+          "The auction ended, but the season couldn't be marked as held offline. Set it in Season details.",
+      };
+    }
+  }
+  revalidatePath(`/seasons/${slug}`, "layout");
+  return { ok: true };
 }

@@ -20,6 +20,7 @@ import { requireOnboarded } from "../../../../server/auth/onboarding-gate";
 import { standingsView } from "../../../../server/competition/fixture-actions";
 import { teamsWorkspaceView } from "../../../../server/competition/actions";
 import { OfflinePublish, OfflineResultsSheet } from "./offline-results";
+import { OfflineSwitch } from "./offline-switch";
 import "../teams/teams.css";
 import { AuctionPanel } from "./auction-panel";
 import { AuctioneerPanel } from "./auctioneer-panel";
@@ -105,6 +106,11 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
     resultsDesk.teams.length > 0
       ? resultsDesk
       : null;
+  const showSwitch =
+    (status === null || status === "scheduled" || status === "abandoned") &&
+    !imported &&
+    dashboard.viewer.canManage;
+  const leadCard = showSwitch || (practice !== null && status === "scheduled");
   const rows = table?.standings.rows ?? [];
   const standing = rows.some((row) => row.played > 0)
     ? Object.fromEntries(
@@ -121,11 +127,24 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
           {/* An auction renames the surface — the tab still says "Auction",
               the title says what is happening on it, which is not always
               "live". */}
-          {title !== null ? <PageTitle title={title} /> : null}
+          {/* A season switched to offline results ended its scheduled auction
+              on purpose: "Auction abandoned" in red would read as an accident. */}
+          {imported ? (
+            <PageTitle title="Auction results" />
+          ) : title !== null ? (
+            <PageTitle title={title} />
+          ) : null}
           {/* Before an auction exists every control here is absent, and the
               empty header drew a stray rule and a blank band at the top. */}
-          {status !== null ? (
-            <header className="auc-head">
+          {status !== null && !imported ? (
+            <header
+              className={
+                // A card leads the page (the offline switch, the practice):
+                // the head takes its own row instead of being pinned into the
+                // tab strip's corner, where it landed on the card.
+                leadCard ? "auc-head auc-head-row" : "auc-head"
+              }
+            >
               {pill !== null ? (
                 <span className="auc-status">
                   <Pill tone={pill.tone} dot testId="auction-status">
@@ -183,29 +202,11 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
               </div>
             </header>
           ) : null}
+          {/* The fork in the road, first: a night that has not started can
+              still be held offline instead (switchToOfflineResultsAction). */}
+          {showSwitch ? <OfflineSwitch slug={slug} scheduled={status === "scheduled"} /> : null}
           {practice !== null && status === "scheduled" ? (
             <PracticeCard slug={slug} card={practice} />
-          ) : null}
-          {/* 0105: before any auction, the other road — it already happened. */}
-          {(status === null || status === "abandoned") &&
-          !imported &&
-          dashboard.viewer.canManage ? (
-            <p className="auc-hand-hint" data-testid="auction-hand-hint">
-              Auction already held outside the app?{" "}
-              <Link href={`/seasons/${slug}/teams`}>Add the results on the Teams tab</Link> to get
-              posters and team cards.
-            </p>
-          ) : null}
-          {/* A night set up here but run somewhere else: hand entry opens once
-              the scheduled auction is aborted (an aborted auction is no
-              auction — team-workspace.ts), and this is the only place that
-              says so. */}
-          {status === "scheduled" && dashboard.viewer.canManage ? (
-            <p className="auc-hand-hint" data-testid="auction-hand-hint-scheduled">
-              Held the auction outside the app instead? Abort this auction at the bottom of the
-              page, then{" "}
-              <Link href={`/seasons/${slug}/teams`}>add the results on the Teams tab</Link>.
-            </p>
           ) : null}
           {/* Posters exist before the hammer too (the season poster and each
               team's "meet the squad"), but every door to them used to open
@@ -230,7 +231,13 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
                 roleLabels={Object.fromEntries(typing.roles.map((role) => [role.key, role.label]))}
                 heading="Auction results"
               />
-              <OfflinePublish slug={slug} teams={typing.teams} imported inList />
+              <OfflinePublish
+                slug={slug}
+                teams={typing.teams}
+                imported
+                inList
+                suggestedPurse={typing.suggestedPurse ?? null}
+              />
               {dashboard.viewer.canPoster ? (
                 <p className="auc-hand-hint" data-testid="auction-posters-door">
                   <Link href={`/seasons/${slug}/posters`}>Make posters</Link> — squad posters and

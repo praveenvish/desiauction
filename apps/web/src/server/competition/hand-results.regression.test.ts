@@ -37,7 +37,7 @@ import { createCompetition, createTeam, type CompetitionSummary } from "./compet
 import { ownedTeamIdsOn } from "./team-ownership";
 import { teamsWorkspace } from "./team-workspace";
 import { playerPosterFor, seasonPosterFor, teamPosterFor } from "./posters";
-import { auctionHoldsRoster, rosterAuction } from "./registration-aggregate";
+import { auctionHoldsRoster, rosterAuction, seasonRosterLocked } from "./registration-aggregate";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
@@ -248,8 +248,46 @@ describe("RESULTS ENTERED BY HAND", () => {
       .update(auctionsTable)
       .set({ status: "abandoned" })
       .where(eq(auctionsTable.id, auctionId));
-    expect(
-      (await teamsWorkspace(db, other, { money: false, roster: false, manage: true })).handEntry,
-    ).toBe("open");
+    const after = await teamsWorkspace(db, other, { money: false, roster: false, manage: true });
+    expect(after.handEntry).toBe("open");
+    // The setup's purse rides along, to fill "points each team started with".
+    expect(after.suggestedPurse).toBe(config.pursePerTeam);
+    // BPL-4 (2026-10-07): an auction aborted before it ever opened holds no
+    // roster — the club's own team sheet must not lock behind it.
+    expect(await seasonRosterLocked(db, other.id)).toBe(false);
+  });
+
+  it("keeps the roster locked behind an auction aborted AFTER it opened", async () => {
+    const other = await createCompetition(db, orgId, owner, {
+      sport: "cricket",
+      name: `Hand Aborted Live ${RUN}`,
+      location: "Pune",
+      startsOn: "2026-10-01",
+      endsOn: "2026-10-30",
+    });
+    const auctionId = newId();
+    await db.insert(auctionsTable).values({
+      id: auctionId,
+      orgId,
+      competitionId: other.id,
+      name: "Opened, then abandoned mid-night",
+      config,
+      createdBy: owner,
+      status: "abandoned",
+    });
+    expect(await seasonRosterLocked(db, other.id)).toBe(false);
+    // The room opened once: lots were drawn and may have sold.
+    await db.insert(auctionEventsTable).values({
+      id: newId(),
+      orgId,
+      auctionId,
+      seq: 1,
+      type: "AuctionOpened",
+      atMs: Date.now(),
+      actor: owner,
+      correlationId: newId(),
+      payload: {},
+    });
+    expect(await seasonRosterLocked(db, other.id)).toBe(true);
   });
 });

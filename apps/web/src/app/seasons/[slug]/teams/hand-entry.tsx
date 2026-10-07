@@ -322,6 +322,7 @@ export function PublishByHand({
   teams,
   imported = false,
   inList = false,
+  suggestedPurse = null,
 }: {
   slug: string;
   teams: readonly TeamCard[];
@@ -329,13 +330,17 @@ export function PublishByHand({
   imported?: boolean;
   /** Drawn under the one-list results screen: the last step, said briefly. */
   inList?: boolean;
+  /** Paise: the purse an earlier auction setup declared, to start the box with. */
+  suggestedPurse?: number | null;
 }) {
   const router = useRouter();
   const toast = useToast();
   const money = useMoney();
   const unit = useMoneyUnit();
   const [open, setOpen] = useState(false);
-  const [purse, setPurse] = useState("");
+  const [purse, setPurse] = useState(
+    suggestedPurse === null ? "" : String(Math.round(suggestedPurse / 100)),
+  );
   const [error, setError] = useState<{ text: string; field: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -468,7 +473,11 @@ export function PublishByHand({
           inputMode="numeric"
           autoComplete="off"
           value={purse}
-          help="Used for the “left” figure on team cards and squad posters."
+          help={
+            suggestedPurse === null
+              ? "Used for the “left” figure on team cards and squad posters."
+              : "From your auction setup — change it if teams started with a different amount. Used for the “left” figure."
+          }
           data-testid="hand-purse"
           {...(error?.field === true ? { error: error.text } : {})}
           onChange={(event) => {
