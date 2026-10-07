@@ -60,3 +60,19 @@ If India loses, or there's no result: **post nothing** — never a loss joke, ne
   `.work/practice/` and `.work/ek-link/`).
 - Result card: `cards/match-result-india-1-0-1080x1920.png` (Story) and
   `cards/match-result-india-1-0-1080x1350.png` (feed); `reels/build-match-result-card.cjs`.
+
+## Posted
+
+Reel (section A) posted Wed 7 Oct 2026, ~08:15 IST — late: the Tue 6 Oct 6:00 pm slot was
+missed (the Mac was asleep) and the match had already been played. The founder said to post
+it anyway, with the kit's wording unchanged.
+
+| Platform | Posted? | Link |
+|---|---|---|
+| Instagram (@desiauction) | Yes (Reel, crop Original, cover uploaded, AI label off) | https://www.instagram.com/desiauction/reel/DeLUGnrisVa/ |
+| Facebook Page (DesiAuction) | Yes (Reel, Public, "safe to publish", facebook UTM link, AI label off) | https://www.facebook.com/reel/1762072708437355/ |
+| YouTube Shorts (@DesiAuction) | Yes (Public, not for kids, no paid promotion, AI: No; added to "Cricket Moments") | https://youtube.com/shorts/CR1tQt0jTfI |
+| Threads (@desiauction) | Yes (video, topic DesiAuction) | https://www.threads.com/@desiauction/post/DeLUxbXjq7Z |
+| X (@thedesiauction) | Yes (video) | https://x.com/thedesiauction/status/2107665259305841078 |
+
+Result card (section B) not posted by this run.
