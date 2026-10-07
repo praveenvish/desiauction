@@ -76,3 +76,15 @@ it anyway, with the kit's wording unchanged.
 | X (@thedesiauction) | Yes (video) | https://x.com/thedesiauction/status/2107665259305841078 |
 
 Result card (section B) not posted by this run.
+
+## Result card
+
+India won the 1st T20I (Lucknow, Tue 6 Oct 2026) by 8 wickets with 32 balls left (ESPN, Wisden, AP).
+Founder said to post it; posted Wed 7 Oct 2026, ~08:35 IST.
+
+| Platform | Posted? | Link |
+|---|---|---|
+| Facebook Page story (DesiAuction) | Yes (9:16 card, "Learn More" button → desiauction.in facebook/story/match_day UTM) | Page story, no permalink: https://www.facebook.com/thedesiauction |
+| Threads (@desiauction) | Yes (4:5 card, topic DesiAuction; Threads allows one tag, so the two hashtags became the topic) | https://www.threads.com/@desiauction/post/DeLWrX5E1xb |
+| X (@thedesiauction) | Yes (4:5 card, exact text) | https://x.com/thedesiauction/status/2107669184784355501 |
+| Instagram story (@desiauction) | No — founder to post from phone (`cards/match-result-india-1-0-1080x1920.png`, link sticker to desiauction.in) | — |
