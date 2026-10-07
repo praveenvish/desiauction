@@ -19,8 +19,7 @@ import { appointmentsPanelView } from "../../../../server/competition/appointmen
 import { requireOnboarded } from "../../../../server/auth/onboarding-gate";
 import { standingsView } from "../../../../server/competition/fixture-actions";
 import { teamsWorkspaceView } from "../../../../server/competition/actions";
-import { PublishByHand } from "../teams/hand-entry";
-import { ResultsSheet } from "../teams/results-sheet";
+import { OfflinePublish, OfflineResultsSheet } from "./offline-results";
 import "../teams/teams.css";
 import { AuctionPanel } from "./auction-panel";
 import { AuctioneerPanel } from "./auctioneer-panel";
@@ -221,7 +220,7 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
           ) : null}
           {typing !== null ? (
             <>
-              <ResultsSheet
+              <OfflineResultsSheet
                 slug={slug}
                 teams={typing.teams.map((team) => ({
                   id: team.id,
@@ -231,7 +230,7 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
                 roleLabels={Object.fromEntries(typing.roles.map((role) => [role.key, role.label]))}
                 heading="Auction results"
               />
-              <PublishByHand slug={slug} teams={typing.teams} imported inList />
+              <OfflinePublish slug={slug} teams={typing.teams} imported inList />
               {dashboard.viewer.canPoster ? (
                 <p className="auc-hand-hint" data-testid="auction-posters-door">
                   <Link href={`/seasons/${slug}/posters`}>Make posters</Link> — squad posters and
