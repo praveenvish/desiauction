@@ -284,7 +284,9 @@ export function skinFor(theme: PosterTheme, teamColor: string | null): Skin {
       team: teamToneFor(palette, teamColor),
     };
   }
-  const classic = CLASSIC[theme];
+  // Stadium draws its own stage in the team's colour (`poster-stadium.tsx`);
+  // its skin is the night palette, for the footer and the chips it shares.
+  const classic = CLASSIC[theme === "stadium" ? "floodlight" : theme];
   const palette = settle(classic.palette);
   return {
     theme,

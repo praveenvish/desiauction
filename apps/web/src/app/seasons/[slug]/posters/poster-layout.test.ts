@@ -156,8 +156,9 @@ describe("fitPrice", () => {
 });
 
 describe("themes and sizes stay in step with the model", () => {
-  it("still has exactly the six themes the renderer paints", () => {
+  it("still has exactly the seven themes the renderer paints", () => {
     expect([...POSTER_THEMES]).toEqual([
+      "stadium",
       "floodlight",
       "matchday",
       "minimal",

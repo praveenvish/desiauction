@@ -888,6 +888,7 @@ async function squadOf(
       isCaptain: registrations.isCaptain,
       isRetained: registrations.isRetained,
       offlinePrice: registrations.offlinePrice,
+      jerseyNumber: registrations.jerseyNumber,
     })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
@@ -921,6 +922,7 @@ async function squadOf(
           pricePaise: null,
           marks: marksOf(row),
           photoKey: posterPhotoKey(row),
+          jerseyNumber: row.jerseyNumber,
         })),
         ...placed.map((row): SquadRow => ({
           name: row.name ?? UNNAMED,
@@ -928,6 +930,7 @@ async function squadOf(
           pricePaise: row.offlinePrice,
           marks: [],
           photoKey: posterPhotoKey(row),
+          jerseyNumber: row.jerseyNumber,
         })),
       ],
       spentPaise: placed.reduce((total, row) => total + (row.offlinePrice ?? 0), 0),
@@ -947,6 +950,7 @@ async function squadOf(
       isIcon: registrations.isIcon,
       isCaptain: registrations.isCaptain,
       isRetained: registrations.isRetained,
+      jerseyNumber: registrations.jerseyNumber,
     })
     .from(lots)
     .innerJoin(paddles, eq(paddles.id, lots.soldToPaddleId))
@@ -962,6 +966,7 @@ async function squadOf(
     // Only a hand-entered auction reads an unmarked player here.
     marks: isPreSigned(row) ? marksOf(row) : [],
     photoKey: posterPhotoKey(row),
+    jerseyNumber: row.jerseyNumber,
   });
   const members: SquadRow[] = [
     ...preSigned.filter((row) => isPreSigned(row)).map(asSigned),
@@ -979,6 +984,7 @@ async function squadOf(
         // is a claim about a night that did not happen this way.
         marks: row.isCaptain ? ["captain"] : [],
         photoKey: posterPhotoKey(row),
+        jerseyNumber: row.jerseyNumber,
       })),
     // Placed by hand at no price: after everyone with one, as the cheapest.
     ...preSigned.filter((row) => !isPreSigned(row)).map(asSigned),
@@ -1022,6 +1028,7 @@ async function withFaces(rows: readonly SquadRow[], px: number): Promise<TeamPos
     pricePaise: row.pricePaise,
     marks: row.marks,
     photoUrl: photos[index] ?? null,
+    jerseyNumber: row.jerseyNumber ?? null,
   }));
 }
 
