@@ -65,6 +65,7 @@ const KIND_LABEL: Record<PosterKind, { label: string; hint: string }> = {
  * so the picker can never advertise a colour the poster does not use.
  */
 const THEME_LABEL: Record<PosterTheme, { name: string; hint: string }> = {
+  stadium: { name: "Stadium", hint: "Each team in its own colours" },
   floodlight: { name: "Floodlight", hint: "The night look" },
   matchday: { name: "Matchday", hint: "The team's own colour" },
   minimal: { name: "Minimal", hint: "Light and editorial" },
@@ -94,7 +95,7 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
   const [kind, setKind] = useState<PosterKind>(kinds[0] ?? "player");
   const [playerId, setPlayerId] = useState(view.players[0]?.id ?? "");
   const [teamId, setTeamId] = useState(view.teams[0]?.id ?? "");
-  const [theme, setTheme] = useState<PosterTheme>("floodlight");
+  const [theme, setTheme] = useState<PosterTheme>("stadium");
   const [wantedSize, setSize] = useState<PosterSize>("portrait");
   const [count, setCount] = useState<TopBuyCount>(5);
   const [prices, setPrices] = useState(true);
@@ -275,8 +276,13 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
                       aria-hidden
                       style={{
                         // The poster's palette, not the app's: these are the
-                        // rasterizer's literal colours by design.
-                        background: palette.surface,
+                        // rasterizer's literal colours by design. Stadium has
+                        // no one colour — every team brings its own — so its
+                        // swatch is a strip of them.
+                        background:
+                          value === "stadium"
+                            ? "linear-gradient(90deg, #14B8A6, #2563EB 33%, #EA580C 66%, #DB2777)"
+                            : palette.surface,
                         borderColor: palette.border,
                       }}
                     >

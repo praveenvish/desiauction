@@ -33,7 +33,21 @@ import { roleLabel } from "./player-profile";
  * Every family draws every poster kind, and the team colour drives the accents
  * in all of them, so the choice is mood, never "which one works for squads".
  */
-export const POSTER_THEMES = ["floodlight", "matchday", "minimal", "gold", "arena", "ink"] as const;
+/*
+ * - `stadium` — the team on a lit stage: its shirt (name and number on the
+ *   back) when there is no photo, a gold-metal price, a rubber stamp. Every
+ *   team in its own colour, so ten squads posted together are ten franchises.
+ *   Made for a Status (founder, 2026-10-07).
+ */
+export const POSTER_THEMES = [
+  "stadium",
+  "floodlight",
+  "matchday",
+  "minimal",
+  "gold",
+  "arena",
+  "ink",
+] as const;
 export type PosterTheme = (typeof POSTER_THEMES)[number];
 
 export function isPosterTheme(value: string): value is PosterTheme {
@@ -357,6 +371,8 @@ export interface TeamPosterMember {
    * forwarded). Null means the initials tile, never a broken image.
    */
   photoUrl: string | null;
+  /** The shirt number the player registered with, as typed. */
+  jerseyNumber?: string | null;
 }
 
 export interface TeamPosterInput {
@@ -395,6 +411,8 @@ export interface TeamPosterRow {
   /** Short role for a list row: BAT, BOWL, AR, WK — or the role's first word. */
   roleTag: string;
   photoUrl: string | null;
+  /** A shirt number worth printing on a shirt (`heroNumberOf`), else null. */
+  shirtNumber: string | null;
 }
 
 export interface TeamPoster {
@@ -453,6 +471,7 @@ function rowOf(member: TeamPosterMember, unit: MoneyUnit): TeamPosterRow {
     isMarked: marks.length > 0,
     roleTag: roleTagOf(member.role),
     photoUrl: member.photoUrl,
+    shirtNumber: heroNumberOf(member.jerseyNumber),
   };
 }
 

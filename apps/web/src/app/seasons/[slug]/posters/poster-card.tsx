@@ -1,4 +1,5 @@
 import type {
+  PlayerPoster,
   PosterKind,
   SeasonPoster,
   TeamPoster,
@@ -8,7 +9,9 @@ import type {
 import type { ReactElement } from "react";
 
 import { mix, withAlpha } from "./poster-color";
+import { renderPlayerPoster as renderV3PlayerPoster } from "./poster-player";
 import { renderSquadPoster } from "./poster-squad";
+import { renderStadiumPlayer, renderStadiumSquad } from "./poster-stadium";
 import { FIGURES } from "./poster-fonts";
 import { withoutHiddenEffects } from "./poster-strip";
 import {
@@ -53,9 +56,16 @@ import {
 
 // --- Player -----------------------------------------------------------------
 
-// The v3 player poster lives in its own module; the route and the studio keep
-// importing it from here, beside the other four kinds.
-export { renderPlayerPoster } from "./poster-player";
+/**
+ * The player card: Stadium draws its own (`poster-stadium.tsx`); every other
+ * theme is the v3 card in `poster-player.tsx`. The route and the studio keep
+ * importing it from here, beside the other four kinds.
+ */
+export function renderPlayerPoster(model: PlayerPoster, options: PosterRenderOptions) {
+  return options.theme === "stadium"
+    ? renderStadiumPlayer(model, options)
+    : renderV3PlayerPoster(model, options);
+}
 
 // --- The squad's faces ------------------------------------------------------
 
@@ -105,11 +115,15 @@ function Badges({ ctx, row, size }: { ctx: PosterContext; row: TeamPosterRow; si
  * and without the money.
  */
 export function renderTeamPoster(model: TeamPoster, options: PosterRenderOptions) {
-  return renderSquadPoster(model, options, "sheet");
+  return options.theme === "stadium"
+    ? renderStadiumSquad(model, options, "sheet")
+    : renderSquadPoster(model, options, "sheet");
 }
 
 export function renderRevealPoster(model: TeamPoster, options: PosterRenderOptions) {
-  return renderSquadPoster(model, options, "reveal");
+  return options.theme === "stadium"
+    ? renderStadiumSquad(model, options, "reveal")
+    : renderSquadPoster(model, options, "reveal");
 }
 
 // --- Top buys ---------------------------------------------------------------
