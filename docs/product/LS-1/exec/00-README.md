@@ -31,9 +31,9 @@ It must be built on DesiAuction's existing seasons, squads and lineups, and exte
 
 ## 2. Branch and commit rules
 
-1. **One branch only:** `feat/ls1-live-scoring`, created from the latest `origin/main`:
+1. **One branch only:** `feat/ls1-live-scoring`. It already exists on `origin`, branched from `main`, and its first commit is this plan. Check it out; do not create it:
    ```bash
-   git fetch origin && git switch -c feat/ls1-live-scoring origin/main
+   git fetch origin && git switch feat/ls1-live-scoring && git pull --ff-only
    ```
 2. **One commit per entry** in `02-commits.md` (C00 → C46), then `03-sports-families.md` (C47 → C56), strictly in order. The commit subject is the exact `Subject:` line given (Conventional Commits; CI's `pr-title` check requires this format for the PR title too). The body lists the acceptance IDs it satisfies, e.g. `Acceptance: A-C09-01..A-C09-08`.
 3. **A commit is only made when its Gate passes** (§4). Never commit red. Never use `--no-verify`.
