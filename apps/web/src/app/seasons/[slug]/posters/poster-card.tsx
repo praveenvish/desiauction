@@ -12,6 +12,7 @@ import { mix, withAlpha } from "./poster-color";
 import { renderPlayerPoster as renderV3PlayerPoster } from "./poster-player";
 import { renderSquadPoster } from "./poster-squad";
 import { renderStadiumPlayer, renderStadiumSquad } from "./poster-stadium";
+import { renderStadiumSeason, renderStadiumTopBuys } from "./poster-stadium-season";
 import { FIGURES } from "./poster-fonts";
 import { withoutHiddenEffects } from "./poster-strip";
 import {
@@ -137,6 +138,9 @@ export function renderRevealPoster(model: TeamPoster, options: PosterRenderOptio
  * organizers are reading.
  */
 export function renderTopBuysPoster(model: TopBuysPoster, options: PosterRenderOptions) {
+  if (options.theme === "stadium") {
+    return renderStadiumTopBuys(model, options);
+  }
   const ctx = contextFor(options, null);
   const { metrics, skin } = ctx;
   const { palette } = skin;
@@ -297,6 +301,9 @@ export function renderTopBuysPoster(model: TopBuysPoster, options: PosterRenderO
  * under it. Organizer-only, because it is every team's roster at once.
  */
 export function renderSeasonPoster(model: SeasonPoster, options: PosterRenderOptions) {
+  if (options.theme === "stadium") {
+    return renderStadiumSeason(model, options);
+  }
   const ctx = contextFor(options, null);
   const { metrics, skin } = ctx;
   const { palette } = skin;

@@ -25,6 +25,7 @@ import {
   type TopBuyInput,
   roleTagOf,
   squadSpotlight,
+  seasonTeamColours,
 } from "./poster";
 
 const PLAYER: PlayerPosterInput = {
@@ -594,5 +595,42 @@ describe("squadSpotlight — who gets a big card on the squad sheet", () => {
     expect(roleTagOf("all_rounder")).toBe("AR");
     expect(roleTagOf("wicket_keeper")).toBe("WK");
     expect(roleTagOf(null)).toBe("");
+  });
+});
+
+describe("seasonTeamColours — every team its own colour", () => {
+  it("gives ten teams with no colour ten different colours", () => {
+    const teams = Array.from({ length: 10 }, (_, index) => ({
+      id: `01TEAM${String(index).padStart(20, "0")}`,
+      color: null,
+    }));
+    const colours = seasonTeamColours(teams);
+    expect(new Set(colours.values()).size).toBe(10);
+  });
+
+  it("keeps an organizer's colour, and never deals it to another team", () => {
+    const colours = seasonTeamColours([
+      { id: "01A", color: null },
+      { id: "01B", color: "#14b8a6" },
+      { id: "01C", color: null },
+    ]);
+    expect(colours.get("01B")).toBe("#14B8A6");
+    expect(colours.get("01A")).not.toBe("#14B8A6");
+    expect(colours.get("01C")).not.toBe("#14B8A6");
+    expect(colours.get("01A")).not.toBe(colours.get("01C"));
+  });
+
+  it("does not move a team's colour when a later team is added", () => {
+    const before = seasonTeamColours([
+      { id: "01A", color: null },
+      { id: "01B", color: null },
+    ]);
+    const after = seasonTeamColours([
+      { id: "01A", color: null },
+      { id: "01B", color: null },
+      { id: "01C", color: null },
+    ]);
+    expect(after.get("01A")).toBe(before.get("01A"));
+    expect(after.get("01B")).toBe(before.get("01B"));
   });
 });
