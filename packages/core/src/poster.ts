@@ -41,6 +41,8 @@ import { roleLabel } from "./player-profile";
  */
 export const POSTER_THEMES = [
   "stadium",
+  "broadcast",
+  "scorecard",
   "floodlight",
   "matchday",
   "minimal",

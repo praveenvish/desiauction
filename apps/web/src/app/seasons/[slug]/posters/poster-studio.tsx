@@ -66,6 +66,8 @@ const KIND_LABEL: Record<PosterKind, { label: string; hint: string }> = {
  */
 const THEME_LABEL: Record<PosterTheme, { name: string; hint: string }> = {
   stadium: { name: "Stadium", hint: "Each team in its own colours" },
+  broadcast: { name: "Broadcast", hint: "TV graphic, team colour and list" },
+  scorecard: { name: "Scorecard", hint: "A clean team sheet table" },
   floodlight: { name: "Floodlight", hint: "The night look" },
   matchday: { name: "Matchday", hint: "The team's own colour" },
   minimal: { name: "Minimal", hint: "Light and editorial" },
@@ -282,7 +284,11 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
                         background:
                           value === "stadium"
                             ? "linear-gradient(90deg, #14B8A6, #2563EB 33%, #EA580C 66%, #DB2777)"
-                            : palette.surface,
+                            : value === "broadcast"
+                              ? "linear-gradient(110deg, #EA580C 0 46%, #FDE047 46% 50%, #0A0C10 50%)"
+                              : value === "scorecard"
+                                ? "linear-gradient(180deg, #C2410C 0 34%, #0F1214 34%)"
+                                : palette.surface,
                         borderColor: palette.border,
                       }}
                     >

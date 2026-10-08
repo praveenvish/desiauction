@@ -284,9 +284,14 @@ export function skinFor(theme: PosterTheme, teamColor: string | null): Skin {
       team: teamToneFor(palette, teamColor),
     };
   }
-  // Stadium draws its own stage in the team's colour (`poster-stadium.tsx`);
-  // its skin is the night palette, for the footer and the chips it shares.
-  const classic = CLASSIC[theme === "stadium" ? "floodlight" : theme];
+  // Stadium, Broadcast and Scorecard draw their own pages in each team's
+  // colour (`poster-stadium.tsx`, `poster-broadcast.tsx`,
+  // `poster-scorecard.tsx`); their skin is the night palette, for the footer
+  // and the chips they share.
+  const classic =
+    CLASSIC[
+      theme === "stadium" || theme === "broadcast" || theme === "scorecard" ? "floodlight" : theme
+    ];
   const palette = settle(classic.palette);
   return {
     theme,
