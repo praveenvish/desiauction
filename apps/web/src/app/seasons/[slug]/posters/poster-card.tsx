@@ -11,6 +11,18 @@ import type { ReactElement } from "react";
 import { mix, withAlpha } from "./poster-color";
 import { renderPlayerPoster as renderV3PlayerPoster } from "./poster-player";
 import { renderSquadPoster } from "./poster-squad";
+import {
+  renderBroadcastPlayer,
+  renderBroadcastSeason,
+  renderBroadcastSquad,
+  renderBroadcastTopBuys,
+} from "./poster-broadcast";
+import {
+  renderScorecardPlayer,
+  renderScorecardSeason,
+  renderScorecardSquad,
+  renderScorecardTopBuys,
+} from "./poster-scorecard";
 import { renderStadiumPlayer, renderStadiumSquad } from "./poster-stadium";
 import { renderStadiumSeason, renderStadiumTopBuys } from "./poster-stadium-season";
 import { FIGURES } from "./poster-fonts";
@@ -63,9 +75,16 @@ import {
  * importing it from here, beside the other four kinds.
  */
 export function renderPlayerPoster(model: PlayerPoster, options: PosterRenderOptions) {
-  return options.theme === "stadium"
-    ? renderStadiumPlayer(model, options)
-    : renderV3PlayerPoster(model, options);
+  switch (options.theme) {
+    case "stadium":
+      return renderStadiumPlayer(model, options);
+    case "broadcast":
+      return renderBroadcastPlayer(model, options);
+    case "scorecard":
+      return renderScorecardPlayer(model, options);
+    default:
+      return renderV3PlayerPoster(model, options);
+  }
 }
 
 // --- The squad's faces ------------------------------------------------------
@@ -116,15 +135,29 @@ function Badges({ ctx, row, size }: { ctx: PosterContext; row: TeamPosterRow; si
  * and without the money.
  */
 export function renderTeamPoster(model: TeamPoster, options: PosterRenderOptions) {
-  return options.theme === "stadium"
-    ? renderStadiumSquad(model, options, "sheet")
-    : renderSquadPoster(model, options, "sheet");
+  switch (options.theme) {
+    case "stadium":
+      return renderStadiumSquad(model, options, "sheet");
+    case "broadcast":
+      return renderBroadcastSquad(model, options, "sheet");
+    case "scorecard":
+      return renderScorecardSquad(model, options, "sheet");
+    default:
+      return renderSquadPoster(model, options, "sheet");
+  }
 }
 
 export function renderRevealPoster(model: TeamPoster, options: PosterRenderOptions) {
-  return options.theme === "stadium"
-    ? renderStadiumSquad(model, options, "reveal")
-    : renderSquadPoster(model, options, "reveal");
+  switch (options.theme) {
+    case "stadium":
+      return renderStadiumSquad(model, options, "reveal");
+    case "broadcast":
+      return renderBroadcastSquad(model, options, "reveal");
+    case "scorecard":
+      return renderScorecardSquad(model, options, "reveal");
+    default:
+      return renderSquadPoster(model, options, "reveal");
+  }
 }
 
 // --- Top buys ---------------------------------------------------------------
@@ -140,6 +173,12 @@ export function renderRevealPoster(model: TeamPoster, options: PosterRenderOptio
 export function renderTopBuysPoster(model: TopBuysPoster, options: PosterRenderOptions) {
   if (options.theme === "stadium") {
     return renderStadiumTopBuys(model, options);
+  }
+  if (options.theme === "broadcast") {
+    return renderBroadcastTopBuys(model, options);
+  }
+  if (options.theme === "scorecard") {
+    return renderScorecardTopBuys(model, options);
   }
   const ctx = contextFor(options, null);
   const { metrics, skin } = ctx;
@@ -303,6 +342,12 @@ export function renderTopBuysPoster(model: TopBuysPoster, options: PosterRenderO
 export function renderSeasonPoster(model: SeasonPoster, options: PosterRenderOptions) {
   if (options.theme === "stadium") {
     return renderStadiumSeason(model, options);
+  }
+  if (options.theme === "broadcast") {
+    return renderBroadcastSeason(model, options);
+  }
+  if (options.theme === "scorecard") {
+    return renderScorecardSeason(model, options);
   }
   const ctx = contextFor(options, null);
   const { metrics, skin } = ctx;
