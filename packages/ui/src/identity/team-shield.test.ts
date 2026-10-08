@@ -27,6 +27,17 @@ describe("the default team shield (0111)", () => {
     expect(shieldTones(hue("2563EB")).rim).not.toBe(hue("FFFFFF"));
   });
 
+  it("is well-formed SVG — every attribute a quoted value", () => {
+    // A find-and-replace once wrote `fill=hue("FFFFFF")` into the markup:
+    // browsers refused the whole image and showed a broken-image icon.
+    for (const colour of [hue("2563EB"), hue("FACC15"), hue("111111"), null]) {
+      const svg = shieldSvg(colour);
+      expect(svg).not.toMatch(/=[^"\s>]/);
+      expect(svg).not.toContain("hue(");
+      expect(svg).toMatch(/^<svg[^>]*>.*<\/svg>$/);
+    }
+  });
+
   it("is shape only — no text for the rasterizer to shape", () => {
     expect(shieldSvg(hue("2563EB"))).not.toContain("<text");
   });
