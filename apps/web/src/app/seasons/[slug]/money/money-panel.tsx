@@ -28,6 +28,8 @@ import {
   useAnnouncer,
   useToast,
   VisuallyHidden,
+  TeamShield,
+  useTeamBadge,
 } from "@desiauction/ui";
 import { useRef, useState, type ReactNode, type RefObject } from "react";
 
@@ -155,6 +157,17 @@ function TeamMark({
   name: string;
   size: 40 | 30;
 }) {
+  const badge = useTeamBadge();
+  if ((team?.logoUrl ?? null) === null && badge === "shield") {
+    // 0111: the season's default team logo.
+    return (
+      <TeamShield
+        initials={initialsFor(name).initials ?? "?"}
+        color={team?.primaryColor ?? null}
+        size={size}
+      />
+    );
+  }
   const mono = (
     <span
       className="mn-mark"

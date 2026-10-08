@@ -1,7 +1,8 @@
-import { NoPhotoStyleProvider } from "@desiauction/ui";
+import { NoPhotoStyleProvider, TeamBadgeProvider } from "@desiauction/ui";
 import type { ReactNode } from "react";
 
 import { seasonNoPhotoStyle } from "../../../server/competition/season-no-photo";
+import { seasonTeamBadge } from "../../../server/competition/season-team-badge";
 
 /**
  * THE PUBLIC SEASON PAGES DRAW A MISSING PHOTO THE SEASON'S WAY (0107).
@@ -19,7 +20,10 @@ export default async function PublicSeasonLayout({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const [noPhoto, badge] = await Promise.all([seasonNoPhotoStyle(slug), seasonTeamBadge(slug)]);
   return (
-    <NoPhotoStyleProvider style={await seasonNoPhotoStyle(slug)}>{children}</NoPhotoStyleProvider>
+    <NoPhotoStyleProvider style={noPhoto}>
+      <TeamBadgeProvider badge={badge}>{children}</TeamBadgeProvider>
+    </NoPhotoStyleProvider>
   );
 }

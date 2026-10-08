@@ -9,10 +9,13 @@ import {
 } from "@desiauction/core";
 import type { ReactNode } from "react";
 
+import type { TeamBadge } from "@desiauction/ui";
+
 import { contrast, luminance, mix, normalize, withAlpha } from "./poster-color";
 import { DISPLAY, FIGURES } from "./poster-fonts";
 import {
   Footer,
+  PosterShield,
   contextFor,
   shown,
   vis,
@@ -497,12 +500,18 @@ export function Crest({
   tones,
   src,
   monogram,
+  badge,
 }: {
   size: number;
   tones: Tones;
   src: string | null;
   monogram: string;
+  /** A TEAM's crest: with no logo, the season's shield (0111) unless initials. */
+  badge?: TeamBadge | undefined;
 }) {
+  if (src === null && badge !== undefined && badge !== "initials") {
+    return <PosterShield size={size} color={tones.base} initials={monogram} fontFamily={FACE} />;
+  }
   return (
     <div
       style={{
@@ -910,6 +919,7 @@ export function renderStadiumPlayer(model: PlayerPoster, options: PosterRenderOp
                 tones={tones}
                 src={model.teamCrestUrl}
                 monogram={monogramFor(model.teamName)}
+                badge={options.teamBadge ?? "shield"}
               />
               <div style={{ display: "flex", flexDirection: "column" }}>
                 <div
@@ -1191,6 +1201,7 @@ export function renderStadiumSquad(
             tones={tones}
             src={model.teamCrestUrl}
             monogram={model.teamMonogram}
+            badge={options.teamBadge ?? "shield"}
           />
           <div
             style={{

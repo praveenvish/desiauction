@@ -49,6 +49,7 @@ export async function posterResponse<TInput, TModel>(args: {
     sponsor: query.sponsor,
     shareUrl: source.shareUrl ?? null,
     noPhoto: source.noPhoto,
+    teamBadge: source.teamBadge,
   };
   const model = args.build(source.input);
   // Without these the rupee sign rasterizes as an empty box — see poster-fonts.

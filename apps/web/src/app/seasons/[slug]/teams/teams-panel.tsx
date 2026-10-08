@@ -24,6 +24,8 @@ import {
   SectionCard,
   useToast,
   VisuallyHidden,
+  TeamShield,
+  useTeamBadge,
 } from "@desiauction/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -283,6 +285,11 @@ function TeamGrid({
 /** A team's mark: its crest, else its initials on its own colour. */
 function Crest({ team, size }: { team: TeamCard; size: "md" | "lg" }) {
   const px = size === "lg" ? 64 : 44;
+  const badge = useTeamBadge();
+  if (team.logoUrl === null && badge === "shield") {
+    // 0111: the season's default team logo.
+    return <TeamShield initials={monogram(team)} color={team.color} size={px} />;
+  }
   const mono = (
     <span
       className="tm-crest tm-crest-mono"

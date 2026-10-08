@@ -1086,6 +1086,8 @@ export const competitions = pgTable(
      * still decide whether a real photo shows.
      */
     noPhotoStyle: text("no_photo_style").notNull().default("initials"),
+    // 0111: how a team with no logo is drawn — the shield (default) or initials.
+    teamBadge: text("team_badge").notNull().default("shield"),
     /**
      * THE PLATFORM HOLD (0072). Set by the moderation desk when a public season
      * page is taken down; cleared when the hold is lifted. While it is set the

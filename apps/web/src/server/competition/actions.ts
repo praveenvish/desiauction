@@ -51,7 +51,7 @@ import {
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { isNoPhotoStyle } from "@desiauction/ui";
+import { isNoPhotoStyle, isTeamBadge } from "@desiauction/ui";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { cache } from "react";
@@ -88,6 +88,7 @@ import {
   publishBlockers,
   setAuctionStart,
   setCompetitionNoPhotoStyle,
+  setCompetitionTeamBadge,
   setCompetitionSquadListing,
   setCompetitionVisibility,
   squadListingState,
@@ -743,6 +744,42 @@ export async function setNoPhotoStyleAction(
   }
   await inCompetitionOrg(session.personId, competition, (db) =>
     setCompetitionNoPhotoStyle(db, competition, session.personId, style),
+  );
+  revalidatePath(`/seasons/${competition.slug}`, "layout");
+  revalidatePath(`/c/${competition.slug}`, "layout");
+  return { ok: true };
+}
+
+/**
+ * The shield or initials for teams with no logo (0111) — the same card and
+ * the same capability as the no-photo choice above.
+ */
+export async function setTeamBadgeAction(
+  slug: string,
+  badge: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!isTeamBadge(badge)) {
+    return { ok: false, error: "Choose the shield or initials." };
+  }
+  const session = await requireSession();
+  const competition = await resolveCompetitionScoped(session.personId, slug);
+  if (competition === null) {
+    return { ok: false, error: "Not available." };
+  }
+  try {
+    await inCompetitionOrg(session.personId, competition, (db) =>
+      requireCompetitionCapability(
+        db,
+        session.personId,
+        { orgId: competition.orgId, competitionId: competition.id },
+        "competition.manage",
+      ),
+    );
+  } catch {
+    return { ok: false, error: "You can't manage this competition." };
+  }
+  await inCompetitionOrg(session.personId, competition, (db) =>
+    setCompetitionTeamBadge(db, competition, session.personId, badge),
   );
   revalidatePath(`/seasons/${competition.slug}`, "layout");
   revalidatePath(`/c/${competition.slug}`, "layout");

@@ -14,6 +14,8 @@ import {
   IconClock,
   IconEye,
   IconList,
+  TeamShield,
+  useTeamBadge,
 } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
@@ -87,6 +89,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
   const money = useMoney();
   const router = useRouter();
   const toast = useToast();
+  const badge = useTeamBadge();
   // DA: the hook already computed `stale` and `offline`; the cockpit destructured
   // neither. The auctioneer could hold the gavel over a snapshot the engine had
   // stopped confirming, with a green badge on screen — /live has had a
@@ -734,23 +737,40 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
               <ul className="night-over-teams" aria-label="Squads">
                 {view.teams.map((team) => (
                   <li key={team.id}>
-                    <span
-                      className="night-over-crest"
-                      style={
-                        team.primaryColor === null
-                          ? undefined
-                          : ({ "--team-color": team.primaryColor } as CSSProperties)
-                      }
-                      aria-hidden
-                    >
-                      {team.shortName ??
-                        team.name
-                          .split(/\s+/)
-                          .slice(0, 2)
-                          .map((word) => word.charAt(0))
-                          .join("")
-                          .toUpperCase()}
-                    </span>
+                    {badge === "shield" ? (
+                      // 0111: the season's default team logo.
+                      <TeamShield
+                        initials={
+                          team.shortName ??
+                          team.name
+                            .split(/\s+/)
+                            .slice(0, 2)
+                            .map((word) => word.charAt(0))
+                            .join("")
+                            .toUpperCase()
+                        }
+                        color={team.primaryColor}
+                        size={32}
+                      />
+                    ) : (
+                      <span
+                        className="night-over-crest"
+                        style={
+                          team.primaryColor === null
+                            ? undefined
+                            : ({ "--team-color": team.primaryColor } as CSSProperties)
+                        }
+                        aria-hidden
+                      >
+                        {team.shortName ??
+                          team.name
+                            .split(/\s+/)
+                            .slice(0, 2)
+                            .map((word) => word.charAt(0))
+                            .join("")
+                            .toUpperCase()}
+                      </span>
+                    )}
                     <span className="night-over-team">
                       <strong>{team.name}</strong>
                       <span>

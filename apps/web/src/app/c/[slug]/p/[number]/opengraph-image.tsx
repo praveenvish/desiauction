@@ -1,4 +1,5 @@
 import { seasonNoPhotoStyle } from "../../../../../server/competition/season-no-photo";
+import { seasonTeamBadge } from "../../../../../server/competition/season-team-badge";
 import { imageResponse } from "../../../../../server/image-text/image-response";
 import { buildPlayerPoster, buildPlayerShareCard } from "@desiauction/core";
 import { initialsFor, silhouetteDataUri } from "@desiauction/ui";
@@ -43,9 +44,10 @@ export default async function OpengraphImage({
   params: Promise<{ slug: string; number: string }>;
 }) {
   const { slug, number } = await params;
-  const [poster, noPhoto] = await Promise.all([
+  const [poster, noPhoto, teamBadge] = await Promise.all([
     publicPlayerPoster(slug, number),
     seasonNoPhotoStyle(slug),
+    seasonTeamBadge(slug),
   ]);
   if (poster !== null) {
     const [photoUrl, teamCrestUrl, competitionLogoUrl, brandMarkSrc, fonts] = await Promise.all([
@@ -61,7 +63,7 @@ export default async function OpengraphImage({
       teamCrestUrl,
       competitionLogoUrl,
     });
-    return await imageResponse(renderPlayerLinkCard(model, { brandMarkSrc, noPhoto }), {
+    return await imageResponse(renderPlayerLinkCard(model, { brandMarkSrc, noPhoto, teamBadge }), {
       ...LINK_CARD_SIZE,
       fonts,
     });

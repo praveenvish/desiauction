@@ -1,4 +1,5 @@
 import { seasonNoPhotoStyle } from "../../../../../server/competition/season-no-photo";
+import { seasonTeamBadge } from "../../../../../server/competition/season-team-badge";
 import { imageResponse } from "../../../../../server/image-text/image-response";
 import { monogramOf } from "@desiauction/core";
 
@@ -28,7 +29,11 @@ export default async function OpengraphImage({
   params: Promise<{ slug: string; team: string }>;
 }) {
   const { slug, team: teamSlug } = await params;
-  const [team, noPhoto] = await Promise.all([publicTeam(slug, teamSlug), seasonNoPhotoStyle(slug)]);
+  const [team, noPhoto, teamBadge] = await Promise.all([
+    publicTeam(slug, teamSlug),
+    seasonNoPhotoStyle(slug),
+    seasonTeamBadge(slug),
+  ]);
   if (team === null) {
     return await imageResponse(renderShareFallback(), { ...size });
   }
@@ -56,7 +61,7 @@ export default async function OpengraphImage({
           photoUrl: photos[index] ?? null,
         })),
       },
-      { brandMarkSrc, noPhoto },
+      { brandMarkSrc, noPhoto, teamBadge },
     ),
     { ...size, fonts },
   );

@@ -12,7 +12,9 @@ import { GOLD, PriceText, ROOT, Spaced, markOf, topBuyOf } from "./poster-broadc
 import { withAlpha } from "./poster-color";
 import {
   Footer,
+  PosterShield,
   contextFor,
+  drawsShield,
   shown,
   vis,
   type PosterContext,
@@ -71,6 +73,7 @@ function Band({
   monogram,
   sub,
   titleLayer = "base",
+  team = false,
 }: {
   ctx: PosterContext;
   L: SheetLayout;
@@ -82,6 +85,8 @@ function Band({
   monogram: string;
   sub?: string;
   titleLayer?: "base" | "stamp";
+  /** A team's band: with no logo it wears the season's shield (0111). */
+  team?: boolean;
 }) {
   const tile = Math.round(L.band * 0.56);
   const room = width - 2 * L.pad - tile - L.pad * 0.5;
@@ -139,35 +144,45 @@ function Band({
           />
         )}
       </div>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: tile,
-          height: tile,
-          borderRadius: Math.round(tile * 0.14),
-          background: withAlpha("#FFFFFF", 0.14),
-          border: `3px solid ${withAlpha("#FFFFFF", 0.35)}`,
-          transform: "rotate(4deg)",
-          ...vis(ctx),
-        }}
-      >
-        {crest === null ? (
-          <div
-            style={{
-              display: "flex",
-              fontFamily: FACE,
-              fontSize: Math.round(tile * 0.4),
-              color: tones.onShirt,
-            }}
-          >
-            {monogram}
-          </div>
-        ) : (
-          <Crest size={Math.round(tile * 0.78)} tones={tones} src={crest} monogram={monogram} />
-        )}
-      </div>
+      {team && crest === null && drawsShield(ctx.options) ? (
+        <PosterShield
+          size={tile}
+          color={tones.base}
+          initials={monogram}
+          fontFamily={FACE}
+          style={vis(ctx)}
+        />
+      ) : (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: tile,
+            height: tile,
+            borderRadius: Math.round(tile * 0.14),
+            background: withAlpha("#FFFFFF", 0.14),
+            border: `3px solid ${withAlpha("#FFFFFF", 0.35)}`,
+            transform: "rotate(4deg)",
+            ...vis(ctx),
+          }}
+        >
+          {crest === null ? (
+            <div
+              style={{
+                display: "flex",
+                fontFamily: FACE,
+                fontSize: Math.round(tile * 0.4),
+                color: tones.onShirt,
+              }}
+            >
+              {monogram}
+            </div>
+          ) : (
+            <Crest size={Math.round(tile * 0.78)} tones={tones} src={crest} monogram={monogram} />
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -284,6 +299,7 @@ export function renderScorecardSquad(
         title={model.teamName}
         crest={model.teamCrestUrl}
         monogram={model.teamMonogram || monogramFor(model.teamName)}
+        team
       />
 
       <div
@@ -615,6 +631,7 @@ export function renderScorecardPlayer(model: PlayerPoster, options: PosterRender
         titleLayer="stamp"
         crest={model.teamCrestUrl}
         monogram={monogramFor(model.teamName ?? model.competitionName)}
+        team={model.teamName !== null}
       />
       <div
         style={{

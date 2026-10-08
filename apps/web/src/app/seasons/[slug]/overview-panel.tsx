@@ -36,9 +36,12 @@ import {
   SectionCard,
   Select,
   useNoPhotoStyle,
+  useTeamBadge,
+  TeamShield,
   useToast,
   VisuallyHidden,
   type NoPhotoStyle,
+  type TeamBadge,
 } from "@desiauction/ui";
 import { ENTRY_CATEGORIES, entryCategoryLabel, roleOptions } from "@desiauction/core";
 import Link from "next/link";
@@ -54,6 +57,7 @@ import {
   cloneCompetitionAction,
   setCompetitionVisibilityAction,
   setNoPhotoStyleAction,
+  setTeamBadgeAction,
   setSquadListingAction,
   updateCompetitionDetailsAction,
   type DetailsField,
@@ -624,6 +628,31 @@ export function OverviewPanel({
           style === "silhouette"
             ? "Players without a photo now show the player silhouette"
             : "Players without a photo now show their initials",
+        tone: "success",
+      });
+      router.refresh();
+    } else {
+      toast({ title: result.error ?? "Could not update.", tone: "danger" });
+    }
+  };
+
+  // 0111: how a team with no logo is drawn — the shield or its initials.
+  const teamBadge = useTeamBadge();
+  const [badgeBusy, setBadgeBusy] = useState<TeamBadge | null>(null);
+  const chooseTeamBadge = async (badge: TeamBadge) => {
+    if (badge === teamBadge) {
+      return;
+    }
+    setBadgeBusy(badge);
+    const result = await release(setTeamBadgeAction(slug, badge), () => {
+      setBadgeBusy(null);
+    });
+    if (result.ok) {
+      toast({
+        title:
+          badge === "shield"
+            ? "Teams without a logo now show a team shield"
+            : "Teams without a logo now show their initials",
         tone: "success",
       });
       router.refresh();
@@ -1411,6 +1440,43 @@ export function OverviewPanel({
                   onClick={() => void chooseNoPhotoStyle("silhouette")}
                 >
                   Silhouette
+                </Button>
+              </span>
+            </li>
+            <li className="ov-look" data-testid="team-badge-row">
+              <span className="ov-look-thumb" aria-hidden>
+                <TeamShield initials="TS" color={null} size={30} />
+              </span>
+              <span className="ov-look-text">
+                <strong>Teams without a logo</strong>
+                <span>
+                  {teamBadge === "shield"
+                    ? "Show a team shield in the team's colour — on every page, poster and share card."
+                    : "Show their initials — on every page, poster and share card."}
+                </span>
+              </span>
+              <span className="ov-look-actions" role="group" aria-label="Teams without a logo">
+                <Button
+                  size="sm"
+                  variant={teamBadge === "shield" ? "secondary" : "ghost"}
+                  aria-pressed={teamBadge === "shield"}
+                  loading={badgeBusy === "shield"}
+                  disabled={badgeBusy !== null}
+                  data-testid="team-badge-shield"
+                  onClick={() => void chooseTeamBadge("shield")}
+                >
+                  Shield
+                </Button>
+                <Button
+                  size="sm"
+                  variant={teamBadge === "initials" ? "secondary" : "ghost"}
+                  aria-pressed={teamBadge === "initials"}
+                  loading={badgeBusy === "initials"}
+                  disabled={badgeBusy !== null}
+                  data-testid="team-badge-initials"
+                  onClick={() => void chooseTeamBadge("initials")}
+                >
+                  Initials
                 </Button>
               </span>
             </li>

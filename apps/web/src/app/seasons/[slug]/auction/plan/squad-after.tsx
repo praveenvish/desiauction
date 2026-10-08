@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, PlayerImage, RosterMark } from "@desiauction/ui";
+import { Card, PlayerImage, RosterMark, TeamShield, useTeamBadge } from "@desiauction/ui";
 import type { CSSProperties } from "react";
 
 import { useMoney } from "../../../../../components/money-unit";
@@ -57,14 +57,20 @@ export function SquadHero({
 }) {
   const money = useMoney();
   const segments = mixSegments(mix);
+  const badge = useTeamBadge();
   const crestStyle =
     team.color === null ? undefined : ({ ["--plan-team" as string]: team.color } as CSSProperties);
   return (
     <section className="plan-hero" aria-labelledby="plan-hero-name" data-testid="plan-squad-hero">
       <div className="plan-hero-id">
-        <span className="plan-hero-crest" style={crestStyle} aria-hidden>
-          {initials(team.name)}
-        </span>
+        {badge === "shield" ? (
+          // 0111: the season's default team logo.
+          <TeamShield initials={initials(team.name)} color={team.color} size={56} />
+        ) : (
+          <span className="plan-hero-crest" style={crestStyle} aria-hidden>
+            {initials(team.name)}
+          </span>
+        )}
         <span className="plan-hero-title">
           <h2 id="plan-hero-name">{team.name}</h2>
           <span>{competitionName} · the squad the night signed</span>

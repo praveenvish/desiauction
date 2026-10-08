@@ -1,5 +1,7 @@
 "use client";
 
+import { TeamShield, useTeamBadge } from "@desiauction/ui";
+
 import { CrestImage } from "../../../../components/team/crest-image";
 import "./team-crest.css";
 
@@ -38,6 +40,11 @@ export function TeamCrest({
   const initials = teamInitials(name, short);
   const showLogo = logoUrl !== undefined && logoUrl !== null && logoUrl !== "";
   const px = size === "xl" ? 64 : size === "lg" ? 48 : 32;
+  const badge = useTeamBadge();
+  if (!showLogo && badge === "shield") {
+    // 0111: the season's default team logo, in the tile's own box.
+    return <TeamShield initials={initials} color={color} size={px} />;
+  }
   return (
     <span
       className="st-crest"

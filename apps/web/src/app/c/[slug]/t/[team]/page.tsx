@@ -14,6 +14,7 @@ import {
   IconPin,
   PlayerImage,
   RosterMark,
+  TeamShield,
 } from "@desiauction/ui";
 import type { Metadata } from "next";
 import Image from "next/image";
@@ -24,6 +25,7 @@ import { env } from "../../../../../env";
 import { teamShareMessage } from "../../../../../lib/share-message";
 import { teamFacts } from "../../../../../lib/team-facts";
 import { servedAsStored } from "../../../../../lib/stored-image";
+import { seasonTeamBadge } from "../../../../../server/competition/season-team-badge";
 import { publicTeam, type PublicTeamMember } from "../../../../../server/competition/public";
 import { HeroBanner } from "../../../../../components/public/public-kit";
 import { CrestImage } from "../../../../../components/team/crest-image";
@@ -116,6 +118,8 @@ export default async function PublicTeamPage({
   }
   const facts = teamFacts(team);
   const colour = team.team.color ?? "var(--accent)";
+  // 0111: a team with no logo wears the season's shield, or its initials.
+  const shield = (await seasonTeamBadge(slug)) === "shield";
   const pack = sportPackFor(team.sport);
   const cover = team.season.coverUrl;
 
@@ -212,18 +216,27 @@ export default async function PublicTeamPage({
             </Link>
 
             <div className="tp-identity">
-              <span className="tp-crest">
-                {team.team.crestUrl === null ? (
-                  crestFallback
-                ) : (
-                  <CrestImage
-                    src={team.team.crestUrl}
-                    fallback={crestFallback}
-                    width={160}
-                    height={160}
-                  />
-                )}
-              </span>
+              {team.team.crestUrl === null && shield ? (
+                <TeamShield
+                  className="tp-shield"
+                  initials={facts.teamMonogram}
+                  color={team.team.color}
+                  size={120}
+                />
+              ) : (
+                <span className="tp-crest">
+                  {team.team.crestUrl === null ? (
+                    crestFallback
+                  ) : (
+                    <CrestImage
+                      src={team.team.crestUrl}
+                      fallback={crestFallback}
+                      width={160}
+                      height={160}
+                    />
+                  )}
+                </span>
+              )}
               <div className="tp-identity-copy">
                 <p className="tp-kicker">
                   {pack.label} squad · {team.competitionName}
@@ -421,18 +434,22 @@ export default async function PublicTeamPage({
                         className="tp-team"
                         style={{ "--other": other.color ?? "var(--accent)" } as CSSProperties}
                       >
-                        <span className="tp-team-crest" aria-hidden>
-                          {other.crestUrl === null ? (
-                            mark
-                          ) : (
-                            <CrestImage
-                              src={other.crestUrl}
-                              fallback={mark}
-                              width={64}
-                              height={64}
-                            />
-                          )}
-                        </span>
+                        {other.crestUrl === null && shield ? (
+                          <TeamShield initials={mark} color={other.color} size={34} />
+                        ) : (
+                          <span className="tp-team-crest" aria-hidden>
+                            {other.crestUrl === null ? (
+                              mark
+                            ) : (
+                              <CrestImage
+                                src={other.crestUrl}
+                                fallback={mark}
+                                width={64}
+                                height={64}
+                              />
+                            )}
+                          </span>
+                        )}
                         <span className="tp-team-name">{other.name}</span>
                         <IconChevronRight size={16} aria-hidden />
                       </Link>
