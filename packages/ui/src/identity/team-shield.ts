@@ -147,7 +147,7 @@ export function shieldSvg(colour: string | null): string {
     // A sash and a chief: the two strokes every club badge has.
     `<g clip-path="url(#c)">`,
     `<path d="M-10 74 L110 30 L110 46 L-10 90 Z" fill="${t.shade}" opacity="0.45"/>`,
-    `<rect x="0" y="0" width="100" height="24" fill=hue("FFFFFF") opacity="0.12"/>`,
+    `<rect x="0" y="0" width="100" height="24" fill="${hue("FFFFFF")}" opacity="0.12"/>`,
     `</g>`,
     `</svg>`,
   ].join("");
