@@ -11,6 +11,7 @@ import {
   type KitTone,
   paintOnFill,
   Pill,
+  TeamShield,
 } from "@desiauction/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -253,12 +254,23 @@ function Summary({ teams, documents }: { teams: readonly TeamDocs[]; documents: 
 }
 
 function TeamMark({ team, size }: { team: TeamDocs; size: number }) {
+  if (team.teamLogoUrl === null) {
+    // 0111: the default team logo. This hub spans seasons, so it draws the
+    // default rather than any one season's choice.
+    return (
+      <TeamShield
+        initials={initialsFor(team.teamName).initials ?? "?"}
+        color={team.teamColor}
+        size={size}
+      />
+    );
+  }
   const mono = (
     <span className="mm-mark" style={paintOnFill(team.teamColor)} aria-hidden>
       {initialsFor(team.teamName).initials ?? "?"}
     </span>
   );
-  return team.teamLogoUrl !== null ? (
+  return (
     <CrestImage
       className="mm-mark"
       src={team.teamLogoUrl}
@@ -267,8 +279,6 @@ function TeamMark({ team, size }: { team: TeamDocs; size: number }) {
       loading="lazy"
       fallback={mono}
     />
-  ) : (
-    mono
   );
 }
 

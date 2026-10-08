@@ -751,6 +751,31 @@ export async function setCompetitionNoPhotoStyle(
   });
 }
 
+/**
+ * How the season draws teams with no logo (0111): the shield or initials.
+ * Audited like the other "how the season looks" choices.
+ */
+export async function setCompetitionTeamBadge(
+  db: Db,
+  competition: CompetitionSummary,
+  personId: string,
+  badge: "shield" | "initials",
+): Promise<void> {
+  await db
+    .update(competitions)
+    .set({ teamBadge: badge })
+    .where(eq(competitions.id, competition.id));
+  await db.insert(auditLog).values({
+    id: newId(),
+    actor: personId,
+    action: "competition.team_badge_changed",
+    scopeType: "org",
+    scopeId: competition.orgId,
+    subject: competition.id,
+    meta: { to: badge, slug: competition.slug },
+  });
+}
+
 /** Whether squads are listed, and what the rule decides right now, for the organizer. */
 export async function squadListingState(
   db: Db,

@@ -5,8 +5,15 @@ import {
   type PosterSize,
   type PosterTheme,
 } from "@desiauction/core";
-import { silhouetteDataUri, type NoPhotoStyle } from "@desiauction/ui";
-import type { ReactNode } from "react";
+import {
+  SHIELD_RATIO,
+  shieldDataUri,
+  shieldTones,
+  silhouetteDataUri,
+  type NoPhotoStyle,
+  type TeamBadge,
+} from "@desiauction/ui";
+import type { CSSProperties, ReactNode } from "react";
 
 import { mix, withAlpha } from "./poster-color";
 import { FIGURES } from "./poster-fonts";
@@ -101,6 +108,11 @@ export interface PosterRenderOptions {
    * cricketer. Omitted means initials, the default every season starts with.
    */
   readonly noPhoto?: NoPhotoStyle;
+  /**
+   * How a team with no logo is drawn (0111): the shield or initials. Omitted
+   * means the shield, the default every season starts with.
+   */
+  readonly teamBadge?: TeamBadge;
 }
 
 export interface PosterContext {
@@ -115,6 +127,68 @@ export function contextFor(options: PosterRenderOptions, teamColor: string | nul
     metrics: metricsFor(options.size),
     options,
   };
+}
+
+/** Does this poster draw a logo-less team as the shield (0111)? The default. */
+export function drawsShield(options: PosterRenderOptions): boolean {
+  return options.teamBadge !== "initials";
+}
+
+/**
+ * THE DEFAULT TEAM LOGO on a poster: the shield in the team's colour, its
+ * initials laid over it in the poster's own face (HarfBuzz shapes them; the
+ * SVG carries no text). `size` is the HEIGHT, the square slot it replaces.
+ */
+export function PosterShield({
+  size,
+  color,
+  initials,
+  fontFamily,
+  style,
+}: {
+  size: number;
+  color: string | null;
+  initials: string;
+  fontFamily?: string;
+  style?: CSSProperties;
+}) {
+  const width = Math.round(size / SHIELD_RATIO);
+  const letters = initials.trim();
+  return (
+    <div
+      style={{
+        position: "relative",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width,
+        height: size,
+        flexShrink: 0,
+        ...style,
+      }}
+    >
+      <img
+        src={shieldDataUri(color)}
+        width={width}
+        height={size}
+        style={{ position: "absolute", left: 0, top: 0 }}
+        alt=""
+      />
+      <div
+        style={{
+          display: "flex",
+          marginTop: -Math.round(size * 0.06),
+          fontFamily: fontFamily ?? "Geist Sans, Anek Devanagari, sans-serif",
+          fontSize: Math.round(size * (letters.length >= 3 ? 0.26 : 0.33)),
+          fontWeight: 800,
+          lineHeight: 1,
+          color: shieldTones(color).ink,
+        }}
+      >
+        {letters}
+      </div>
+    </div>
+  );
 }
 
 /** Is this band drawn at all in the render in progress? */
@@ -163,6 +237,8 @@ export interface TileProps {
    * own sponsor lockup on the first real render.
    */
   fit?: "cover" | "contain";
+  /** A TEAM's crest: with no logo it wears the season's shield (0111). */
+  team?: boolean;
   /**
    * A PLAYER's face, as opposed to a crest or a logo: when it has no photo and
    * the season chose the cricketer (0107), the cricketer is drawn instead of
@@ -220,7 +296,18 @@ export function Tile({
   round = false,
   fit = "cover",
   face = false,
+  team = false,
 }: TileProps) {
+  if (team && src === null && drawsShield(ctx.options)) {
+    return (
+      <PosterShield
+        size={height}
+        color={ring ?? null}
+        initials={monogram}
+        style={vis(ctx, layer)}
+      />
+    );
+  }
   const { skin } = ctx;
   const { palette } = skin;
   const border = ring ?? palette.border;

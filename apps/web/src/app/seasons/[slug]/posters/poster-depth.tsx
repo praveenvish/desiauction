@@ -2,7 +2,15 @@ import type { ReactNode } from "react";
 
 import { mix, WHITE, withAlpha } from "./poster-color";
 import { DISPLAY } from "./poster-fonts";
-import { BrandLockup, shown, vis, type MotionLayer, type PosterContext } from "./poster-kit";
+import {
+  BrandLockup,
+  PosterShield,
+  drawsShield,
+  shown,
+  vis,
+  type MotionLayer,
+  type PosterContext,
+} from "./poster-kit";
 import { hostOf, qrDataUri } from "./poster-qr";
 import type { Depth } from "./poster-surface";
 
@@ -191,6 +199,7 @@ export function Coin({
   src = null,
   labelColour = WHITE,
   layer = "base",
+  team = false,
 }: {
   ctx: PosterContext;
   size: number;
@@ -199,9 +208,14 @@ export function Coin({
   src?: string | null;
   labelColour?: string;
   layer?: MotionLayer;
+  /** A TEAM's coin: with no logo it wears the season's shield (0111). */
+  team?: boolean;
 }) {
   if (!shown(ctx, layer)) {
     return <div style={{ display: "flex", width: size, height: size, flexShrink: 0 }} />;
+  }
+  if (team && src === null && drawsShield(ctx.options)) {
+    return <PosterShield size={size} color={colour} initials={label} fontFamily={DISPLAY} />;
   }
   return (
     <div

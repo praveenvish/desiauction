@@ -517,6 +517,7 @@ function SlabHead({
   monogram,
   text,
   room,
+  team = false,
 }: {
   ctx: PosterContext;
   L: SplitLayout;
@@ -525,6 +526,8 @@ function SlabHead({
   monogram: string;
   text: string;
   room?: number;
+  /** A team's crest (not the competition's): wears the season's shield. */
+  team?: boolean;
 }) {
   const size = Math.round(L.kicker * 3);
   const full = room ?? 2000;
@@ -541,7 +544,13 @@ function SlabHead({
       }}
     >
       <div style={{ display: "flex", ...vis(ctx) }}>
-        <Crest size={size} tones={tones} src={crest} monogram={monogram} />
+        <Crest
+          size={size}
+          tones={tones}
+          src={crest}
+          monogram={monogram}
+          badge={team ? (ctx.options.teamBadge ?? "shield") : undefined}
+        />
       </div>
       <Spaced
         text={text}
@@ -610,6 +619,7 @@ export function renderBroadcastSquad(
             monogram={model.teamMonogram || monogramFor(model.teamName)}
             text={`${model.competitionName.toUpperCase()} · ${mode === "sheet" ? "THE SQUAD" : "MEET THE SQUAD"}`}
             room={cols.leftRoom}
+            team
           />
           <div
             style={{
@@ -839,9 +849,10 @@ export function renderBroadcastPlayer(model: PlayerPoster, options: PosterRender
           ctx={ctx}
           L={{ ...SPLIT[options.size], kicker: L.kicker }}
           tones={tones}
-          crest={model.teamCrestUrl ?? model.competitionLogoUrl}
+          crest={model.teamName === null ? model.competitionLogoUrl : model.teamCrestUrl}
           monogram={monogramFor(model.teamName ?? model.competitionName)}
           text={`${model.competitionName.toUpperCase()} · AUCTION`}
+          team={model.teamName !== null}
         />
 
         <div

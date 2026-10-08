@@ -560,6 +560,7 @@ export function renderStadiumSeason(model: SeasonPoster, options: PosterRenderOp
                         tones={tones}
                         src={squad.teamCrestUrl}
                         monogram={squad.teamMonogram || monogramFor(squad.teamName)}
+                        badge={options.teamBadge ?? "shield"}
                       />
                       <div
                         style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}

@@ -43,7 +43,7 @@ const PANEL: PanelMetrics = {
 
 export function renderPlayerLinkCard(
   model: PlayerPoster,
-  options: Pick<PosterRenderOptions, "brandMarkSrc" | "noPhoto">,
+  options: Pick<PosterRenderOptions, "brandMarkSrc" | "noPhoto" | "teamBadge">,
 ) {
   const ctx = contextFor(
     {
@@ -55,6 +55,7 @@ export function renderPlayerLinkCard(
       prices: true,
       sponsor: null,
       ...(options.noPhoto === undefined ? {} : { noPhoto: options.noPhoto }),
+      ...(options.teamBadge === undefined ? {} : { teamBadge: options.teamBadge }),
     },
     model.teamColor,
   );
@@ -254,7 +255,7 @@ export interface TeamLinkCard {
  */
 export function renderTeamLinkCard(
   card: TeamLinkCard,
-  options: Pick<PosterRenderOptions, "brandMarkSrc" | "noPhoto">,
+  options: Pick<PosterRenderOptions, "brandMarkSrc" | "noPhoto" | "teamBadge">,
 ) {
   const ctx = contextFor(
     {
@@ -265,6 +266,7 @@ export function renderTeamLinkCard(
       prices: true,
       sponsor: null,
       ...(options.noPhoto === undefined ? {} : { noPhoto: options.noPhoto }),
+      ...(options.teamBadge === undefined ? {} : { teamBadge: options.teamBadge }),
     },
     card.teamColor,
   );
@@ -393,6 +395,7 @@ export function renderTeamLinkCard(
           colour={teamColour}
           label={card.teamMonogram}
           src={card.teamCrestUrl}
+          team
         />
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div

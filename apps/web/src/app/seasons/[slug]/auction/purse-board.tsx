@@ -1,7 +1,7 @@
 "use client";
 
 import { maxAffordableBid } from "@desiauction/core";
-import { paintOnFill } from "@desiauction/ui";
+import { TeamShield, paintOnFill, useTeamBadge } from "@desiauction/ui";
 import type { AuctionSnapshot } from "@desiauction/core";
 import { CrestImage } from "../../../../components/team/crest-image";
 import { useMoney } from "../../../../components/money-unit";
@@ -82,6 +82,17 @@ export function PurseTeamCrest({
   fallback: string;
 }) {
   const crest = team?.logoUrl ?? null;
+  const badge = useTeamBadge();
+  if ((crest === null || crest === "") && badge === "shield") {
+    // 0111: the season's default team logo, in the same 30px slot.
+    return (
+      <TeamShield
+        initials={initialsOf(team, fallback)}
+        color={team?.primaryColor ?? null}
+        size={30}
+      />
+    );
+  }
   const chip = (
     <span className="purse-chip" style={paintOf(team)} aria-hidden>
       {initialsOf(team, fallback)}

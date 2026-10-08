@@ -122,6 +122,7 @@ export function renderSquadPoster(
           layer="hero"
           src={model.teamCrestUrl}
           monogram={model.teamMonogram}
+          team
           width={Math.round(titleHeight * 0.72)}
           height={Math.round(titleHeight * 0.72)}
           radius={Math.round(titleHeight * 0.36)}

@@ -1,7 +1,13 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { isNoPhotoStyle, type NoPhotoStyle } from "@desiauction/ui";
+import {
+  DEFAULT_TEAM_BADGE,
+  isNoPhotoStyle,
+  isTeamBadge,
+  type NoPhotoStyle,
+  type TeamBadge,
+} from "@desiauction/ui";
 import {
   DEFAULT_AUCTION_CONFIG,
   isTier,
@@ -94,6 +100,8 @@ export interface PosterSource<T> {
   readonly shareUrl?: string | null;
   /** How the season draws a player with no photo (0107). */
   readonly noPhoto: NoPhotoStyle;
+  /** How a team with no logo is drawn (0111): the shield or initials. */
+  readonly teamBadge: TeamBadge;
 }
 
 export type PosterResult<T> = PosterSource<T> | PosterRefusal;
@@ -146,6 +154,8 @@ interface Gate {
   readonly unit: MoneyUnit;
   /** Initials or the cricketer for a player with no photo (0107). */
   readonly noPhoto: NoPhotoStyle;
+  /** How a team with no logo is drawn (0111): the shield or initials. */
+  readonly teamBadge: TeamBadge;
   readonly grant: PosterGrant;
 }
 
@@ -263,6 +273,7 @@ export async function posterGateFor(personId: string, slug: string): Promise<Gat
         unit: competitions.auctionUnit,
         visibility: competitions.visibility,
         noPhoto: competitions.noPhotoStyle,
+        teamBadge: competitions.teamBadge,
       })
       .from(competitions)
       .where(eq(competitions.id, competition.id))
@@ -279,6 +290,7 @@ export async function posterGateFor(personId: string, slug: string): Promise<Gat
     showBranding: row !== undefined && isTier(row.tier) ? row.tier === "free" : true,
     unit: row?.unit ?? "inr",
     noPhoto: isNoPhotoStyle(row?.noPhoto) ? row.noPhoto : "initials",
+    teamBadge: isTeamBadge(row?.teamBadge) ? row.teamBadge : DEFAULT_TEAM_BADGE,
     grant: { organizer, ownRegistrationIds, ownTeamIds },
   };
 }
@@ -595,6 +607,7 @@ async function playerPosterFrom(
     ok: true,
     showBranding: gated.showBranding,
     noPhoto: gated.noPhoto,
+    teamBadge: gated.teamBadge,
     filename: posterFilename(gated.competition.slug, read.playerName, request.size),
     shareUrl:
       gated.published && read.number !== ""
@@ -747,6 +760,7 @@ async function teamPosterFrom(
     ok: true,
     showBranding: gated.showBranding,
     noPhoto: gated.noPhoto,
+    teamBadge: gated.teamBadge,
     // The squad's own page: a QR on a squad sheet should open that squad.
     shareUrl: gated.published
       ? `${env.PUBLIC_BASE_URL}/c/${encodeURIComponent(gated.competition.slug)}/t/${slugifyName(read.teamName)}?ref=qr`
@@ -1192,6 +1206,7 @@ async function topBuysPosterFrom(
     ok: true,
     showBranding: gated.showBranding,
     noPhoto: gated.noPhoto,
+    teamBadge: gated.teamBadge,
     shareUrl: seasonShareUrl(gated),
     filename: posterFilename(gated.competition.slug, `top ${String(count)}`, request.size),
     input: {
@@ -1305,6 +1320,7 @@ async function seasonPosterFrom(
     ok: true,
     showBranding: gated.showBranding,
     noPhoto: gated.noPhoto,
+    teamBadge: gated.teamBadge,
     shareUrl: seasonShareUrl(gated),
     filename: posterFilename(gated.competition.slug, "all squads", request.size),
     input: {

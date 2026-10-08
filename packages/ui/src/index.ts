@@ -125,6 +125,18 @@ export {
   silhouetteSvg,
 } from "./identity/silhouette";
 export type { NoPhotoStyle } from "./identity/silhouette";
+export { TeamBadgeProvider, TeamShield, useTeamBadge } from "./identity/team-badge";
+export {
+  DEFAULT_TEAM_BADGE,
+  SHIELD_RATIO,
+  TEAM_BADGES,
+  isTeamBadge,
+  shieldColourFor,
+  shieldDataUri,
+  shieldSvg,
+  shieldTones,
+} from "./identity/team-shield";
+export type { TeamBadge } from "./identity/team-shield";
 export { PlayerPortrait } from "./identity/player-portrait";
 export type { PlayerPortraitProps } from "./identity/player-portrait";
 export { identityCardOf, IDENTITY_CARD_VIEW } from "./identity/identity-card";

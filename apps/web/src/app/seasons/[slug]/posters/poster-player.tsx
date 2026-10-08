@@ -392,6 +392,7 @@ export function ResultPanel({
             label={monogramOf(model.teamName ?? "")}
             src={model.teamCrestUrl}
             layer="stamp"
+            team
           />
           <div
             style={{
@@ -429,6 +430,7 @@ export function ResultPanel({
             label={monogramOf(model.teamName ?? "")}
             src={model.teamCrestUrl}
             layer="stamp"
+            team
           />
           <div
             style={{
