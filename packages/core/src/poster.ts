@@ -791,3 +791,60 @@ export function buildSeasonPoster(input: SeasonPosterInput): SeasonPoster {
     largestSquad: squads.reduce((max, squad) => Math.max(max, squad.rows.length), 0),
   };
 }
+
+// --- Every team its own colour ------------------------------------------------
+
+/**
+ * Saturated, mutually distinct colours for teams whose organizer set none
+ * (founder, 2026-10-08: "each team a different colour"). Picked by name they
+ * collided — three crimson squads in a ten-team season — so they are dealt per
+ * SEASON instead (`seasonTeamColours`).
+ */
+export const TEAM_PALETTE = [
+  "#14B8A6", // teal
+  "#2563EB", // blue
+  "#EA580C", // orange
+  "#DC2626", // red
+  "#7C3AED", // violet
+  "#16A34A", // green
+  "#DB2777", // magenta
+  "#0891B2", // cyan
+  "#CA8A04", // mustard
+  "#4F46E5", // indigo
+  "#BE123C", // rose
+  "#65A30D", // lime
+] as const;
+
+/**
+ * Each team's colour for the season's posters: the organizer's own where set,
+ * otherwise the next palette colour no other team in the season wears, dealt
+ * in the teams' creation order (ids are ULIDs) so a team's colour never moves
+ * when another team is added later. Past twelve, the palette repeats.
+ */
+export function seasonTeamColours(
+  teams: readonly { id: string; color: string | null }[],
+): Map<string, string> {
+  const ordered = [...teams].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const used = new Set<string>();
+  for (const team of ordered) {
+    const own = normalizeHexColor(team.color);
+    if (own !== null) {
+      used.add(own);
+    }
+  }
+  const out = new Map<string, string>();
+  let next = 0;
+  for (const team of ordered) {
+    const own = normalizeHexColor(team.color);
+    if (own !== null) {
+      out.set(team.id, own);
+      continue;
+    }
+    const free = TEAM_PALETTE.find((colour) => !used.has(colour));
+    const colour = free ?? TEAM_PALETTE[next % TEAM_PALETTE.length] ?? TEAM_PALETTE[0];
+    next += 1;
+    used.add(colour);
+    out.set(team.id, colour);
+  }
+  return out;
+}

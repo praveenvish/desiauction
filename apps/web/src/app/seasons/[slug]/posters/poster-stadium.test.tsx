@@ -1,6 +1,8 @@
 import {
   buildPlayerPoster,
+  buildSeasonPoster,
   buildTeamPoster,
+  buildTopBuysPoster,
   POSTER_SIZES,
   type PosterOutcome,
   type PosterSize,
@@ -9,7 +11,13 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { imageResponse } from "../../../../server/image-text/image-response";
-import { renderPlayerPoster, renderRevealPoster, renderTeamPoster } from "./poster-card";
+import {
+  renderPlayerPoster,
+  renderRevealPoster,
+  renderSeasonPoster,
+  renderTeamPoster,
+  renderTopBuysPoster,
+} from "./poster-card";
 import { contrast } from "./poster-color";
 import { posterFonts } from "./poster-fonts";
 import { MOTION_BANDS, type PosterRenderOptions } from "./poster-kit";
@@ -228,4 +236,56 @@ describe("Stadium draws, through the real pipeline", () => {
       expect(layer.subarray(0, 4).equals(PNG_SIGNATURE)).toBe(true);
     }
   }, 120_000);
+});
+
+describe("Stadium season-wide posters draw, through the real pipeline", () => {
+  const teams = BPL_TEAMS;
+  const season = buildSeasonPoster({
+    competitionName: "BPL-4",
+    competitionLogoUrl: null,
+    unit: "points",
+    stage: "after",
+    squads: teams.map((teamName, t) => ({
+      teamName,
+      teamShortName: null,
+      teamColor: null,
+      teamCrestUrl: null,
+      spentPaise: 9000 * 100,
+      members: SQUAD.map((member) => ({
+        ...member,
+        pricePaise: member.pricePaise === null ? null : member.pricePaise + t,
+      })),
+    })),
+  });
+
+  for (const size of ["story", "portrait"] as const) {
+    it(`draws all ten squads of fifteen (${size})`, async () => {
+      const image = await png(renderSeasonPoster(season, options(size)), size);
+      expect(image.subarray(0, 4).equals(PNG_SIGNATURE)).toBe(true);
+    }, 60_000);
+  }
+
+  for (const count of [3, 5, 10] as const) {
+    it(`draws the top ${String(count)} buys`, async () => {
+      const top = buildTopBuysPoster({
+        competitionName: "BPL-4",
+        competitionLogoUrl: null,
+        unit: "points",
+        count,
+        buys: SQUAD.slice(2).map((member, index) => ({
+          playerName: member.name,
+          role: member.role,
+          photoUrl: null,
+          pricePaise: member.pricePaise ?? 0,
+          teamName: teams[index % teams.length] ?? "X",
+          teamColor: null,
+          teamCrestUrl: null,
+        })),
+      });
+      for (const size of ["story", "square"] as const) {
+        const image = await png(renderTopBuysPoster(top, options(size)), size);
+        expect(image.subarray(0, 4).equals(PNG_SIGNATURE)).toBe(true);
+      }
+    }, 60_000);
+  }
 });

@@ -1,6 +1,7 @@
 import {
   monogramOf,
   POSTER_SIZES,
+  TEAM_PALETTE,
   type PlayerPoster,
   type PosterSize,
   type TeamPoster,
@@ -51,23 +52,13 @@ import { estimateTextWidth } from "./poster-layout";
  * Distinct, saturated colours for teams with none set — ten franchises posting
  * the same evening should look like ten franchises.
  */
-const TEAM_COLOURS = [
-  "#14B8A6", // teal
-  "#2563EB", // blue
-  "#EA580C", // orange
-  "#DC2626", // red
-  "#7C3AED", // violet
-  "#16A34A", // green
-  "#DB2777", // magenta
-  "#0891B2", // cyan
-  "#CA8A04", // mustard
-  "#4F46E5", // indigo
-  "#BE123C", // rose
-  "#65A30D", // lime
-] as const;
+// The palette lives in the core (`TEAM_PALETTE`), where the server deals it per
+// season (`seasonTeamColours`); this hash pick is only the last resort for a
+// model that arrived with no colour at all.
+const TEAM_COLOURS = TEAM_PALETTE;
 
 /** The night a season-wide or team-less poster stands in. */
-const NIGHT = "#3156B8";
+export const NIGHT = "#3156B8";
 
 const GOLD = "#FDE047";
 const GOLD_METAL =
@@ -118,8 +109,8 @@ export function tonesFor(colour: string | null, teamName: string | null): Tones 
 
 // --- Pieces -------------------------------------------------------------------
 
-const FACE = `${DISPLAY}, Anek Devanagari, sans-serif`;
-const LABEL = `${FIGURES}, Anek Devanagari, sans-serif`;
+export const FACE = `${DISPLAY}, Anek Devanagari, sans-serif`;
+export const LABEL = `${FIGURES}, Anek Devanagari, sans-serif`;
 
 /** A dot screen that fades away from one edge — print texture on the stage. */
 function Halftone({
@@ -170,7 +161,7 @@ function Halftone({
 }
 
 /** The lit stage: the team's colour as light from above, two beams, dots. */
-function Stage({
+export function Stage({
   ctx,
   tones,
   width,
@@ -245,7 +236,7 @@ function Stage({
 }
 
 /** A giant word in outline behind everything — "SOLD", "SQUAD". */
-function GhostWord({
+export function GhostWord({
   ctx,
   word,
   top,
@@ -379,7 +370,7 @@ function Shirt({ width, tones, id }: { width: number; tones: Tones; id: string }
 }
 
 /** The shirt with a name across the shoulders and the number in raised twill. */
-function Jersey({
+export function Jersey({
   width,
   tones,
   name,
@@ -475,7 +466,7 @@ function Jersey({
 }
 
 /** A photograph where a shirt would stand: framed in the team's light. */
-function Portrait({ width, tones, src }: { width: number; tones: Tones; src: string }) {
+export function Portrait({ width, tones, src }: { width: number; tones: Tones; src: string }) {
   const height = Math.round(width * 1.1);
   const ring = Math.max(4, Math.round(width * 0.012));
   return (
@@ -501,7 +492,7 @@ function Portrait({ width, tones, src }: { width: number; tones: Tones; src: str
 }
 
 /** The franchise's crest on a white disc ringed in its trim. */
-function Crest({
+export function Crest({
   size,
   tones,
   src,
@@ -552,7 +543,7 @@ function Crest({
 }
 
 /** "———  BPL-4 · AUCTION  ———" */
-function Kicker({ text, size, tones }: { text: string; size: number; tones: Tones }) {
+export function Kicker({ text, size, tones }: { text: string; size: number; tones: Tones }) {
   const rule = Math.round(size * 3);
   return (
     <div style={{ display: "flex", alignItems: "center", gap: Math.round(size * 0.8) }}>
@@ -620,14 +611,14 @@ function Stamp({ word, size, tones }: { word: string; size: number; tones: Tones
 }
 
 /** Gold metal type, for the one number that counts. */
-function metal(): Record<string, string> {
+export function metal(): Record<string, string> {
   return { backgroundImage: GOLD_METAL, backgroundClip: "text", color: "transparent" };
 }
 
 // --- Sizing -------------------------------------------------------------------
 
 /** The largest size (≤ max) at which `text` fits `room`, never under `min`. */
-function fitSize(text: string, room: number, max: number, min: number): number {
+export function fitSize(text: string, room: number, max: number, min: number): number {
   let size = Math.round(max);
   while (size > min && estimateTextWidth(text, size) > room) {
     size -= 2;
@@ -965,7 +956,7 @@ export function renderStadiumPlayer(model: PlayerPoster, options: PosterRenderOp
  * words ("Demo Falcons" → DF); otherwise the core's script-aware monogram, so
  * a Hindi name is cut on grapheme clusters, never mid-letter.
  */
-function monogramFor(name: string): string {
+export function monogramFor(name: string): string {
   const words = name
     .trim()
     .split(/\s+/)

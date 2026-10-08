@@ -23,6 +23,7 @@ import {
   type TeamPosterMember,
   type TopBuyCount,
   type TopBuysPosterInput,
+  seasonTeamColours,
 } from "@desiauction/core";
 import { isRealAuction } from "@desiauction/auction";
 import {
@@ -563,7 +564,10 @@ async function playerPosterFrom(
         jerseyNumber: row.jerseyNumber,
         teamName: outcome === "pool" ? null : (team?.name ?? null),
         teamCrestKey: team?.logoKey ?? null,
-        teamColor: team?.colour ?? null,
+        teamColor:
+          teamId === null || team === undefined
+            ? null
+            : ((await teamColoursOf(db, gated.competition.id)).get(teamId) ?? team.colour),
       };
     },
   );
@@ -713,7 +717,7 @@ async function teamPosterFrom(
         teamName: team.name,
         teamShortName: team.shortName,
         teamCrestKey: team.logoKey,
-        teamColor: team.colour,
+        teamColor: (await teamColoursOf(db, gated.competition.id)).get(teamId) ?? team.colour,
         coachName: team.coachName,
         members: squad.members,
         spentPaise: squad.spentPaise,
@@ -802,6 +806,20 @@ async function liveAuction(
     )
     .limit(1);
   return auction ?? null;
+}
+
+/**
+ * EVERY TEAM ITS OWN COLOUR, for the whole season at once (`seasonTeamColours`):
+ * the organizer's colour where set, else a palette colour no other team in the
+ * season wears. Read per poster so a squad sheet, a player card and the
+ * all-squads sheet always agree on a team's colour.
+ */
+async function teamColoursOf(db: Db, competitionId: string): Promise<Map<string, string>> {
+  const rows = await db
+    .select({ id: teams.id, color: teams.primaryColor })
+    .from(teams)
+    .where(eq(teams.competitionId, competitionId));
+  return seasonTeamColours(rows);
 }
 
 /**
@@ -1095,6 +1113,7 @@ async function topBuysPosterFrom(
                 dateOfBirth: registrations.dateOfBirth,
                 adultConfirmedAt: registrations.adultConfirmedAt,
                 price: registrations.offlinePrice,
+                teamId: teams.id,
                 teamName: teams.name,
                 teamColor: teams.primaryColor,
                 teamCrestKey: teams.logoUrl,
@@ -1121,6 +1140,7 @@ async function topBuysPosterFrom(
                 dateOfBirth: registrations.dateOfBirth,
                 adultConfirmedAt: registrations.adultConfirmedAt,
                 price: lots.soldPrice,
+                teamId: teams.id,
                 teamName: teams.name,
                 teamColor: teams.primaryColor,
                 teamCrestKey: teams.logoUrl,
@@ -1149,7 +1169,8 @@ async function topBuysPosterFrom(
         squadSize: Math.min(rows.length, count),
         via: "organizer",
       });
-      return rows;
+      const colours = await teamColoursOf(db, gated.competition.id);
+      return rows.map((row) => ({ ...row, teamColor: colours.get(row.teamId) ?? row.teamColor }));
     },
   );
 
@@ -1254,7 +1275,15 @@ async function seasonPosterFrom(
         squadSize: squads.reduce((total, squad) => total + squad.members.length, 0),
         via: "organizer",
       });
-      return { franchises, squads, stage };
+      const colours = await teamColoursOf(db, gated.competition.id);
+      return {
+        franchises: franchises.map((team) => ({
+          ...team,
+          colour: colours.get(team.id) ?? team.colour,
+        })),
+        squads,
+        stage,
+      };
     },
   );
 
