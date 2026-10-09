@@ -12,7 +12,7 @@ import type { ReactNode } from "react";
 import type { TeamBadge } from "@desiauction/ui";
 
 import { contrast, luminance, mix, normalize, withAlpha } from "./poster-color";
-import { DISPLAY, FIGURES } from "./poster-fonts";
+import { DEVANAGARI_HEAVY, DISPLAY, FIGURES } from "./poster-fonts";
 import {
   Footer,
   PosterShield,
@@ -112,7 +112,7 @@ export function tonesFor(colour: string | null, teamName: string | null): Tones 
 
 // --- Pieces -------------------------------------------------------------------
 
-export const FACE = `${DISPLAY}, Anek Devanagari, sans-serif`;
+export const FACE = `${DISPLAY}, ${DEVANAGARI_HEAVY}, sans-serif`;
 export const LABEL = `${FIGURES}, Anek Devanagari, sans-serif`;
 
 /** A dot screen that fades away from one edge — print texture on the stage. */
