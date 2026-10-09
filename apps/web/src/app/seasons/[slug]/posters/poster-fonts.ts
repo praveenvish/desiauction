@@ -37,6 +37,16 @@ const DIR = join(process.cwd(), "public", "fonts", "poster");
  * OFL — the licences sit beside them.
  */
 export const DISPLAY = "Archivo Condensed";
+/**
+ * Anek Devanagari 800, under its own family name: the Hindi beside a display
+ * face that is itself 800. Registered as a separate family (not a second
+ * weight of "Anek Devanagari") so it is chosen by the font stack, not by a
+ * `fontWeight` every display node would have to remember to set — a name in
+ * Devanagari on a Stadium poster was a 600 beside an 800 surname's Latin.
+ * Same @fontsource/anek-devanagari 5.2.7 package as the 600 (OFL, licence
+ * beside it).
+ */
+export const DEVANAGARI_HEAVY = "Anek Devanagari Heavy";
 export const FIGURES = "Archivo SemiCondensed";
 export const SERIF = "Instrument Serif";
 
@@ -49,6 +59,7 @@ const FACES: readonly {
   { file: "geist-sans-400.woff", name: "Geist Sans", weight: 400 },
   { file: "geist-sans-600.woff", name: "Geist Sans", weight: 600 },
   { file: "anek-devanagari-600.woff", name: "Anek Devanagari", weight: 600 },
+  { file: "anek-devanagari-800.woff", name: DEVANAGARI_HEAVY, weight: 800 },
   { file: "archivo-condensed-800.woff", name: DISPLAY, weight: 800 },
   { file: "archivo-semicondensed-700.woff", name: FIGURES, weight: 700 },
   { file: "instrument-serif-italic.woff", name: SERIF, weight: 400, style: "italic" },
