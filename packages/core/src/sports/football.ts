@@ -1,3 +1,4 @@
+import { TIMED_FORMAT_PRESETS } from "../scoring/timed/formats";
 import { termsOf, type TermDetail } from "./vocabulary";
 import { difference, summariseFields, total } from "./tiebreakers";
 
@@ -179,6 +180,13 @@ const TERMS: Terminology = {
 };
 
 export const FOOTBALL: SportPack = {
+  scoring: {
+    family: "timed",
+    depth: 2,
+    defaultFormat: "football_90",
+    awardTable: "football-v1",
+    formats: [TIMED_FORMAT_PRESETS.football_90, TIMED_FORMAT_PRESETS.football_90_shootout],
+  },
   key: "football",
   label: "Football",
   roles: ROLES,

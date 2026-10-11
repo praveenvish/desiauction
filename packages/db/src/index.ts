@@ -169,3 +169,5 @@ export async function withTenantDb<T>(
     return fn(tx);
   });
 }
+
+export { scoringPublicAccess, type ScoringPublicProof } from "./scoring-public";

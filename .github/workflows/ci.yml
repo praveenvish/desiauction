@@ -122,7 +122,6 @@ jobs:
       # Every CI run proves the committed migrations apply cleanly (§20, §36).
       - run: pnpm --filter @desiauction/db db:migrate
       - run: pnpm --filter @desiauction/engine db:migrate
-      - run: pnpm test:integration
 
       # THE PRODUCTION ROLE MODEL, PROVEN ON EVERY PR.
       #
@@ -144,6 +143,11 @@ jobs:
             -v app_password='ci-app' -v system_password='ci-system' \
             -v engine_password='ci-engine' -v runner_password='ci-runner' \
             -f ops/db/create-app-role.sql
+      - run: pnpm test:integration --force --concurrency=1
+        env:
+          APP_DATABASE_URL: postgres://desiauction_app:ci-app@localhost:5433/desiauction
+          SYSTEM_DATABASE_URL: postgres://desiauction_system:ci-system@localhost:5433/desiauction
+          RUNNER_DATABASE_URL: postgres://desiauction_runner:ci-runner@localhost:5433/desiauction
       - name: Grant drift gate
         run: pnpm --filter @desiauction/web grants:verify
       # The runner's receipt delivery, run AS desiauction_runner: the gate and
@@ -326,6 +330,9 @@ jobs:
         include:
           - name: web
             dockerfile: apps/web/Dockerfile
+            context: .
+          - name: live
+            dockerfile: apps/live/Dockerfile
             context: .
           - name: engine
             dockerfile: apps/engine/Dockerfile

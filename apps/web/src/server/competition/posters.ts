@@ -19,6 +19,7 @@ import {
   type AuctionConfig,
   type MoneyUnit,
   type PlayerPosterInput,
+  type ResultPosterInput,
   type PosterKind,
   type PosterSize,
   type PosterTheme,
@@ -36,6 +37,11 @@ import {
   auctions,
   auditLog,
   competitions,
+  fixtures,
+  fixtureResults,
+  matches,
+  matchEvents,
+  matchAwards,
   lots,
   newId,
   paddles,
@@ -59,6 +65,10 @@ import { preSignedSql } from "./pre-signed";
 import { marksOf, outcomeOf } from "./poster-outcome";
 import { ownTeamsIn, ownedTeamIdsOn } from "./team-ownership";
 import { shownName, shownPhotoConsentAt, shownPhotoKey } from "./shown-name";
+import { deriveResult, publicLiveState, replayMatch } from "@desiauction/core/scoring";
+import { matchAgeDate, scoringNames } from "../scoring/live-state";
+import { persistedMatchEvent } from "../scoring/persisted-event";
+import { resultDetailsFor } from "../scoring/result-details";
 
 /**
  * THE POSTER'S SERVER SIDE — the gate, the join, and the evidence.
@@ -1470,6 +1480,7 @@ export interface PosterPicker {
   readonly showBranding: boolean;
   readonly players: readonly PosterSubject[];
   readonly teams: readonly PosterSubject[];
+  readonly results?: readonly PosterSubject[];
   /**
    * WHICH POSTERS THIS PERSON MAY MAKE, in the order the studio offers them.
    *
@@ -1633,6 +1644,37 @@ async function pickerFrom(gated: Gate): Promise<PosterPicker> {
           (handPlaced && row.offlinePrice !== null && row.rosterTeamName !== null),
       );
       const kinds: PosterKind[] = [];
+      const resultRows = gated.grant.organizer
+        ? await db
+            .select({ id: fixtures.id, number: fixtures.fixtureNumber, note: fixtureResults.note })
+            .from(fixtures)
+            .innerJoin(
+              matches,
+              and(
+                eq(matches.fixtureId, fixtures.id),
+                eq(matches.orgId, fixtures.orgId),
+                eq(matches.competitionId, fixtures.competitionId),
+              ),
+            )
+            .innerJoin(
+              fixtureResults,
+              and(
+                eq(fixtureResults.fixtureId, fixtures.id),
+                eq(fixtureResults.orgId, fixtures.orgId),
+                eq(fixtureResults.competitionId, fixtures.competitionId),
+              ),
+            )
+            .where(
+              and(
+                eq(fixtures.competitionId, gated.competition.id),
+                eq(fixtures.status, "completed"),
+                ne(matches.phase, "void"),
+                sql`${matches.finishedAt} is not null`,
+                eq(fixtureResults.source, "scored"),
+              ),
+            )
+            .orderBy(fixtures.seq)
+        : [];
       if (playerRows.length > 0) {
         kinds.push("player");
       }
@@ -1652,6 +1694,7 @@ async function pickerFrom(gated: Gate): Promise<PosterPicker> {
       if (gated.grant.organizer && teamRows.length > 0) {
         kinds.push("season");
       }
+      if (resultRows.length > 0) kinds.push("result");
       const namesSeen = new Map<string, number>();
       for (const row of playerRows) {
         const label = row.name ?? "Unnamed";
@@ -1661,6 +1704,11 @@ async function pickerFrom(gated: Gate): Promise<PosterPicker> {
         competitionName: gated.competition.name,
         showBranding: gated.showBranding,
         kinds,
+        results: resultRows.map((row) => ({
+          id: row.id,
+          label: `Match ${row.number}`,
+          sublabel: row.note ?? "Result",
+        })),
         scope: gated.grant.organizer ? ("season" as const) : ("mine" as const),
         players: playerRows.map((row) => {
           const label = row.name ?? "Unnamed";
@@ -1684,4 +1732,191 @@ async function pickerFrom(gated: Gate): Promise<PosterPicker> {
       };
     },
   );
+}
+
+export async function resultPosterSource(
+  slug: string,
+  fixtureId: string,
+  request: PosterRequest,
+): Promise<PosterResult<ResultPosterInput>> {
+  const gated = await gate(slug);
+  return "ok" in gated ? gated : resultPosterFrom(gated, fixtureId, request);
+}
+export async function resultPosterFor(
+  personId: string,
+  slug: string,
+  fixtureId: string,
+  request: PosterRequest,
+): Promise<PosterResult<ResultPosterInput>> {
+  const gated = await posterGateFor(personId, slug);
+  return "ok" in gated ? gated : resultPosterFrom(gated, fixtureId, request);
+}
+async function resultPosterFrom(
+  gated: Gate,
+  fixtureId: string,
+  request: PosterRequest,
+): Promise<PosterResult<ResultPosterInput>> {
+  if (!gated.grant.organizer) return { ok: false, status: 404, message: "Not available." };
+  const read = await withTenantDb(
+    dbHandle,
+    { personId: gated.personId, orgId: gated.competition.orgId },
+    async (db) => {
+      if (
+        !(await canCompetition(
+          db,
+          gated.personId,
+          { orgId: gated.competition.orgId, competitionId: gated.competition.id },
+          "registration.review",
+        ))
+      )
+        return null;
+      const [match] = await db
+        .select()
+        .from(matches)
+        .where(
+          and(
+            eq(matches.fixtureId, fixtureId),
+            eq(matches.competitionId, gated.competition.id),
+            eq(matches.orgId, gated.competition.orgId),
+          ),
+        )
+        .for("share");
+      if (!match || !match.finishedAt || match.phase === "void") return null;
+      const [fixture] = await db
+        .select()
+        .from(fixtures)
+        .where(
+          and(
+            eq(fixtures.id, fixtureId),
+            eq(fixtures.competitionId, gated.competition.id),
+            eq(fixtures.orgId, gated.competition.orgId),
+            eq(fixtures.status, "completed"),
+          ),
+        );
+      const [result] = await db
+        .select()
+        .from(fixtureResults)
+        .where(
+          and(
+            eq(fixtureResults.fixtureId, fixtureId),
+            eq(fixtureResults.competitionId, gated.competition.id),
+            eq(fixtureResults.orgId, gated.competition.orgId),
+            eq(fixtureResults.source, "scored"),
+          ),
+        );
+      if (!fixture || !result) return null;
+      const events = await db
+        .select()
+        .from(matchEvents)
+        .where(eq(matchEvents.fixtureId, fixtureId))
+        .orderBy(matchEvents.seq);
+      const state = replayMatch(events.map(persistedMatchEvent));
+      const derived = deriveResult(state);
+      if (
+        !state.finished ||
+        state.phase === "void" ||
+        state.lastSeq !== match.lastSeq ||
+        state.attempt !== match.attempt ||
+        !derived
+      )
+        return null;
+      const names = await scoringNames(
+        db,
+        gated.competition.id,
+        matchAgeDate(fixture.kickoffAt, match.startedAt),
+      );
+      const live = publicLiveState(state, names);
+      const details = await resultDetailsFor(db, fixtureId, state, names);
+      const pom = details?.awards.find((award) => award.kind === "player_of_match");
+      let photoKey: string | null = null;
+      if (pom?.photoUrl) {
+        const [award] = await db
+          .select({ winner: matchAwards.winnerRegistrationId })
+          .from(matchAwards)
+          .where(
+            and(
+              eq(matchAwards.fixtureId, fixtureId),
+              eq(matchAwards.kind, "player_of_match"),
+              eq(matchAwards.scope, "match"),
+            ),
+          )
+          .orderBy(desc(matchAwards.createdAt), desc(matchAwards.id))
+          .limit(1);
+        const [registration] = await db
+          .select({ photoKey: shownPhotoKey })
+          .from(registrations)
+          .innerJoin(people, eq(people.id, registrations.personId))
+          .where(
+            and(
+              eq(registrations.id, award?.winner ?? ""),
+              eq(registrations.competitionId, gated.competition.id),
+            ),
+          );
+        photoKey = registration?.photoKey ?? null;
+      }
+      const teamRows = await db
+        .select({ id: teams.id, color: teams.primaryColor })
+        .from(teams)
+        .where(eq(teams.competitionId, gated.competition.id));
+      await recordPosterGenerated(db, gated, {
+        action: "season.poster_generated",
+        subject: fixtureId,
+        kind: "result",
+        theme: request.theme,
+        size: request.size,
+        photo: photoKey ? "included" : "withheld",
+        via: "organizer",
+      });
+      const winner = derived.winnerTeamId ? names.teams[derived.winnerTeamId]?.name : null;
+      return { fixture, live, derived, pom, photoKey, teamRows, winner };
+    },
+  );
+  if (!read) return { ok: false, status: 404, message: "Not available." };
+  const [logo, photo] = await Promise.all([
+    inlineStoredImage(gated.logoKey, 256),
+    inlineStoredImage(read.photoKey, 256),
+  ]);
+  return {
+    ok: true,
+    showBranding: gated.showBranding,
+    noPhoto: gated.noPhoto,
+    teamBadge: gated.teamBadge,
+    filename: posterFilename(
+      gated.competition.slug,
+      `match ${read.fixture.fixtureNumber} result`,
+      request.size,
+    ),
+    shareUrl: gated.published
+      ? `${env.PUBLIC_BASE_URL}/c/${encodeURIComponent(gated.competition.slug)}/m/${encodeURIComponent(read.fixture.fixtureNumber)}`
+      : null,
+    input: {
+      competitionName: gated.competition.name,
+      competitionLogoUrl: logo,
+      fixtureNumber: read.fixture.fixtureNumber,
+      headline: read.winner
+        ? `${read.winner} win`
+        : read.derived.outcome === "tie"
+          ? "Match tied"
+          : read.derived.outcome === "abandoned"
+            ? "Match abandoned"
+            : "No result",
+      margin: read.derived.marginText,
+      trustLabel: read.live.trust.replaceAll("_", " "),
+      teams: [read.live.teams.home, read.live.teams.away].map((team) => {
+        const innings = read.live.innings.find(
+          (innings) => innings.battingTeamId === team.id && !innings.superOver,
+        );
+        return {
+          name: team.name,
+          color: read.teamRows.find((row) => row.id === team.id)?.color ?? null,
+          score: innings
+            ? `${String(innings.runs)}/${String(innings.wickets)} (${innings.overs})`
+            : "Did not bat",
+        };
+      }),
+      playerOfMatch: read.pom
+        ? { name: read.pom.name, photoUrl: photo, figures: read.pom.figures, shots: read.pom.shots }
+        : null,
+    },
+  };
 }

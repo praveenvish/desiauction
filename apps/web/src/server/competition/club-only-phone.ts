@@ -46,7 +46,7 @@ export async function attachPhoneToClubOnly(
     registrationId: string;
     /** E.164, validated by the caller. */
     phone: string;
-    source: "organizer_manual" | "csv_import";
+    source: "organizer_manual" | "csv_import" | "scorer_guest_claim";
   },
 ): Promise<AttachPhoneResult> {
   const [entry] = await db

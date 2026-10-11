@@ -13,6 +13,7 @@ import {
   pageIdentity,
   sectionLabel,
   shellKind,
+  seasonTabs,
   careerTitle,
 } from "./nav";
 
@@ -38,6 +39,10 @@ describe("shellKind", () => {
     expect(shellKind("/seasons/mpl-2026/auction/replay")).toBe("live");
     // WR-1: the owner's plan is an Owner Room surface.
     expect(shellKind("/seasons/mpl-2026/auction/plan")).toBe("live");
+    expect(shellKind("/c/cup/m/Match%201/overlay")).toBe("bare");
+    expect(shellKind("/c/cup/m/Match%201/board")).toBe("bare");
+    expect(shellKind("/c/cup/m/Match%201/live")).toBe("public");
+    expect(shellKind("/seasons/cup/brief/id")).toBe("console");
     expect(shellKind("/gallery")).toBe("bare");
     expect(shellKind("/dev/inbox")).toBe("bare");
     // The OBS overlay and public live board are chrome-free, never Live-framed.
@@ -95,6 +100,9 @@ describe("pageIdentity", () => {
     orgs: [{ slug: "malad-cc", name: "Malad CC" }],
     isAdmin: true,
   };
+  it("identifies the organiser match-day board under Schedule", () => {
+    expect(pageIdentity("/seasons/mpl/fixtures/today", ctx).title).toBe("Match day");
+  });
   const trail = (pathname: string) =>
     pageIdentity(pathname, ctx).crumbs.map((crumb) => crumb.label);
 
@@ -353,4 +361,59 @@ describe("adminNavLayout", () => {
     expect(layout.more).toEqual([]);
     expect(layout.inline.map((s) => s.key)).toEqual(few.map((s) => s.key));
   });
+});
+
+describe("scorer navigation", () => {
+  it("offers Score only for current scoring roles and keeps scoring chrome-free", async () => {
+    const { navigationFor } = await import("./nav");
+    const roles = {
+      organizes: false,
+      teams: [],
+      conducts: [],
+      plays: false,
+      hasBooks: false,
+      platform: [],
+    };
+    expect(
+      navigationFor({ roles, pathname: "/home" }).rail.some((item) => item.key === "score"),
+    ).toBe(false);
+    expect(
+      navigationFor({ roles: { ...roles, scores: 1 }, pathname: "/score/match/setup" }).rail.find(
+        (item) => item.key === "score",
+      ),
+    ).toMatchObject({ label: "Score", href: "/score", active: true });
+    expect(shellKind("/score")).toBe("bare");
+    expect(shellKind("/score/match/setup")).toBe("bare");
+  });
+});
+
+it("uses compact match shells only for exact canonical and bearer live pages", () => {
+  for (const path of ["/c/cup/m/Match%201", "/c/cup/m/Match%201/", "/m/secret", "/m/secret/"]) {
+    expect(shellKind(path)).toBe("bare");
+  }
+  for (const path of ["/c", "/c/cup", "/c/cup/t/team", "/c/cup/p/player", "/c/cup/m/1/details"]) {
+    expect(shellKind(path)).toBe("public");
+  }
+  expect(shellKind("/m/secret/details")).toBe("console");
+});
+
+describe("non-auction formation tabs", () => {
+  it.each(["organizer", "team_entry"] as const)(
+    "hides auction destinations and claims for %s",
+    (teamFormation) => {
+      for (const role of [
+        "organizer",
+        "staff",
+        "auctioneer",
+        "owner",
+        "player",
+        "member",
+        "public",
+      ] as const) {
+        const tabs = seasonTabs("entry-season", role, { teamFormation });
+        expect(tabs.some((tab) => tab.href.includes("/auction"))).toBe(false);
+        expect(tabs.some((tab) => tab.claims?.includes("/readiness"))).toBe(false);
+      }
+    },
+  );
 });

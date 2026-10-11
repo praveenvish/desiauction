@@ -20,15 +20,15 @@
   "allow": {
     "apps/web/src/server/auction/practice-engine.ts": {
       "class": "by-design",
-      "reason": "Practice auctions (0101): endStalePractices is the scheduled sweep (/api/jobs/feedback behind FEEDBACK_JOB_SECRET) that finds idle, overage or superseded practices across every club — a SELECT only on the system pool. Ending one is the engine's AbortAuction command, attributed to the organiser who started it; this module writes nothing itself."
+      "reason": "Practice auctions (0101): endStalePractices is the scheduled sweep (/api/jobs/feedback behind FEEDBACK_JOB_SECRET) that finds idle, overage or superseded practices across every club \u2014 a SELECT only on the system pool. Ending one is the engine's AbortAuction command, attributed to the organiser who started it; this module writes nothing itself."
     },
     "apps/web/src/server/auth/step-up-actions.ts": {
       "class": "by-design",
-      "reason": "AC-1.1 step-up: re-confirming the signed-in person with a fresh code. Identity tables only (otp_codes, email_verifications, sessions.stepped_up_at) — no org_id, no RLS arm, the same class as auth/actions.ts."
+      "reason": "AC-1.1 step-up: re-confirming the signed-in person with a fresh code. Identity tables only (otp_codes, email_verifications, sessions.stepped_up_at) \u2014 no org_id, no RLS arm, the same class as auth/actions.ts."
     },
     "apps/web/src/server/jobs/job-runs.ts": {
       "class": "by-design",
-      "reason": "AC-1.1 job_runs (0102): a platform table recording each scheduled job's run — no org_id, no RLS. Written on the app pool after the job, reachable only from /api/jobs/* behind their secrets."
+      "reason": "AC-1.1 job_runs (0102): a platform table recording each scheduled job's run \u2014 no org_id, no RLS. Written on the app pool after the job, reachable only from /api/jobs/* behind their secrets."
     },
     "apps/web/src/server/platform-ops/club-actions.ts": {
       "class": "by-design",
@@ -36,7 +36,7 @@
     },
     "apps/web/src/server/platform-ops/people-actions.ts": {
       "class": "by-design",
-      "reason": "AC-1.2 /admin/people: person-scoped and platform data — people.suspended_*, sessions, platform_invites, platform grants — none carries an org_id. Superadmin only behind operatorFor; platform grants are written on desiauction_system (pinned by grants:verify), the rest on the app pool (proved by people-admin.posture.test.ts)."
+      "reason": "AC-1.2 /admin/people: person-scoped and platform data \u2014 people.suspended_*, sessions, platform_invites, platform grants \u2014 none carries an org_id. Superadmin only behind operatorFor; platform grants are written on desiauction_system (pinned by grants:verify), the rest on the app pool (proved by people-admin.posture.test.ts)."
     },
     "apps/web/src/server/messaging/email-events.ts": {
       "class": "by-design",
@@ -130,9 +130,13 @@
       "class": "by-design",
       "reason": "0107. Same shape as season-unit.ts: reads one drawing word (competitions.no_photo_style: initials | silhouette) by slug for the season layout and the public /c/[slug] layout, which sit above public children no tenant gate can wrap. Returns no season data; every page under them keeps its own gate."
     },
+    "apps/web/src/server/scoring/sweep.ts": {
+      "class": "by-design",
+      "reason": "C22 focused Astra amendment explicitly extends INV-05 for authenticated scheduled scoring maintenance. System pool selects only candidate fixtureId/orgId values; all detail reads, eligibility checks, locked phase/result/audit/snapshot mutations and gated notices run inside withTenantDb. No system writes."
+    },
     "apps/web/src/server/competition/resolve.ts": {
       "class": "by-design",
-      "reason": "THE pre-tenant season resolver (PA-1R Phase 3.4, final readiness Phase 1). A console request knows only a slug, or spans every club a person belongs to, before any org can be named, and competitions/tournaments are org-only under RLS. Each function answers one pre-tenant question: membership-gated reads carry the org_members join in the same SQL statement; public reads return only what the public season page shows. Everything after resolution runs inside withTenantDb in the caller. This file replaced eight modules that had each done this themselves and then kept reading money, rosters and auctions on the bypass pool."
+      "reason": "C19 adds authenticated handover resolution: canonical token/HMAC/TTL verified before one exact fixture-ID lookup returning orgId only; all authority, issuance binding, appointment, redemption and claim writes remain tenant transactions. THE pre-tenant season resolver (PA-1R Phase 3.4, final readiness Phase 1). A console request knows only a slug, or spans every club a person belongs to, before any org can be named, and competitions/tournaments are org-only under RLS. Each function answers one pre-tenant question: membership-gated reads carry the org_members join in the same SQL statement; public reads return only what the public season page shows. Everything after resolution runs inside withTenantDb in the caller. This file replaced eight modules that had each done this themselves and then kept reading money, rosters and auctions on the bypass pool."
     },
     "apps/web/src/server/competition/sports.ts": {
       "class": "by-design",
@@ -341,6 +345,22 @@
     "apps/web/src/server/competition/match-day.ts": {
       "class": "by-design",
       "reason": "Match-day notes (email programme PR11), swept by the messages job with no session: reads, across every club, which published fixtures are due a note (7 am IST on the day, 6 pm the evening before an early match), each season's team players, owners and organizers, and which lineups were announced, on the system pool \u2014 the same shape as auction-reminders.ts. Mail is queued on the app pool (message_outbox, keyed by person) and the drain applies each person's gate inside their club's scope. There is no single tenant to scope a cross-club sweep to."
+    },
+    "apps/web/src/server/scoring/public-page.ts": {
+      "class": "by-design",
+      "reason": "public fixture facts after visibility/share-token gate; scores use the delayed public selector"
+    },
+    "apps/web/src/server/scoring/public.ts": {
+      "class": "by-design",
+      "reason": "public live read model after visibility/share-token gate"
+    },
+    "apps/web/src/server/scoring/trust-facts.ts": {
+      "class": "by-design",
+      "reason": "C38 focused Astra exception: internal cross-club overlap proof for server-derived canonical participants. Read-only relevant registration/person identities and actual canonical participation/play windows; returns only a boolean, no public history or arbitrary-person API. Tenant writers retain match lock/revision checks. Sweep recomputes both sides, including finalized matches; no globally serializable claim or system writes."
+    },
+    "apps/web/src/server/competition/team-entry-resolver.ts": {
+      "class": "by-design",
+      "reason": "C41 focused Astra exception: signed-in strict six-character current entry-code discovery, registration_open and team_entry only. Read-only minimal competition/org identity, name and sport; no roster, contacts, captain list, grants, history or system writes. Submission rechecks locked tenant facts and session identity."
     }
   }
 }

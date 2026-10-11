@@ -139,7 +139,11 @@ export const NOINDEX_HEADER = "noindex, nofollow";
  * the classification test to pass, so the two cannot drift.
  */
 export const CONSOLE_SEGMENTS = [
+  // Public bearer link, excluded from search; authentication is not required.
+  "m",
+  "match",
   "home",
+  "score",
   "account",
   "inbox",
   "money",
@@ -165,6 +169,10 @@ export const CONSOLE_SEGMENTS = [
   // but a duplicate of /c/[slug], so never indexed.
   "embed",
 ] as const;
+/** A bare /m prefix would also disallow the public /manifest.webmanifest. */
+export function robotsDisallows(): string[] {
+  return CONSOLE_SEGMENTS.map((segment) => (segment === "m" ? "/m/" : `/${segment}`));
+}
 
 /**
  * Paths robots.txt allows inside a disallowed segment. The more specific rule
@@ -180,7 +188,13 @@ export const ROBOTS_ALLOW_INSIDE_CONSOLE = [
  * Top-level `app/` segments that are neither pages nor consoles: route
  * handlers and health probes. They serve no HTML, so there is nothing to index.
  */
-export const INFRA_SEGMENTS = ["api", "healthz", "readyz", "indexnow-key.txt"] as const;
+export const INFRA_SEGMENTS = [
+  ".well-known",
+  "api",
+  "healthz",
+  "readyz",
+  "indexnow-key.txt",
+] as const;
 
 /** The first path segment of every public page, used by the classification test. */
 export function publicTopSegments(): ReadonlySet<string> {

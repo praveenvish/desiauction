@@ -1,8 +1,8 @@
 import { cache } from "react";
+import { publicName } from "../scoring/public-name";
 import {
   deriveAge,
   describeAttributes,
-  isMinor,
   mayPublishPhoto,
   paise,
   type MoneyUnit,
@@ -376,12 +376,13 @@ function toShowcasePlayer(r: ShowcaseRow, now: Date, sport: string): ShowcasePla
   // at once — regardless of any photo consent an adult would have given. The
   // organizer still sees the full roster on the authenticated, capability-gated
   // review screens; only public exposure is withheld.
-  const minor = isMinor(r.dateOfBirth, now);
+  const identity = publicName(r, r, now);
+  const minor = identity.minor;
   const photoKey = publicPhotoKey(r, now);
   return {
     registrationId: r.registrationId,
     number: r.number,
-    name: r.name ?? "Unnamed",
+    name: identity.name,
     role: r.role,
     age: minor ? null : deriveAge(r.dateOfBirth, now),
     battingStyle: r.battingStyle,
@@ -617,7 +618,10 @@ export async function publicPlayerCard(
       and(
         eq(registrations.personId, row.personId),
         eq(competitions.orgId, comp.orgId),
-        eq(competitions.visibility, "public"),
+        and(
+          eq(competitions.visibility, "public"),
+          sql`exists (select 1 from organizations directory_org where directory_org.id = ${competitions.orgId} and directory_org.kind = 'club')`,
+        ),
         eq(registrations.status, "approved"),
         ne(registrations.competitionId, comp.id),
       ),
@@ -1502,8 +1506,21 @@ export async function publicCompetitionsDirectory(params: {
   const sort = params.sort ?? "opportunity";
   const published =
     params.sport === undefined
-      ? eq(competitions.visibility, "public")
-      : and(eq(competitions.visibility, "public"), eq(competitions.sport, params.sport));
+      ? and(
+          and(
+            eq(competitions.visibility, "public"),
+            sql`exists (select 1 from organizations directory_org where directory_org.id = ${competitions.orgId} and directory_org.kind = 'club')`,
+          ),
+          eq(organizations.kind, "club"),
+        )
+      : and(
+          and(
+            eq(competitions.visibility, "public"),
+            sql`exists (select 1 from organizations directory_org where directory_org.id = ${competitions.orgId} and directory_org.kind = 'club')`,
+          ),
+          eq(organizations.kind, "club"),
+          eq(competitions.sport, params.sport),
+        );
   const term = params.q?.trim();
   const search =
     term === undefined || term === ""
@@ -1834,7 +1851,12 @@ export async function publicSeasonSitemap(limit = 5000): Promise<SeasonSitemapEn
       )`)}`.mapWith((value: string | Date) => new Date(value)),
     })
     .from(competitions)
-    .where(eq(competitions.visibility, "public"))
+    .where(
+      and(
+        eq(competitions.visibility, "public"),
+        sql`exists (select 1 from organizations directory_org where directory_org.id = ${competitions.orgId} and directory_org.kind = 'club')`,
+      ),
+    )
     .orderBy(asc(competitions.id))
     .limit(limit);
   const optedIn = rows.filter((row) => row.optedIn).map((row) => row.id);
@@ -1905,4 +1927,74 @@ export async function publicSquadListing(
     birthDates: births.get(competitionId) ?? [],
     now: new Date(),
   });
+}
+
+/** Resolve identity privately behind the existing published approved player gate. */
+export async function publicCricketCareer(slug: string, number: string) {
+  const card = await publicPlayerCard(slug, number);
+  if (!card || card.player.sport !== "cricket") return null;
+  const [identity] = await systemDb
+    .select({
+      personId: registrations.personId,
+      orgId: competitions.orgId,
+      dateOfBirth: registrations.dateOfBirth,
+    })
+    .from(registrations)
+    .innerJoin(competitions, eq(competitions.id, registrations.competitionId))
+    .where(
+      and(
+        eq(competitions.slug, slug),
+        and(
+          eq(competitions.visibility, "public"),
+          sql`exists (select 1 from organizations directory_org where directory_org.id = ${competitions.orgId} and directory_org.kind = 'club')`,
+        ),
+        eq(registrations.status, "approved"),
+        eq(registrations.registrationNumber, number),
+        eq(registrations.orgId, competitions.orgId),
+      ),
+    )
+    .limit(1);
+  if (!identity || publicName({ name: null }, identity, new Date()).minor) return null;
+  const { cricketCareerFor } = await import("../player/career-stats");
+  return cricketCareerFor(systemDb, { kind: "public", ...identity });
+}
+
+/** Public insight identity stays behind the published approved player boundary. */
+export async function publicCricketInsights(
+  slug: string,
+  number: string,
+  filter: import("../insights/sample").InsightFilter = {},
+) {
+  const card = await publicPlayerCard(slug, number);
+  if (!card || !["cricket", "box_cricket"].includes(card.player.sport)) return null;
+  const [identity] = await systemDb
+    .select({
+      personId: registrations.personId,
+      orgId: competitions.orgId,
+      dateOfBirth: registrations.dateOfBirth,
+    })
+    .from(registrations)
+    .innerJoin(competitions, eq(competitions.id, registrations.competitionId))
+    .where(
+      and(
+        eq(competitions.slug, slug),
+        eq(competitions.visibility, "public"),
+        sql`exists (select 1 from organizations directory_org where directory_org.id = ${competitions.orgId} and directory_org.kind = 'club')`,
+        eq(registrations.status, "approved"),
+        eq(registrations.registrationNumber, number),
+        eq(registrations.orgId, competitions.orgId),
+      ),
+    )
+    .limit(1);
+  if (!identity || publicName({ name: null }, identity, new Date()).minor) return null;
+  const [{ batterInsights }, { bowlerInsights }] = await Promise.all([
+    import("../insights/batter"),
+    import("../insights/bowler"),
+  ]);
+  const scope = { kind: "public" as const, ...identity };
+  const [batter, bowler] = await Promise.all([
+    batterInsights(systemDb, scope, filter),
+    bowlerInsights(systemDb, scope, filter),
+  ]);
+  return { batter, bowler };
 }

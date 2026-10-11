@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { capabilitiesOf, hasCapability, isCapabilitySet } from "./capabilities";
+import { capabilitiesOf, hasCapability, isCapabilitySet, isOrgCapabilitySet } from "./capabilities";
 
 const ORG = { scopeType: "org" as const, scopeId: "org_1" };
 
@@ -58,5 +58,39 @@ describe("hasCapability", () => {
 
   it("empty grant lists confer nothing", () => {
     expect(hasCapability([], ORG, "org.manage")).toBe(false);
+  });
+});
+
+describe("fixture scoring capabilities", () => {
+  it("gives owners and staff scoring while keeping scorer appointments narrow and season-only", () => {
+    expect(capabilitiesOf("org:owner")).toContain("fixture.score");
+    expect(capabilitiesOf("org:staff")).toContain("fixture.score");
+    expect(capabilitiesOf("fixture:scorer")).toEqual(["fixture.score"]);
+    expect(isCapabilitySet("fixture:scorer")).toBe(true);
+    expect(isOrgCapabilitySet("fixture:scorer")).toBe(false);
+    expect(capabilitiesOf("auction:conductor")).not.toContain("fixture.score");
+  });
+  it("scoring appointments confer no fixture management and do not cross seasons", () => {
+    const scorer = grant({
+      scopeType: "tournament",
+      scopeId: "season-a",
+      capabilitySet: "fixture:scorer",
+    });
+    expect(
+      hasCapability([scorer], { scopeType: "tournament", scopeId: "season-a" }, "fixture.score"),
+    ).toBe(true);
+    expect(
+      hasCapability([scorer], { scopeType: "tournament", scopeId: "season-b" }, "fixture.score"),
+    ).toBe(false);
+    expect(
+      hasCapability([scorer], { scopeType: "tournament", scopeId: "season-a" }, "fixture.manage"),
+    ).toBe(false);
+    expect(
+      hasCapability(
+        [{ ...scorer, revokedAt: new Date() }],
+        { scopeType: "tournament", scopeId: "season-a" },
+        "fixture.score",
+      ),
+    ).toBe(false);
   });
 });

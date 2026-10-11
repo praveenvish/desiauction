@@ -1,5 +1,5 @@
-import { competitions, organizations, people, type Db } from "@desiauction/db";
-import { and, desc, eq, ilike, isNotNull, lt, or, sql, type SQL } from "drizzle-orm";
+import { competitions, organizations, people, fixtures, matches, type Db } from "@desiauction/db";
+import { and, desc, eq, ilike, isNotNull, lt, ne, or, sql, type SQL } from "drizzle-orm";
 
 import { systemDb } from "../db";
 import { platformModerationGate } from "./authz";
@@ -212,4 +212,45 @@ export async function adminModerationDesk(
     return null;
   }
   return moderationDesk(systemDb, query, options);
+}
+
+export async function flaggedScoredMatches(db: Db) {
+  const rows = await db
+    .select({
+      fixtureId: fixtures.id,
+      orgId: fixtures.orgId,
+      fixtureNumber: fixtures.fixtureNumber,
+      seasonName: competitions.name,
+      orgName: organizations.name,
+      attempt: matches.attempt,
+      lastSeq: matches.lastSeq,
+      reasons: matches.trustReasons,
+    })
+    .from(matches)
+    .innerJoin(fixtures, and(eq(fixtures.id, matches.fixtureId), eq(fixtures.orgId, matches.orgId)))
+    .innerJoin(
+      competitions,
+      and(eq(competitions.id, matches.competitionId), eq(competitions.orgId, matches.orgId)),
+    )
+    .innerJoin(organizations, eq(organizations.id, matches.orgId))
+    .where(
+      and(
+        eq(matches.trustLevel, "flagged"),
+        isNotNull(matches.finishedAt),
+        ne(matches.phase, "void"),
+      ),
+    )
+    .orderBy(desc(matches.updatedAt), desc(matches.fixtureId))
+    .limit(PAGE);
+  return rows.map((row) => ({
+    ...row,
+    reasons: Array.isArray(row.reasons)
+      ? row.reasons.filter((reason: unknown): reason is string => typeof reason === "string")
+      : [],
+  }));
+}
+export type FlaggedScoredMatch = Awaited<ReturnType<typeof flaggedScoredMatches>>[number];
+export async function adminFlaggedScoredMatches() {
+  if ((await platformModerationGate()) === null) return null;
+  return flaggedScoredMatches(systemDb);
 }

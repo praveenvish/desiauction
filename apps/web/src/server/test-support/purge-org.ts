@@ -17,6 +17,9 @@ import {
   finopsProfiles,
   finopsSeries,
   fixtureLineups,
+  fixtureOfficials,
+  teamManagers,
+  teamEntries,
   fixtureResults,
   fixtures,
   franchises,
@@ -27,6 +30,13 @@ import {
   journalLegs,
   journalPostings,
   lots,
+  matchLiveState,
+  matchEvents,
+  matchConfirmations,
+  matches,
+  matchPlayerLines,
+  ballFacts,
+  matchAwards,
   orgImportMappings,
   orgMembers,
   orgMessagingSettings,
@@ -44,7 +54,7 @@ import {
   venues,
   type Db,
 } from "@desiauction/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 /**
  * DELETE EVERYTHING ONE TEST ORG OWNS, IN AN ORDER A FOREIGN KEY WILL ACCEPT.
@@ -112,11 +122,21 @@ export async function purgeOrg(db: Db, orgId: string): Promise<void> {
   // misses is no longer silent residue, it is a teardown that cannot delete
   // its people. (fixture_results was missed, and 185 orphaned results were
   // what the local database had to show for it.)
+  await db.delete(fixtureOfficials).where(eq(fixtureOfficials.orgId, orgId));
   await db.delete(fixtureLineups).where(eq(fixtureLineups.orgId, orgId));
   await db.delete(fixtureResults).where(eq(fixtureResults.orgId, orgId));
+  await db.delete(matchLiveState).where(eq(matchLiveState.orgId, orgId));
+  await db.delete(matchConfirmations).where(eq(matchConfirmations.orgId, orgId));
+  await db.delete(matchEvents).where(eq(matchEvents.orgId, orgId));
+  await db.delete(matchAwards).where(eq(matchAwards.orgId, orgId));
+  await db.delete(matchPlayerLines).where(eq(matchPlayerLines.orgId, orgId));
+  await db.delete(ballFacts).where(eq(ballFacts.orgId, orgId));
+  await db.delete(matches).where(eq(matches.orgId, orgId));
   await db.delete(fixtures).where(eq(fixtures.orgId, orgId));
   await db.delete(passUpgradeRequests).where(eq(passUpgradeRequests.orgId, orgId));
   await db.delete(registrations).where(eq(registrations.orgId, orgId));
+  await db.delete(teamManagers).where(eq(teamManagers.orgId, orgId));
+  await db.delete(teamEntries).where(eq(teamEntries.orgId, orgId));
   await db.delete(teams).where(eq(teams.orgId, orgId));
   await db.delete(franchises).where(eq(franchises.orgId, orgId));
   // Season-scoped grants (0076, the auctioneer) reach the org only through
@@ -147,6 +167,23 @@ export async function purgeOrg(db: Db, orgId: string): Promise<void> {
   await db.delete(invites).where(eq(invites.orgId, orgId));
   await db.delete(grants).where(eq(grants.scopeId, orgId));
   await db.delete(orgMembers).where(eq(orgMembers.orgId, orgId));
+  await db
+    .delete(auditLog)
+    .where(
+      and(
+        eq(auditLog.scopeType, "person"),
+        inArray(auditLog.action, [
+          "match.result_published",
+          "match.award_won",
+          "match.notice_dispatched",
+          "match.confirm_requested",
+          "match.confirm_notice_dispatched",
+          "player.claim_invited",
+          "player.claim_notice_dispatched",
+        ]),
+        sql`${auditLog.meta}->>'orgId' = ${orgId}`,
+      ),
+    );
   await db.delete(auditLog).where(eq(auditLog.scopeId, orgId));
   await db.delete(organizations).where(eq(organizations.id, orgId));
 }

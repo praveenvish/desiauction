@@ -46,7 +46,17 @@ export interface LobbyResultInput {
   readonly outcome?: "played" | "abandoned";
 }
 
-export type AnyResultInput = FixtureResultInput | LobbyResultInput;
+export interface ScoredLobbyResultInput {
+  readonly source: "scored";
+  readonly scoredPlacements: readonly {
+    teamId: string;
+    placement: number;
+    points: number;
+    kills: number;
+  }[];
+  readonly outcome?: "played" | "abandoned";
+}
+export type AnyResultInput = FixtureResultInput | LobbyResultInput | ScoredLobbyResultInput;
 
 /**
  * Points for finishing Nth in a lobby, plus what each score unit is worth.
@@ -119,6 +129,9 @@ export interface TiebreakerSpec {
 }
 
 export interface StandingsRules {
+  /** Applied when fixture scoring produces its NRR denominator. */
+  readonly allOutUsesQuota?: boolean;
+  readonly excludeNoResultFromNrr?: boolean;
   readonly points: PointsPolicy;
   /**
    * Placement points, for a sport whose fixtures are lobbies. Absent for every
@@ -174,6 +187,24 @@ function addInto(
 ): void {
   for (const field of fields) {
     target[field] = (target[field] ?? 0) + (source?.[field] ?? 0);
+  }
+}
+
+function addFixtureScore(
+  target: Record<string, number>,
+  source: ScoreRecord | undefined,
+  fields: readonly string[],
+): void {
+  const previousBalls = target.balls ?? 0;
+  const previousNrr = target.nrr_balls;
+  const supplied = source?.nrr_balls;
+  addInto(
+    target,
+    source,
+    fields.filter((field) => field !== "nrr_balls"),
+  );
+  if (previousNrr !== undefined || (supplied !== undefined && supplied !== null)) {
+    target.nrr_balls = (previousNrr ?? previousBalls) + (supplied ?? source?.balls ?? 0);
   }
 }
 
@@ -267,6 +298,17 @@ export function buildStandings(
     if (result.outcome === "abandoned") {
       continue;
     }
+    if ("scoredPlacements" in result) {
+      for (const entry of result.scoredPlacements) {
+        const row = rows.get(entry.teamId);
+        if (!row) continue;
+        row.played += 1;
+        if (entry.placement === 1) row.won += 1;
+        row.points += entry.points;
+        addInto(row.scored, { kills: entry.kills }, scoreFields);
+      }
+      continue;
+    }
     if ("placements" in result) {
       foldLobby(rows, result, rules, scoreFields);
       continue;
@@ -303,21 +345,13 @@ export function buildStandings(
       away.points += policy.noResult;
     }
 
-    /*
-     * The innings, halves or sets that were actually played count, whatever the
-     * outcome. A no-result often has one complete innings and a rained-off
-     * reply; counting the first and not the second is right, and a scheme that
-     * needed both would throw away real cricket.
-     *
-     * A side bowled out short of its full overs is deliberately NOT credited
-     * with the full quota here. That is a genuine variation between leagues,
-     * and inventing one silently would make the table subtly wrong for the
-     * clubs using the other. It belongs in the rules the day somebody asks.
-     */
-    addInto(home.scored, result.homeScore, scoreFields);
-    addInto(home.conceded, result.awayScore, scoreFields);
-    addInto(away.scored, result.awayScore, scoreFields);
-    addInto(away.conceded, result.homeScore, scoreFields);
+    if (result.outcome === "no_result" && rules.excludeNoResultFromNrr) continue;
+    // Recorded denominators already encode scoring rules. Backfill legacy balls
+    // per fixture so mixed old/new seasons retain every included contribution.
+    addFixtureScore(home.scored, result.homeScore, scoreFields);
+    addFixtureScore(home.conceded, result.awayScore, scoreFields);
+    addFixtureScore(away.scored, result.awayScore, scoreFields);
+    addFixtureScore(away.conceded, result.homeScore, scoreFields);
   }
 
   return [...rows.values()]

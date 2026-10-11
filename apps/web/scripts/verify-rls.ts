@@ -146,9 +146,14 @@ async function main(): Promise<void> {
  * participant sees exactly their team's rows, and a member of the same org who
  * does not participate in that team sees none.
  */
-const PARTICIPANT_SCOPED = new Set(["auction_team_targets", "auction_team_target_revisions"]);
+const PARTICIPANT_SCOPED = new Set([
+  "auction_team_targets",
+  "auction_team_target_revisions",
+  "match_player_lines",
+]);
 
 async function participantProof(relname: string): Promise<void> {
+  if (relname === "match_player_lines") return playerLinesProof();
   const [sample] = await owner.sql<{ orgId: string; auctionId: string; teamId: string }[]>`
     select org_id as "orgId", auction_id as "auctionId", team_id as "teamId"
     from ${owner.sql(relname)} limit 1`;
@@ -246,3 +251,65 @@ main()
     void owner.sql.end();
     void app.sql.end();
   });
+
+/** D9 permits a person's own registrations without granting cross-club writes. */
+async function playerLinesProof(): Promise<void> {
+  const [sample] = await owner.sql<
+    { orgId: string; personId: string; fixtureId: string; registrationId: string }[]
+  >`
+    select l.org_id as "orgId", r.person_id as "personId", l.fixture_id as "fixtureId", l.registration_id as "registrationId"
+    from match_player_lines l join registrations r on r.id=l.registration_id limit 1`;
+  if (!sample) {
+    console.log("  · match_player_lines: no rows — dedicated integration proof required");
+    return;
+  }
+  const [tenantCount] = await owner.sql<
+    { count: number }[]
+  >`select count(*)::int as count from match_player_lines where org_id=${sample.orgId}`;
+  const [personCount] = await owner.sql<
+    { count: number }[]
+  >`select count(*)::int as count from match_player_lines l join registrations r on r.id=l.registration_id where r.person_id=${sample.personId}`;
+  const tenantSeen = await withTenant(
+    app,
+    { personId: sample.personId, orgId: sample.orgId },
+    async (tx) => {
+      const [r] = await tx<
+        { count: number }[]
+      >`select count(*)::int as count from match_player_lines where org_id=${sample.orgId}`;
+      return r?.count;
+    },
+  );
+  const personSeen = await withTenant(app, { personId: sample.personId }, async (tx) => {
+    const [r] = await tx<
+      { count: number }[]
+    >`select count(*)::int as count from match_player_lines`;
+    return r?.count;
+  });
+  if (tenantSeen === tenantCount?.count && personSeen === personCount?.count)
+    ok("match_player_lines: tenant and person-only reads match their exact owner counts");
+  else fail("match_player_lines: tenant/person-only read count mismatch");
+  const [stranger] = await owner.sql<
+    { id: string }[]
+  >`select p.id from people p where not exists (select 1 from match_player_lines l join registrations r on r.id=l.registration_id where r.person_id=p.id) limit 1`;
+  if (!stranger) fail("match_player_lines: no unrelated person for privacy proof");
+  else {
+    const seen = await withTenant(app, { personId: stranger.id }, async (tx) => {
+      const [r] = await tx<
+        { count: number }[]
+      >`select count(*)::int as count from match_player_lines`;
+      return r?.count;
+    });
+    if (seen === 0) ok("match_player_lines: unrelated person sees zero rows");
+    else fail("match_player_lines: unrelated person can see lines");
+  }
+
+  const changed = await withTenant(app, { personId: sample.personId }, async (tx) => {
+    const updated =
+      await tx`update match_player_lines set points=points where fixture_id=${sample.fixtureId} and registration_id=${sample.registrationId} returning registration_id`;
+    const deleted =
+      await tx`delete from match_player_lines where fixture_id=${sample.fixtureId} and registration_id=${sample.registrationId} returning registration_id`;
+    return updated.length + deleted.length;
+  });
+  if (changed === 0) ok("match_player_lines: person-only UPDATE and DELETE affect zero rows");
+  else fail("match_player_lines: person-only read arm authorized a mutation");
+}

@@ -91,6 +91,8 @@ const RUNNER_DELIVERY_READS = [
  */
 const APPEND_ONLY = [
   "auction_events",
+  "match_events",
+  "match_awards",
   "settlement_events",
   "finops_events",
   "audit_log",
@@ -272,6 +274,7 @@ const APP_WRITES_UNPROTECTED = [
  * on this device" button writes it on the app pool.
  */
 const APP_WRITES_PERSON = [
+  "player_previous_careers",
   "player_profiles",
   "consent_records",
   "notification_preferences",
@@ -329,6 +332,14 @@ function expectations(allTables: string[]): Expectation[] {
       });
     }
   }
+
+  out.push({
+    role: "desiauction_app",
+    table: "player_previous_careers",
+    verb: "DELETE",
+    allowed: true,
+    why: "self-reported person history can be removed by its owner or account erasure",
+  });
 
   // Turning a device off, and a push service's "gone", delete the row (PR18).
   out.push({
@@ -391,7 +402,9 @@ function expectations(allTables: string[]): Expectation[] {
   }
 
   for (const table of APPEND_ONLY) {
-    for (const role of RUNTIME_ROLES) {
+    for (const role of ["match_events", "match_awards"].includes(table)
+      ? [...RUNTIME_ROLES, "desiauction_system"]
+      : RUNTIME_ROLES) {
       for (const verb of ["UPDATE", "DELETE"] as const) {
         out.push({
           role,
@@ -444,6 +457,29 @@ function expectations(allTables: string[]): Expectation[] {
       "(the app role already holds full DML on every projection rebuilt from " +
       "this log, so blocking only the append contained nothing)",
   });
+
+  for (const table of [
+    "matches",
+    "match_confirmations",
+    "team_entries",
+    "match_events",
+    "match_live_state",
+    "match_player_lines",
+    "ball_facts",
+    "match_awards",
+    "player_previous_careers",
+  ]) {
+    for (const role of ["desiauction_engine", "desiauction_runner"]) {
+      for (const verb of ["SELECT", "INSERT", "UPDATE", "DELETE"] as const)
+        out.push({
+          role,
+          table,
+          verb,
+          allowed: false,
+          why: "LS-1 scoring is confined to the web tier",
+        });
+    }
+  }
 
   for (const table of PRIVATE_PLAN_TABLES) {
     for (const role of ["desiauction_engine", "desiauction_runner"]) {

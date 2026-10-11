@@ -29,6 +29,7 @@ test-results/
 *.tsbuildinfo
 .local/
 test-results-sim/
+apps/web/e2e-artifacts/ls1/
 
 # pnpm mail:gallery output (every rendered email + screenshots)
 .mail-gallery/

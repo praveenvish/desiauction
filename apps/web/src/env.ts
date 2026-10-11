@@ -5,6 +5,8 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   APP_VERSION: z.string().min(1).default("dev"),
   DATABASE_URL: z.string().startsWith("postgres"),
+  // Optional app-role connection for schema isolation regression checks.
+  APP_DATABASE_URL: z.string().startsWith("postgres").optional(),
   // PRP-1 §1 two-role recipe: DATABASE_URL carries the non-BYPASSRLS app role;
   // the system pool serves ONLY the named pre-tenant token paths (invite
   // preview/accept — ops/db/create-app-role.sql). Unset = same URL (local dev).
@@ -46,8 +48,19 @@ const envSchema = z.object({
   // The live Auction Engine (M-IP4-2): web submits commands over HTTP with the
   // shared secret; browsers receive snapshots over the engine's WebSocket.
   ENGINE_URL: z.url().default("http://localhost:4000"),
+  TWA_PACKAGE_NAME: z
+    .string()
+    .regex(/^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+$/)
+    .default("in.desiauction.app"),
+  TWA_SHA256_FINGERPRINTS: z
+    .string()
+    .transform((value) => value.split(",").map((fingerprint) => fingerprint.trim().toUpperCase()))
+    .pipe(z.array(z.string().regex(/^(?:[A-F0-9]{2}:){31}[A-F0-9]{2}$/)).min(1))
+    .optional(),
+  NEXT_PUBLIC_LIVE_WS_PATH: z.literal("/live/ws").optional(),
   ENGINE_PUBLIC_WS_URL: z.string().default("ws://localhost:4000/ws"),
   ENGINE_SECRET: z.string().min(8).default("dev-engine-secret"),
+  SCORING_HANDOVER_SECRET: z.string().min(32).optional(),
   /**
    * THE KEY FOR SIGN-IN CODES AND PASSKEY CHALLENGES, APART FROM THE ENGINE'S
    * (PRR 2026-09-29).
@@ -161,6 +174,7 @@ const envSchema = z.object({
   WHATSAPP_TEMPLATE_AUCTION_SOLD: z.string().min(1).optional(),
   WHATSAPP_TEMPLATE_TEAM_APPOINTED: z.string().min(1).optional(),
   WHATSAPP_TEMPLATE_LINEUP_ANNOUNCED: z.string().min(1).optional(),
+  WHATSAPP_TEMPLATE_MATCH_AWARD: z.string().min(1).optional(),
   // WhatsApp first (2026-09-23): every text moment has a template.
   WHATSAPP_TEMPLATE_REGISTRATION_APPROVED: z.string().min(1).optional(),
   WHATSAPP_TEMPLATE_REGISTRATION_WAITLISTED: z.string().min(1).optional(),
@@ -448,6 +462,10 @@ const envSchema = z.object({
    * violations on every surface — and the same policy becomes enforced. It is a
    * switch rather than a code change so that turning it off is just as quick.
    */
+  NEXT_DIST_DIR: z
+    .string()
+    .regex(/^\.next(?:-[A-Za-z0-9_-]+)?$/)
+    .optional(),
   CSP_ENFORCE: z
     .enum(["1", "true"])
     .optional()
@@ -502,6 +520,10 @@ function serving(v: z.infer<typeof envSchema>): boolean {
 }
 
 const productionSchema = envSchema
+  .refine((v) => !serving(v) || v.SCORING_HANDOVER_SECRET !== undefined, {
+    message: "SCORING_HANDOVER_SECRET must be set in production (at least 32 characters)",
+    path: ["SCORING_HANDOVER_SECRET"],
+  })
   // PRR P1-1: the two-role recipe must be in effect in production. Unset
   // SYSTEM_DATABASE_URL aliases the app pool (server/db.ts), so the ~130
   // RLS-exempt system reads would run under the app role and fail; an equal URL

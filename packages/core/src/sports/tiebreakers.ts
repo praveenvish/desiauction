@@ -182,3 +182,28 @@ export function summariseFields(
       return formatter === undefined ? String(raw) : formatter(raw);
     });
 }
+
+/** Prefer recorded denominators; older aggregates retain their actual-ball fallback. */
+export function netRateWithFallback(
+  numerator: string,
+  preferred: string,
+  fallback: string,
+  per: number,
+  label: string,
+  options: TiebreakerOptions = {},
+): TiebreakerSpec {
+  const side = (totals: SideTotals, which: "scored" | "conceded"): number | null => {
+    const bottom = totals[which][preferred] ?? totals[which][fallback] ?? 0;
+    return bottom === 0 ? null : (value(totals, which, numerator) / bottom) * per;
+  };
+  return {
+    key: options.key ?? `net_${numerator}_rate`,
+    label,
+    precision: options.precision ?? 3,
+    compute: (totals) => {
+      const scored = side(totals, "scored");
+      const conceded = side(totals, "conceded");
+      return scored === null || conceded === null ? null : scored - conceded;
+    },
+  };
+}

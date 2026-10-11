@@ -1,4 +1,8 @@
 {
+  "chart": {
+    "s1": { "$value": "#4A90E8", "$type": "color" },
+    "s2": { "$value": "#C2861F", "$type": "color" }
+  },
   "surface": {
     "default": { "$value": "{color.ink.900}", "$type": "color" },
     "raised": { "$value": "{color.ink.850}", "$type": "color" },

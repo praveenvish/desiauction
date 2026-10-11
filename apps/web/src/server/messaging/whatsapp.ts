@@ -57,7 +57,7 @@ export { WHATSAPP_CONSENT_LABEL, WHATSAPP_LANGUAGES, type WhatsAppLanguage };
  * alert that never had an SMS — the email change, which DLT would have needed
  * its own registration for (auth/email-changed-notice.ts).
  */
-export type WhatsAppKey = TemplateKey | "security.email_changed";
+export type WhatsAppKey = TemplateKey | "security.email_changed" | "match.award";
 
 /** What fills a variable: the person's own name, or one of the moment's slots. */
 export type WhatsAppParam =
@@ -300,6 +300,20 @@ export const WHATSAPP_TEMPLATES: Readonly<Record<WhatsAppKey, WhatsAppTemplate>>
     button: { label: SEE_SEASON, url: HOME },
     nameEnv: "WHATSAPP_TEMPLATE_LINEUP_ANNOUNCED",
   },
+  "match.award": {
+    key: "match.award",
+    category: "UTILITY",
+    header: "none",
+    body: {
+      en: "Hi {{1}}, you received a match award in {{2}}. Sign in to see your award and points.",
+      hi: "नमस्ते {{1}}, आपको {{2}} में मैच पुरस्कार मिला है। अपना पुरस्कार और अंक देखने के लिए साइन इन करें।",
+    },
+    params: ["name", "competition"],
+    samples: { en: ["Neel", "MPL 2026"], hi: ["Neel", "MPL 2026"] },
+    footer: "DesiAuction",
+    button: { label: SEE_SEASON, url: HOME },
+    nameEnv: "WHATSAPP_TEMPLATE_MATCH_AWARD",
+  },
 };
 
 /**
@@ -317,6 +331,7 @@ export const WHATSAPP_SUGGESTED_NAMES: Readonly<Record<WhatsAppKey, string>> = {
   "auction.sold": "da_auction_sold",
   "team.appointed": "da_team_appointed",
   "lineup.announced": "da_lineup_announced",
+  "match.award": "da_match_award",
 };
 
 export function isWhatsAppKey(key: string): key is WhatsAppKey {

@@ -1,5 +1,6 @@
 "use client";
 
+import { scoringSignOut } from "../../lib/scoring-sign-out";
 import { Button, Field, IconTile, IconUser } from "@desiauction/ui";
 import { useActionState, useEffect, useRef } from "react";
 
@@ -89,7 +90,7 @@ export function OnboardingPanel({
             type="button"
             className="onboarding-signout"
             data-testid="onboarding-signout"
-            onClick={() => void logoutAction()}
+            onClick={() => void scoringSignOut(logoutAction)}
           >
             Not you? Sign out
           </button>

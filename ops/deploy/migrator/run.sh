@@ -63,7 +63,7 @@ case "${1:-}" in
     ;;
   preflight)
     exec node scripts/preflight-production.mjs \
-      --env=/env/web.env --engine-env=/env/engine.env --runner-env=/env/runner.env
+      --env=/env/web.env --engine-env=/env/engine.env --runner-env=/env/runner.env --live-env=/env/live.env
     ;;
   *)
     echo "usage: migrator live-window|migrate|roles|grants|preflight" >&2

@@ -53,7 +53,12 @@ __PUBLIC_DOMAIN__ {
 		}
 	}
 
-	reverse_proxy __STACK__-web:3000
+	handle /live/* {
+		reverse_proxy __STACK__-live:4100
+	}
+	handle {
+		reverse_proxy __STACK__-web:3000
+	}
 }
 
 # prod-only:start

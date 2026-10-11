@@ -112,7 +112,11 @@ describe("offline.html", () => {
   const page = readFileSync(path.join(PUBLIC, "offline.html"), "utf8");
 
   it("is the revision the worker stores", () => {
-    const digest = createHash("sha256").update(page).digest("hex").slice(0, 8);
+    const digest = createHash("sha256")
+      .update(page)
+      .update(readFileSync(path.join(PUBLIC, "sw-score-route.js")))
+      .digest("hex")
+      .slice(0, 8);
     const declared = /const OFFLINE_REVISION = "([0-9a-f]{8})";/.exec(WORKER_SOURCE)?.[1];
     expect(
       declared,
@@ -198,7 +202,9 @@ function loadWorker(userAgent = CHROME_UA) {
     clients: { claim: () => Promise.resolve() },
     skipWaiting: () => Promise.resolve(),
   };
+  vm.runInNewContext(readFileSync(path.join(PUBLIC, "sw-score-route.js"), "utf8"), { self });
   vm.runInNewContext(WORKER_SOURCE, {
+    importScripts: () => undefined,
     self,
     caches,
     fetch: (request: Request) => network(request),
@@ -333,6 +339,30 @@ describe("sw.js", () => {
     worker.network.mockRejectedValueOnce(new TypeError("Failed to fetch"));
     const response = await worker.dispatch(navigation("/seasons/x/squad")).responded;
     expect(await response?.text()).toContain("You're offline");
+  });
+
+  it("uses the cached data-free shell only for exact offline fixture pads", async () => {
+    const id = "01HZ0000000000000000000000";
+    worker.network.mockRejectedValue(new TypeError("offline"));
+    const redirect = await worker.dispatch(navigation(`/score/${id}`)).responded;
+    expect(redirect?.status).toBe(302);
+    expect(redirect?.headers.get("location")).toBe(`${ORIGIN}/score/shell#${id}`);
+    expect(await (await worker.dispatch(navigation("/score/shell")).responded)?.text()).toBe("ok");
+    for (const route of [
+      `/score/${id}/setup`,
+      "/score/handover/token",
+      "/score/not-an-id",
+      "/account",
+    ])
+      expect(await (await worker.dispatch(navigation(route)).responded)?.text()).toContain(
+        "You're offline",
+      );
+    worker.network.mockResolvedValueOnce(new Response("server error", { status: 500 }));
+    expect((await worker.dispatch(navigation(`/score/${id}`)).responded)?.status).toBe(500);
+    const pages = [...worker.store.values()]
+      .flatMap((cache) => [...cache.entries.keys()])
+      .filter((url) => !url.includes("/_next/static/"));
+    expect(pages.sort()).toEqual([`${ORIGIN}/offline.html`, `${ORIGIN}/score/shell`].sort());
   });
 
   it("never stores a page", async () => {

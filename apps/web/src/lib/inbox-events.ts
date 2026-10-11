@@ -21,6 +21,12 @@ import type { SecurityAction } from "../server/auth/security-actions";
  * missing label a type error at the point the event is invented.
  */
 const PERSON_EVENT_LABELS = {
+  "match.toss_reminder": "The toss has happened",
+  "match.result_published": "Your match result is ready",
+  "match.award_won": "You received a match award",
+  "player.claim_invited": "Sign in to see your match stats",
+  "match.confirm_requested": "Please confirm the match result",
+  "match.quiet": "Scoring has gone quiet — check on your live match",
   "auth.login.otp": "Signed in with a one-time code",
   "auth.login.email": "Signed in with a code sent to your email",
   // The FIRST line of an email-anchored account's ledger. Deliberately not

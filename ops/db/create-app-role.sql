@@ -233,7 +233,7 @@ grant insert on finops_events to desiauction_app;
 -- perf scripts, which run as the OWNER and are unaffected. journal_postings and
 -- journal_legs are deliberately NOT here: they are projections rebuilt from
 -- events by settlement recovery, so they must stay deletable.
-revoke update, delete on auction_events, settlement_events, finops_events, audit_log
+revoke update, delete on auction_events, settlement_events, finops_events, audit_log, match_events, match_awards
   from desiauction_app, desiauction_engine, desiauction_runner, desiauction_system;
 
 -- PRIVATE PER-TEAM PLANS (WR-1 "My plan", migration 0041).
@@ -298,3 +298,17 @@ grant execute on function platform_move_tournament(char, char, char, text, char,
   to desiauction_app;
 
 \echo 'roles ready: desiauction_app (nobypassrls) · desiauction_system (bypassrls, least-privilege)'
+
+-- LS-1 scoring belongs to the web tier, never the auction engine or runner.
+revoke all on matches, match_events, match_live_state, match_player_lines, match_awards
+  from desiauction_engine, desiauction_runner;
+
+-- LS-1: external history is person-scoped web data.
+revoke all on player_previous_careers from desiauction_engine, desiauction_runner;
+
+-- LS-1: confirmation projections remain in the web tenant boundary.
+revoke all on match_confirmations from desiauction_engine, desiauction_runner;
+
+-- LS-1: team entries belong to the web tenant boundary.
+revoke all on team_entries from desiauction_engine, desiauction_runner;
+revoke all on ball_facts from desiauction_engine, desiauction_runner;

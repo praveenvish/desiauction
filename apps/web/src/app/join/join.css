@@ -133,3 +133,21 @@
   background: var(--warning-subtle);
   color: var(--text-primary);
 }
+
+.team-entry-form {
+  display: grid;
+  gap: var(--space-4);
+}
+.team-entry-form fieldset {
+  margin: 0;
+  min-width: 0;
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.team-entry-form legend {
+  padding: 0 var(--space-2);
+  color: var(--text-secondary);
+}

@@ -124,7 +124,7 @@ jobs:
             echo "::warning::NEXT_SERVER_ACTIONS_ENCRYPTION_KEY is not set for this environment — pages open during this deploy must be reloaded before their forms work again"
             echo "⚠️ No \`NEXT_SERVER_ACTIONS_ENCRYPTION_KEY\` secret for **${{ inputs.environment }}**: every page open during this deploy must be reloaded before its forms and bids work again. Add one (\`openssl rand -base64 32\`) to the environment's secrets." >> "$GITHUB_STEP_SUMMARY"
           fi
-          for app in web engine finops-runner; do
+          for app in web engine live finops-runner; do
             EXTRA=""
             if [ "$app" = web ]; then EXTRA="$WEB_SECRET"; fi
             # $EXTRA is unquoted on purpose: it is either empty or two words.
@@ -377,6 +377,7 @@ jobs:
             wait_ready engine 4000 180
             docker compose up -d
             wait_ready web 3000 180
+            wait_ready live 4100 180
             # No port to probe on these two; "running, not restarting" is the
             # claim that can be checked.
             sleep 10
@@ -427,7 +428,7 @@ jobs:
               local registry ref
               registry="$(envval REGISTRY)"
               [ -n "$registry" ] || return 0
-              for repo in web engine finops-runner migrator; do
+              for repo in web engine live finops-runner migrator; do
                 docker image ls --format '{{.Repository}}:{{.Tag}}' "${registry}/${repo}" \
                   | while read -r ref; do
                       case "$ref" in

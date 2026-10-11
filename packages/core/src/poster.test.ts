@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildPlayerPoster,
+  buildResultPoster,
   buildSeasonPoster,
   buildTeamPoster,
   buildTopBuysPoster,
@@ -19,6 +20,7 @@ import {
   shortNameOf,
   splitName,
   type PlayerPosterInput,
+  type ResultPosterInput,
   type PosterMark,
   type TeamPosterInput,
   type TeamPosterMember,
@@ -41,6 +43,73 @@ const PLAYER: PlayerPosterInput = {
   competitionLogoUrl: null,
   unit: "inr",
 };
+
+describe("result poster", () => {
+  const result: ResultPosterInput = {
+    competitionName: "MPL 2026",
+    competitionLogoUrl: null,
+    fixtureNumber: "7",
+    headline: "Royals win",
+    margin: "by 6 wickets",
+    trustLabel: "Unverified",
+    teams: [
+      { name: "Marwar Royals", score: "158/4 (18.2)", color: "#a23" },
+      { name: "Jodhpur Strikers", score: "154/8 (20)", color: null },
+    ],
+    playerOfMatch: {
+      name: "Neel Mehta",
+      photoUrl: null,
+      figures: "58* (37) · 2 for 27",
+      shots: [
+        { angle: 90, runs: 4 },
+        { angle: 220, runs: 6 },
+      ],
+    },
+  };
+  it("keeps the actual result, trust, scores and recorded winning-player shots", () => {
+    const poster = buildResultPoster(result);
+    expect(poster.fixtureLabel).toBe("MATCH 7");
+    expect(poster.teams[0]).toEqual({
+      name: "Marwar Royals",
+      score: "158/4 (18.2)",
+      color: "#AA2233",
+    });
+    expect(poster.trustLabel).toBe("Unverified");
+    expect(poster.playerOfMatch).toEqual({ ...result.playerOfMatch, monogram: "NM" });
+    expect(result.teams[0]?.color).toBe("#a23");
+  });
+  it("does not invent a winner, face or wagon when the award is unavailable", () => {
+    expect(
+      buildResultPoster({ ...result, headline: "No result", playerOfMatch: null }).playerOfMatch,
+    ).toBeNull();
+    const minor = buildResultPoster({
+      ...result,
+      playerOfMatch: { name: "NM", photoUrl: null, figures: "58 (37)", shots: [] },
+    });
+    expect(minor.playerOfMatch?.name).toBe("NM");
+    expect(minor.playerOfMatch?.photoUrl).toBeNull();
+    expect(minor.playerOfMatch?.shots).toEqual([]);
+  });
+  it("bounds long copy and excludes unusable shot coordinates without adding synthetic shots", () => {
+    const poster = buildResultPoster({
+      ...result,
+      headline: "Winner ".repeat(30),
+      playerOfMatch: {
+        name: "Neel",
+        photoUrl: null,
+        figures: "58 (37)",
+        shots: [
+          { angle: NaN, runs: 4 },
+          { angle: 20, runs: 0 },
+          { angle: 10, runs: 1 },
+        ],
+      },
+    });
+    expect(poster.headline.endsWith("…")).toBe(true);
+    expect(poster.playerOfMatch?.shots).toEqual([{ angle: 10, runs: 1 }]);
+    expect(POSTER_KIND_SIZES.result).toEqual(["square", "portrait", "story"]);
+  });
+});
 
 describe("player poster", () => {
   it("renders the sale: stamp, price and the buying team", () => {

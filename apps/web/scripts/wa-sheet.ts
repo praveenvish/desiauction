@@ -24,6 +24,8 @@ import {
 const SUGGESTED_NAME = WHATSAPP_SUGGESTED_NAMES;
 
 const WHEN: Record<WhatsAppKey, string> = {
+  "match.award":
+    "When a finalized match award is set — to the current winner, only on WhatsApp with consent.",
   "registration.approved": "When an organizer approves a registration — to the player.",
   "registration.waitlisted":
     "When an organizer puts a registration on the waitlist — to the player.",

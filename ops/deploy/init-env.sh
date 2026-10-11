@@ -127,6 +127,7 @@ SYSTEM_DATABASE_URL=postgres://desiauction_system:$SYSTEM_PW@db:5432/$DB
 # Server-side calls stay inside this stack's private network.
 ENGINE_URL=http://engine:4000
 ENGINE_PUBLIC_WS_URL=wss://engine.$DOMAIN/ws
+NEXT_PUBLIC_LIVE_WS_PATH=/live/ws
 ENGINE_SECRET=$ENGINE_SECRET
 LOGIN_DEFAULT_METHOD=email
 $STORAGE
@@ -159,6 +160,14 @@ $INDEXNOW
 # RAZORPAY_KEY_ID=
 # RAZORPAY_KEY_SECRET=
 # RAZORPAY_WEBHOOK_SECRET=
+EOF
+
+write live.env <<EOF
+NODE_ENV=production
+PORT=4100
+SYSTEM_DATABASE_URL=postgres://desiauction_system:$SYSTEM_PW@db:5432/$DB
+LIVE_ALLOWED_ORIGINS=$ORIGINS
+TRUSTED_PROXY_COUNT=1
 EOF
 
 write engine.env <<EOF

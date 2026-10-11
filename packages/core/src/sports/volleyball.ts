@@ -1,3 +1,4 @@
+import { RALLY_FORMAT_PRESETS } from "../scoring/rally/formats";
 import { termsOf, type TermDetail } from "./vocabulary";
 import { ratio, summariseFields } from "./tiebreakers";
 
@@ -125,6 +126,13 @@ const TERMS: Terminology = {
 };
 
 export const VOLLEYBALL: SportPack = {
+  scoring: {
+    family: "rally",
+    depth: 2,
+    formats: [RALLY_FORMAT_PRESETS.volleyball_bo5],
+    defaultFormat: "volleyball_bo5",
+    awardTable: "volleyball-v1",
+  },
   key: "volleyball",
   label: "Volleyball",
   roles: ROLES,

@@ -20,8 +20,10 @@ ARG APP_VERSION=dev
 ENV NODE_ENV=production \
     APP_VERSION=$APP_VERSION \
     NEXT_TELEMETRY_DISABLED=1 \
+    NEXT_PUBLIC_LIVE_WS_PATH=/live/ws \
     DATABASE_URL=postgres://build:build@localhost:5432/build \
     SYSTEM_DATABASE_URL=postgres://build2:build2@localhost:5432/build \
+    SCORING_HANDOVER_SECRET=build-only-scoring-handover-placeholder \
     PUBLIC_BASE_URL=https://build.invalid
 # ONE KEY ACROSS BUILDS, OR EVERY DEPLOY BREAKS EVERY OPEN TAB (PRR 2026-09-29).
 #
@@ -57,6 +59,11 @@ ARG APP_VERSION=dev
 ENV NODE_ENV=production APP_VERSION=$APP_VERSION PORT=3000 HOSTNAME=0.0.0.0
 COPY --from=build /repo/apps/web/.next/standalone ./
 COPY --from=build /repo/apps/web/.next/static ./apps/web/.next/static
+# LS-1 C27 exact static shell/hash-policy artifacts, fixed paths only.
+COPY --from=build /repo/apps/web/.next/server/app/score/shell.html ./apps/web/.next/server/app/score/shell.html
+COPY --from=build /repo/apps/web/.next/app-build-manifest.json ./apps/web/.next/app-build-manifest.json
+COPY --from=build /repo/apps/web/.next/react-loadable-manifest.json ./apps/web/.next/react-loadable-manifest.json
+COPY --from=build /repo/apps/web/.next/BUILD_ID ./apps/web/.next/BUILD_ID
 COPY --from=build /repo/apps/web/public ./apps/web/public
 EXPOSE 3000
 CMD ["apps/web/server.js"]

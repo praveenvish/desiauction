@@ -1,3 +1,4 @@
+import { redactSupportPath } from "../../lib/support-path";
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
@@ -70,6 +71,49 @@ describe("redactPageUrl — no secret leaves the browser in a report", () => {
     );
   });
 
+  it("redacts nested scoring handover tokens, trailing paths and URL state", () => {
+    expect(redactPageUrl(`${BASE}/score/handover/bearer-secret/next?token=secret#qr`, BASE)).toBe(
+      `${BASE}/score/handover/${REDACTED}/next`,
+    );
+    const client = readFileSync(
+      resolve(import.meta.dirname, "../../components/report-problem/report-problem.tsx"),
+      "utf8",
+    );
+    expect(client).toContain("pathname: redactSupportPath(window.location.pathname)");
+    expect(redactSupportPath("/match/confirm/bearer-secret")).toBe("/match/confirm/[redacted]");
+    expect(redactPageUrl(`${BASE}/match/confirm/bearer-secret?token=secret`, BASE)).toBe(
+      `${BASE}/match/confirm/${REDACTED}`,
+    );
+    expect(redactSupportPath("/score/handover/bearer-secret/next")).toBe(
+      "/score/handover/[redacted]/next",
+    );
+    const sheet = readFileSync(
+      resolve(import.meta.dirname, "../../app/score/[fixtureId]/sheets/handover-sheet.tsx"),
+      "utf8",
+    );
+    expect(sheet).toContain("data-report-problem-exclude");
+  });
+
+  it("redacts only the top-level share path and keeps canonical fixture numbers", () => {
+    for (const suffix of [
+      "secret",
+      "secret/",
+      "secret/next?token=other#secret",
+      "encoded%2Fsecret",
+    ]) {
+      const raw = `${BASE}/m/${suffix}`;
+      const trailing = suffix.startsWith("secret/next") ? "/next" : suffix === "secret/" ? "/" : "";
+      expect(redactPageUrl(raw, BASE)).toBe(`${BASE}/m/${REDACTED}${trailing}`);
+      expect(redactSupportPath(new URL(raw).pathname)).toBe(`/m/${REDACTED}${trailing}`);
+    }
+    expect(redactPageUrl(`${BASE}/c/league/m/42?token=secret#secret`, BASE)).toBe(
+      `${BASE}/c/league/m/42`,
+    );
+    expect(redactSupportPath("/c/league/m/42")).toBe("/c/league/m/42");
+    expect(redactSupportPath("/something/m/value")).toBe("/something/m/value");
+    expect(redactSupportPath("/unknown/TOKEN_SENTINEL_SECRET")).toContain("TOKEN_SENTINEL_SECRET");
+  });
+
   it("refuses another origin rather than recording it as ours", () => {
     expect(redactPageUrl("https://evil.example/join/abc", BASE)).toBeNull();
     expect(redactPageUrl("javascript:alert(1)", BASE)).toBeNull();
@@ -93,23 +137,32 @@ describe("redactPageUrl — no secret leaves the browser in a report", () => {
           continue;
         }
         if (/^\[.*token.*\]$/i.test(entry.name)) {
-          found.push(
-            dir
-              .slice(appDir.length + 1)
-              .split("/")
-              .at(-1) ?? "",
-          );
+          found.push(join(dir, entry.name).slice(appDir.length));
         }
         walk(join(dir, entry.name));
       }
     };
     walk(appDir);
     expect(found.length).toBeGreaterThan(0);
-    for (const prefix of found) {
-      expect(
-        TOKEN_ROUTE_PREFIXES as readonly string[],
-        `/${prefix}/[token] is not redacted`,
-      ).toContain(prefix);
+    for (const route of found) {
+      const sentinel = "TOKEN_SENTINEL_SECRET";
+      const pathname = route
+        .split("/")
+        .filter((segment) => !/^\(.*\)$/.test(segment))
+        .map((segment) =>
+          /^\[.*token.*\]$/i.test(segment)
+            ? sentinel
+            : /^\[.*\]$/.test(segment)
+              ? "fixture"
+              : segment,
+        )
+        .join("/");
+      expect(redactPageUrl(`${BASE}${pathname}`, BASE), `${route} is not redacted`).not.toContain(
+        sentinel,
+      );
+      expect(redactSupportPath(pathname), `${route} client path is not redacted`).not.toContain(
+        sentinel,
+      );
     }
   });
 });

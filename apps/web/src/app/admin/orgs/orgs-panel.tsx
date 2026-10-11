@@ -56,6 +56,7 @@ export function OrgsPanel({
   return (
     <>
       <div className="admin-panel">
+        <p>Personal · {formatCount(directory.personalTotal)}</p>
         <AdminFilterForm testId="admin-org-search">
           <Toolbar>
             <ToolbarSearch

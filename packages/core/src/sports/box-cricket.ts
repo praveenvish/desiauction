@@ -1,6 +1,7 @@
 import { CRICKET } from "./cricket";
 import { ballsOf } from "./overs";
-import { netRate, summariseFields } from "./tiebreakers";
+import { netRateWithFallback, summariseFields } from "./tiebreakers";
+import { FORMAT_PRESETS } from "../scoring/formats";
 
 import type { ScoreFieldSpec, SportPack, Terminology } from "./types";
 
@@ -62,6 +63,13 @@ const TERMS: Terminology = {
 };
 
 export const BOX_CRICKET: SportPack = {
+  scoring: {
+    family: "delivery",
+    depth: 2,
+    formats: [FORMAT_PRESETS.box_6, FORMAT_PRESETS.six_over],
+    defaultFormat: "box_6",
+    awardTable: "cricket-v1",
+  },
   key: "box_cricket",
   label: "Box cricket",
   /*
@@ -85,7 +93,9 @@ export const BOX_CRICKET: SportPack = {
      * share of the total, so the decimal-overs mistake `netRate` exists to
      * prevent is proportionally worse in a box than on a ground.
      */
-    tiebreakers: [netRate("runs", "balls", 6, "NRR", { key: "net_run_rate" })],
+    tiebreakers: [
+      netRateWithFallback("runs", "nrr_balls", "balls", 6, "NRR", { key: "net_run_rate" }),
+    ],
     summariseSide: summariseFields("{runs}/{wickets} ({balls:overs})"),
   },
   terms: TERMS,

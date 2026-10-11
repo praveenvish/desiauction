@@ -3,9 +3,14 @@ import { notFound } from "next/navigation";
 
 import { recordAdminAccess } from "../../../server/admin/access-log";
 import { platformModerationGate } from "../../../server/admin/authz";
-import { MODERATION_FILTERS, adminModerationDesk } from "../../../server/admin/moderation-views";
+import {
+  MODERATION_FILTERS,
+  adminModerationDesk,
+  adminFlaggedScoredMatches,
+} from "../../../server/admin/moderation-views";
 import { AdminPageHead } from "../admin-ui";
 import { ModerationPanel } from "./moderation-panel";
+import { ScoredMatchReviews } from "./scored-match-reviews";
 import "../../seasons/seasons.css";
 import "../admin.css";
 import "./moderation.css";
@@ -38,6 +43,8 @@ export default async function AdminModerationPage({
   if (desk === null) {
     notFound();
   }
+  const flagged = await adminFlaggedScoredMatches();
+  if (flagged === null) notFound();
   return (
     <ToastProvider>
       <main className="registrations-dash">
@@ -46,6 +53,7 @@ export default async function AdminModerationPage({
             Every season on the open web, and every one DesiAuction has taken down.
           </AdminPageHead>
           <ModerationPanel desk={desk} paged={typeof after === "string" && after !== ""} />
+          <ScoredMatchReviews matches={flagged} />
         </div>
       </main>
     </ToastProvider>

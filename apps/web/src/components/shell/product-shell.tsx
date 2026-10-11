@@ -1,5 +1,6 @@
 "use client";
 
+import { scoringSignOut } from "../../lib/scoring-sign-out";
 import {
   AppShell,
   Breadcrumb,
@@ -96,6 +97,7 @@ export interface ShellOrg {
 }
 
 export interface ShellCompetition {
+  teamFormation?: "auction" | "organizer" | "team_entry";
   slug: string;
   name: string;
   orgName: string;
@@ -471,6 +473,7 @@ export function ProductShell({
         label: `In ${currentCompetition.name}`,
         items: [
           ...seasonTabs(currentCompetition.slug, currentCompetition.seasonRole, {
+            teamFormation: currentCompetition.teamFormation ?? "auction",
             canSettle: currentCompetition.canSettle,
             ...(currentCompetition.ownTeamId !== undefined
               ? { ownTeamId: currentCompetition.ownTeamId }
@@ -939,6 +942,7 @@ export function ProductShell({
     if (competition !== undefined) {
       seasonSwitcherFor = slug;
       const tabs = seasonTabs(slug, competition.seasonRole, {
+        teamFormation: competition.teamFormation ?? "auction",
         canSettle: competition.canSettle,
         ...(competition.ownTeamId !== undefined ? { ownTeamId: competition.ownTeamId } : {}),
       });
@@ -1165,7 +1169,7 @@ export function ProductShell({
                       danger: true,
                       onSelect: () => {
                         track("auth.logout");
-                        void logout();
+                        void scoringSignOut(logout);
                       },
                     },
                   ]}
@@ -1264,7 +1268,7 @@ export function ProductShell({
                 <button
                   type="button"
                   className="shell-drawer-link shell-drawer-danger"
-                  onClick={() => void logout()}
+                  onClick={() => void scoringSignOut(logout)}
                 >
                   Sign out
                 </button>

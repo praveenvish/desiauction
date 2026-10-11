@@ -57,6 +57,7 @@ const KIND_LABEL: Record<PosterKind, { label: string; hint: string }> = {
   reveal: { label: "Meet the squad", hint: "The same squad, announced — faces only, no money" },
   top: { label: "Top buys", hint: "The night's biggest signings, ranked" },
   season: { label: "All squads", hint: "Every franchise in the season on one sheet" },
+  result: { label: "Match result", hint: "Result and Player of the Match" },
 };
 
 /**
@@ -97,6 +98,7 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
   const [kind, setKind] = useState<PosterKind>(kinds[0] ?? "player");
   const [playerId, setPlayerId] = useState(view.players[0]?.id ?? "");
   const [teamId, setTeamId] = useState(view.teams[0]?.id ?? "");
+  const [fixtureId, setFixtureId] = useState(view.results?.[0]?.id ?? "");
   const [theme, setTheme] = useState<PosterTheme>("stadium");
   const [wantedSize, setSize] = useState<PosterSize>("portrait");
   const [count, setCount] = useState<TopBuyCount>(5);
@@ -125,10 +127,17 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
   const sizes = POSTER_KIND_SIZES[kind];
   const size = sizes.includes(wantedSize) ? wantedSize : (sizes[0] ?? "portrait");
 
-  const subjects = kind === "team" || kind === "reveal" ? view.teams : view.players;
-  const subjectId = kind === "team" || kind === "reveal" ? teamId : playerId;
-  const needsSubject = kind === "player" || kind === "team" || kind === "reveal";
-  const showPrices = kind !== "reveal";
+  const subjects =
+    kind === "result"
+      ? (view.results ?? [])
+      : kind === "team" || kind === "reveal"
+        ? view.teams
+        : view.players;
+  const subjectId =
+    kind === "result" ? fixtureId : kind === "team" || kind === "reveal" ? teamId : playerId;
+  const needsSubject =
+    kind === "result" || kind === "player" || kind === "team" || kind === "reveal";
+  const showPrices = kind !== "reveal" && kind !== "result";
 
   const base =
     kind === "top"
@@ -199,10 +208,12 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
 
           {!needsSubject ? null : (
             <Select
-              label={kind === "player" ? "Player" : "Team"}
+              label={kind === "result" ? "Match" : kind === "player" ? "Player" : "Team"}
               value={subjectId}
               onChange={(event) => {
-                if (kind === "player") {
+                if (kind === "result") {
+                  setFixtureId(event.target.value);
+                } else if (kind === "player") {
                   setPlayerId(event.target.value);
                 } else {
                   setTeamId(event.target.value);

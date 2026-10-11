@@ -1,5 +1,6 @@
 "use client";
 
+import { scoringSignOut } from "../../../../lib/scoring-sign-out";
 import { Button, Field } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState } from "react";
@@ -147,7 +148,11 @@ export function AddPhoneStep({
           </p>
           <Button
             variant="secondary"
-            onClick={() => void logoutToAction(`/login?next=${encodeURIComponent(returnTo)}`)}
+            onClick={() =>
+              void scoringSignOut(() =>
+                logoutToAction(`/login?next=${encodeURIComponent(returnTo)}`),
+              )
+            }
           >
             Sign in again
           </Button>

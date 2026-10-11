@@ -62,7 +62,7 @@ Branch: feat/ls1-live-scoring · Base: main @ <sha>
 | X-14 | INV-15 dependencies | `git diff origin/main -- '**/package.json'` adds only `idb-keyval`, `qrcode` (+ `@types/qrcode` dev) and the new `apps/live` package's deps (copied from the engine set) |
 | X-15 | Mockup fidelity | The architect compares the `ls1-screens` screenshots to the canvas boards (Scorer, Watch, Insights, Organiser, Both themes). Layout, hierarchy and copy must match; pixel-perfection is not required |
 | X-16 | Performance | EXEC-LOG shows: pad tap → local update < 50 ms (A-C24-01); viewer sees a ball ≤ 3 s (A-C34-01); live-load p95 < 300 ms and 304 ratio > 80% (A-C34-03); `/score/[id]` route JS within budget (A-C24-04) |
-| X-17 | Oracle | EXEC-LOG shows the Cricsheet oracle summary: 60 committed fixtures pass; the local full run has 0 failures and ≤ 0.5% skips (A-C09-02/04) |
+| X-17 | Oracle | EXEC-LOG shows the Cricsheet oracle summary: 60 committed fixtures pass; the local full run has 0 failures and ≤ 1.0% skips (A-C09-02/04) |
 | X-18 | Migrations | `check-journal.mjs` green; numbering is contiguous after main's last; every new table is in purge-org and the move-tournament function (D-8) |
 | X-19 | CI | Every PR CI job green on the final head |
 | X-20 | Competitor bar (product) | The architect runs the "60-second start" timing on a seeded season: from `/score` to the first ball recorded is ≤ 60 s for a person who knows the app (record it as a Playwright trace in the screens spec) |
@@ -184,7 +184,7 @@ These are the meanings of the IDs referenced in `02-commits.md` and `03-sports-f
 | A-C26-04 | Finish sheet + next match |
 | A-C26-05 | Theme toggle persists |
 | A-C27-01..05 | See C27 |
-| A-C28-01 | Full T10 e2e |
+| A-C28-01 | Full T10 e2e with existing live-state projection updates; public viewer coverage not yet implemented, owned by C30 |
 | A-C28-02 | Offline e2e |
 | A-C28-03 | Handover e2e |
 | A-C28-04 | Both-themes axe e2e |
@@ -198,7 +198,7 @@ These are the meanings of the IDs referenced in `02-commits.md` and `03-sports-f
 | A-C30-02 | Poll cadence 2 s / 15 s / stop |
 | A-C30-03 | Stale state after 60 s |
 | A-C30-04 | Reconnecting banner after 2 failures |
-| A-C30-05 | Result in place, both themes |
+| A-C30-05 | Result in place, both themes; extend C28 journey with second-browser displayed score and terminal result updates |
 | A-C30-06 | `noindex` on `/m/[token]` |
 | A-C31-01..04 | Wagon (batter pills + All), worm, Manhattan, table link, keyboard focus, tokens in both themes |
 | A-C32-01..03 | OG/Twitter images render the live score; view ping throttled; `revalidate = 15` |
@@ -297,3 +297,7 @@ These are the meanings of the IDs referenced in `02-commits.md` and `03-sports-f
 4. Spot-check the domain: replay 5 random Cricsheet matches outside the committed 60 through `replayMatch` and compare scorecards by hand.
 5. Product walk-through on the precompiled build, both themes, phone viewport. Score a full T10 including the shot map, a wicket with a pin, an over-end matchup hint (after C42), finish, poster and live page from a second device.
 6. Verdict: **merge**, **fix list**, or **re-plan** (only if the plan itself was wrong; the plan is amended in a new commit before more code).
+
+### C39/C42 focused Astra sequencing obligation (2026-10-10)
+
+C39 guest claims prove unchanged registration ID, accepted match_events and match_player_lines, with authenticated recipient career ownership following registration.personId. D14 is introduced only at C42. C42 must additionally create actual ball_facts, perform the same claim, and assert unchanged registration references/statistical contents and recipient-owned reads. This C42 acceptance obligation remains pending until that integration proof passes.

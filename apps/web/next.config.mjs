@@ -102,7 +102,7 @@ export default {
    * `import { Button } from "@desiauction/ui"` to the file that defines Button.
    */
   experimental: {
-    optimizePackageImports: ["@desiauction/ui"],
+    optimizePackageImports: ["@desiauction/ui", "@desiauction/core", "@desiauction/core/scoring"],
   },
   /*
    * PINO RUNS FROM node_modules, NOT FROM A BUNDLE.

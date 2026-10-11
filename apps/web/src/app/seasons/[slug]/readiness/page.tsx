@@ -54,6 +54,19 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
   if (view === null) {
     notFound();
   }
+  if (
+    view.competition.teamFormation !== undefined &&
+    view.competition.teamFormation !== "auction"
+  ) {
+    return (
+      <main className="registrations-dash">
+        <h1>Season readiness</h1>
+        <p>Review the teams and players, then build the match schedule.</p>
+        <ButtonLink href={`/seasons/${slug}/teams`}>Review teams</ButtonLink>
+        <ButtonLink href={`/seasons/${slug}/fixtures`}>Build the schedule</ButtonLink>
+      </main>
+    );
+  }
   const [registrations, fixtures, auction, orgs] = await Promise.all([
     registrationDashboard(slug, {}),
     fixtureDashboard(slug, {}),

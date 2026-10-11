@@ -1491,3 +1491,83 @@ What the plan says: C54 folds lobby_round events with pack LobbyPoints, writes f
 What the repo has: packages/db/src/schema.ts:1530 fixture_participants has placement/score but no source. apps/web/src/server/competition/results.ts:153 typed lobby writer bounds single-round kills 0..100; lines586–616 read one placement per fixture. packages/core/src/standings.ts:224 foldLobby adds placement points once per input. Multi-round aggregate placement cannot reproduce summed round placement points without a defined canonical reader. FamilyEngine and public envelope require two home/away sides, but lobby fixtures explicitly have no home/away; inventing two squads violates existing standings intent. No placement format/round count/approved lineup snapshot, round correction completion semantics, partial player kill attribution, top_fragger final tie/null/override, original receipt trust minimum or multi-team confirmation contract is specified.
 
 Smallest change: focused Astra amendment defining an own placement protocol/envelope without fictional duel sides; frozen pack points and bounded rounds; exact canonical per-round standings and aggregate persistence/provenance, additive migration and typed collision guard; approved squad/player eligibility and honest missing attribution; top_fragger ties/overrides/no invented season awards; original receipt/current trust/privacy/delay reuse with multi-team authority. Preserve typed lobby behavior, all earlier families, tenant/move continuity, immutable corrections, budgets and every C54 gate. No C54 implementation before architect decision. No heavy run/browser freeze; preserve all work, isolated four-role DB only, no PR/push/merge and implementation commits deferred.
+
+### 2026-10-11 · C54 · Astra placement contract · resumed
+
+Authorize distinct placement format key/label/rounds/frozen LobbyPoints, default1 explicit1–100 rounds, strict actual sport/server pack snapshot. match_started all scheduled teamIDs without home/away; lineup_confirmed actual approved same-team unique disjoint playing players. Each consecutive lobby_round1..configured has every team exactly once, placements1..teamCount/shared allowed, kills0..100, playerKills exactly playing roster including explicitzeroes/nonnegative integers/sumteamkills. Effective corrections/replay refuse broken laterrounds; allrounds derive result/explicitfinish, abandon no competitive result/topfrag/no walkover.
+
+Aggregate roundpoints separately fromkills; overallcompetitionrank bytotalpointsDESC/killsDESC/sharedequalrank/teamIDdisplayonly. Add0124 nullable fixture_participants.source typed|scored, backfillexistingplacementtyped/unrecordednull; typedwritersets typed, scoredfinalizeaggregateplacement/kills/source atomically. Aggregatekillsmayexceed100 withoutlooseningtypedroundbounds. Scoredstandings replaycurrentfinalizedhistory/frozenrules anddistincttypedinput aggregatepoints/kills/placement, fixtureplayedonce/rankonewononce/sumeveryroundpoints. Malformed/missinghistoryfailclosed/no typedfallback; typedrefusesacceptedhistory; correctionrefinalizationrebuilds/void-abandonexcludes/nodata deletion. Existingparticipanttenantmovecoverage/proveaccess.
+
+Ownplacementresult/publicvariants participantcollections/aggregaterows/nodummyduelfields, narrowfamilyconsumers/sharedgenuinelifecycle/claim/offlinepipeline. Closed sanitized public snapshots/currenttrust/P1/P3 acrossSSR/HTTP/WS/no rawhistory/privatecontact, cricketpayload/allroutebudgetsunchanged. Actualcumulativeplayerkills top_fragger rankkillsDESC/overallteamplacementASC/registrationIDASC, >=1kill otherwiseautoNULL, completeacceptedrosterappearance. Onlytop_fragger append-onlycomputed/overrideprovenance/auth/reason/membership/refinalization, noPoM/Fighter/season/genericpoints; canonicalstatsavailablewithoutmeaninglesszeroawardrows.
+
+AuthorityA/B/Cunchanged;Dactivemanager scheduledteam/historicalactualrepresentedteam, multiplequalifyingteamsrequires explicitauthorizedselection. Revisionopponentconfirmation everyotherparticipatingteam viaitscurrentmanager;anyparticipantdisputeexistingprecedence, incompleteambiguoushistoricalsidecannot satisfyDarm. Live>=1effective round/full original receipts/120seconds+order/originalcorrectiontimes/restartclears, no physicalpace/scorertopsignal. Overlap/recipientsactualcanonicalallteams/strictengine/tenant. Requiredmultiroundnonfictionpoints/aggregatekills>100/typedbounds/sharedrank/attribution/correction/void/refinalize/source/moveRLS/allopponents/missinghistory/privacydelaytransportoffline/topfragtiemembershipnulloverride/battle-regression/scoredlobbygates plusmigration/roles. Blockerc6415622resolved; C54resumedINPROGRESS NOTPASS.
+
+### 2026-10-11 · C54 · first-round publication repair · IN PROGRESS, NOT PASS
+
+Draft core60files1206tests/type/lint passed; full web317files3303tests, live transport4/unit8, grants593 expectations/94tables/fourroles, RLS/posture82tests, static27forced0cache, production137routes and unchanged137budgets passed. Five emitted family graphs have framework104188bytes and overhead delivery43472/rally20798/raid21390/timed24185/placement18448, all<60000. Own draft dependency cycles fixed with leaf format/panel types and own seven lint faults repaired; prior failure logs retained.
+
+Browser /tmp/ls1-c54-browser.log: typed battle-royale PASS, both scored lobby cases failed at own premature zero-round SSR assertion. Managed runner89087 exited1/servers torn down before edits. Follow-up /tmp/ls1-c54-browser-repair.log retained: typed PASS, both scored cases failed actual3second first-round publication because start had no canonical public snapshot and the existing null-state waiting-page poll interval is15seconds. Managed runner38422 exited1/servers torn down. No timeout/cadence/budget waiver. This was an incomplete own C54 setup implementation, not a changed acceptance rule.
+
+Repair publishes accepted complete placement setup transactionally through existing writeLiveState; canonical complete-roster phase is live while actual round/activity/result/topfrag remain empty. Original P1/P3/current-trust gates and genuine-play minimum still require actual rounds, with no synthetic event or trust claim. New core test proves empty activity/result and new real system-role regression proves delayed zero-round snapshot. Latest core60files1207tests passed; first new test had a wrong activity import, corrected with failed log retained. Current serial /tmp/ls1-c54-publication-rerun.sh runner9490 refreshes every affected gate then required browser acceptance. C54 NOT PASS; no C55 implementation. All work preserved, real index empty, isolated four-role DB only, no PR/push/merge and deferred implementation commits.
+
+## 2026-10-11 · C54 · PASS · feat(web): lobby rounds with per-player kills
+
+A-C54-01..03 PASS under the recorded Astra placement amendment. Own pure multi-team canonical protocol, server-frozen per-round points, exact approved roster kill attribution, bounded consecutive rounds, correction/restart/void/abandon rules, aggregate standings and source provenance are complete. Migration0124 adds nullable typed/scored source without changing typed single-round bounds. Atomic scored projections sum real round points/kills, count one played fixture, refuse typed collisions and fail closed on missing/malformed canonical history or mismatched projections. Actual top-fragger-only awards retain computed/override provenance and null picks; no fabricated cricket/season/zero-point rows. Multi-team manager authority, explicit represented squad, every-other-team confirmation, original receipts/current trust/privacy/delay/device claim and tenant-move source continuity are proved.
+
+Final source core60files1207tests/type/lint PASS /tmp/ls1-c54-publication-final-core-publication.log. Full web317files3304tests PASS /tmp/ls1-c54-publication-final-integration-final.log, including eight real lobby regressions; live transport4/unit8 PASS, grants593/fourroles/94tables and RLS/posture82tests PASS. Earlier local queue/shell24tests and actual move8tests passed; full posture refresh includes move. Journal124entries and isolated0124 migration passed. Final static27forced0cache PASS /tmp/ls1-c54-publication-final-static-final.log. Fresh137route production build and all unchanged137budgets PASS /tmp/ls1-c54-publication-final-{build,bundle}.log. Five emitted family graphs: framework104184bytes; delivery43472/rally20798/raid21390/timed24185/placement18475 overhead, all<60000, /tmp/ls1-c54-family-assets.json.
+
+Required browser3PASS0FAIL0SKIP26.8seconds /tmp/ls1-c54-publication-final-browser.log/evidence: existing typed battle-royale four-squad regression, daylight/floodlight two-round scored lobby, actual offline player kills/durable resync, real second viewer first/second accepted rounds within3seconds, zero-round and accepted-round SSR, exact34/16 aggregate points, standings,14-kill top fragger, phone/laptop axe+overflow/captures. Parent inspected actual daylight phone pad/laptop live and floodlight phone pad/laptop result; readable hierarchy and token themes match the shared scoring/watch shell. Failed draft browser/import/lint/cycle evidence retained above, no increased timeout or waived gate.
+
+Managed runner9490exit0/stagecomplete/ports3050–3051free; source editable. All work preserved/real index empty; isolated four-role DB only/no PR/push/merge/deferred implementation commits. C54 complete; advance C55 only.
+
+C54 checkpoint tree dbcdaa0db344ca9e4bf20430b87542f577f67e48 saved with temporary index; real index empty.
+
+## 2026-10-11 · C55 · PASS · test(e2e): every sport family end to end
+
+A-C55-01 PASS. e2e/scoring-families.spec.ts runs ten compact real UI journeys: delivery/cricket six-over innings and successful chase; rally/badminton two won games; raid/kabaddi actual touched defender and two explicit halves; timed/football attributed goal and two explicit periods; placement/battle-royale actual player kills and completed round. Each repeats in daylight/floodlight, runs axe/phone overflow on its own pad, proves accepted scoring/finish events and final persisted family projection, then opens an anonymous public result and runs axe/capture. No accepted history or result is seeded.
+
+G-e2e10PASS0FAIL0SKIP38.7seconds /tmp/ls1-c55-browser-repair.log/evidence, unchanged production build from C54. First draft omitted the raid's actual Start clock action; controls correctly remained disabled. Graceful SIGINT of owned Playwright79121 preserved /tmp/ls1-c55-browser.log/evidence (two passed, remaining not completed), managed runner61858exit130/portsfree before edits. Corrected test setup and existing raid-specific terminal marker; action timeout tightened to15seconds, no application change or timeout increase. Final managed runner49922exit0/stagecomplete/portsfree; source editable. All work preserved/real index empty/isolated four-role DB only/no PR/push/merge/deferred commits. C55 complete; advance C56 only.
+
+C55 checkpoint tree fc10b9645044b504db8edc420e818e5dd244ca41 saved with temporary index; real index empty.
+
+## 2026-10-11 · C56 · IN PROGRESS, NOT PASS · chore(ls1): verification sweep for all sports
+
+C00–C55 passed in order under recorded amendments and the human's deferred single implementation commit/no PR/push/merge override. FINAL.md now documents all five built families and honest unsupported/untracked award/sport limits. Final G-full, journal, static boundaries, grants/RLS/posture, fresh production build/budgets and full precompiled browser suite are running serially against the isolated four-role database. No C56 PASS or completion claim before every applicable gate passes; no fabricated remote CI. Browser source/log edits remain frozen until managed teardown.
+
+
+## 2026-10-11 · C56 · PASS · chore(ls1): verification sweep for all sports
+
+A-C56-01 PASS. C00–C56 executed in order, with each entry gated before the next and every recorded architecture contradiction resolved before continuation. FINAL.md includes As built: sports for all five families and existing registered sports, with honest unsupported/untracked limits. No remaining implementation or validation blocker. The human override still supersedes per-entry implementation commits, PR creation/push and remote CI; one final local implementation commit follows this record. Mandatory blocker-log commits and failed-run evidence remain intact. No merge or deployment.
+
+Final G-full PASS against only isolated ls1_c29_clean at127.0.0.1:15437 with all four explicit role URLs:
+
+- Journal124entries sequential/strictly increasing/files present/engine migration set unchanged: /tmp/ls1-c56-journal.log.
+- G-static27forced0cache tasks, formatting, dependency boundaries (2403modules/10310dependencies), posture/motion PASS: /tmp/ls1-c56-static-final.log.
+- Required pnpm verify PASS: forced lint/typecheck, ten unit suites1944tests including core60files1207tests, format/depcruise/motion; /tmp/ls1-c56-verify.log.
+- Required full pnpm test:integration PASS: web317files3304tests, engine75, runner5 and live4 (3388tests total), four forced tasks; /tmp/ls1-c56-integration-full.log.
+- Role application,593grant expectations across94tables/fourroles, load-bearing RLS/cross-tenant denial and posture16files82tests PASS: /tmp/ls1-c56-{roles-apply,grants,rls,posture}.log.
+- Fresh production137routes and all unchanged137route budgets PASS: /tmp/ls1-c56-{build,bundle}.log. Final emitted framework104188bytes; family overhead delivery43472/rally20798/raid21390/timed24185/placement18475bytes, all<60000; /tmp/ls1-c56-family-assets.json.
+- Full precompiled browser289cases, one worker/retries0:260PASS29existing conditionalSKIP0FAIL0interrupted/0notrun,21.6minutes; /tmp/ls1-c56-browser.log/evidence. Exact normalized29skip titles equal the completed C51 baseline, no new skip. All scoring/family cases executed, including ten compact both-theme/axe journeys, timed football/basketball/hockey, kabaddi, scored lobby/typed regression, offline/claim/force takeover, SSR/reference screens, privacy/results/awards/insights and the full T10.
+- Final full T10 delivery proof:123deliveries/sevencorrections, slowest viewer2179.199951171875ms<3000. Separate steady-score500-viewer/60second poll load:14939requests,500200/14439304, zero other responses/errors/timeouts/missing validators/non-live responses, p95=13.641790999994555ms<300 and304ratio=96.65305576009103%>80. This does not claim simultaneous append load. Metrics are in the full browser log.
+- Final invariant scans: pure core has no Zod import; engine/auction/financial-operations/runner source diffs from origin/main are empty; scoring-history deletion appears only in test purge; raw scoring hex is limited to authorized UI-3 field SVGs. Branch remains feat/ls1-live-scoring; git diff --check passes. Real index was empty before final commit staging.
+
+Managed runner34250exit0/stagecomplete and ports3050–3051free before completion edits; no source/log edits occurred during browser freeze. Protected source and all implementation preserved, default/development DB never used in this final sweep. Prior approved cleanup is complete. The final commit contains the exact passed implementation, documentation and logged amendments, without fabricating unavailable earlier per-entry trees or remote CI.
+
+### Completion checklist under the human workflow override
+
+- [x] M0 kickoff C00.
+- [x] M1 core C01–C12.
+- [x] M2 data C13–C15.
+- [x] M3 backend C16–C22.
+- [x] M4 scorer app C23–C28.
+- [x] M5 public live C29–C34.
+- [x] M6 results/awards/careers C35–C37.
+- [x] M7 trust C38–C39.
+- [x] M8 modes C40–C41.
+- [x] M9 insights/broadcast/scale C42–C44.
+- [x] M10 launch C45–C46/full local milestone verification.
+- [x] M11 rally/kabaddi C47–C51/full local milestone verification.
+- [x] M12 timed/placement C52–C56/full final local verification.
+- [x] Per-entry acceptance and amendments recorded above instead of a PR body.
+- [x] As built documentation and reproducible final gate evidence.
+- [ ] Human-owned PR/push/remote CI/merge, explicitly deferred by instruction; no claim these occurred.

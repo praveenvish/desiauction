@@ -155,6 +155,7 @@ export interface TeamCard {
 }
 
 export interface TeamsWorkspace {
+  teamFormation?: CompetitionSummary["teamFormation"];
   competitionName: string;
   /**
    * The season's roles, in the pack's order, as plain {key,label} pairs.
@@ -272,7 +273,8 @@ export async function teamsWorkspace(
   // no rule was set, so there is no cap to show.
   const squadMax = auction?.enteredByHand === true ? null : (rules?.squadMax ?? null);
   const handEntry =
-    options.manage !== true
+    options.manage !== true ||
+    (competition.teamFormation !== undefined && competition.teamFormation !== "auction")
       ? undefined
       : auction === undefined
         ? ("open" as const)
@@ -410,6 +412,7 @@ export async function teamsWorkspace(
 
   return {
     competitionName: competition.name,
+    teamFormation: competition.teamFormation ?? "auction",
     sportAttributes: sportPackFor(competition.sport).attributes.map((attribute) => ({
       key: attribute.key,
       label: attribute.label,
@@ -419,7 +422,10 @@ export async function teamsWorkspace(
       label: value.label,
     })),
     teams: cards,
-    ...(options.money ? { purseTotal, squadMax } : {}),
+    ...(options.money &&
+    (competition.teamFormation === undefined || competition.teamFormation === "auction")
+      ? { purseTotal, squadMax }
+      : {}),
     approvedPlayers: stats.approved,
     ...(handEntry !== undefined ? { handEntry } : {}),
     auctionSource: competition.auctionSource,

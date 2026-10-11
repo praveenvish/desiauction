@@ -7,6 +7,7 @@ import {
   fixtures,
   grants,
   messageOutbox,
+  matchAwards,
   newId,
   organizations,
   orgMembers,
@@ -170,6 +171,20 @@ describe("naming the champion", () => {
     expect(
       await announceChampion(db, { competitionId: seasonId, teamId: kings, actorId: organizer }),
     ).toEqual({ ok: true, told: 3 });
+    const awardRows = await db
+      .select()
+      .from(matchAwards)
+      .where(eq(matchAwards.competitionId, seasonId));
+    expect(awardRows).toHaveLength(7);
+    expect(
+      awardRows.every(
+        (row) =>
+          row.scope === "season" &&
+          row.source === "auto" &&
+          row.winnerRegistrationId === null &&
+          row.winnerPersonId === null,
+      ),
+    ).toBe(true);
     const rows = await outbox();
     const champion = rows.find((row) => row.personId === winner);
     expect(champion?.subject).toBe(`Champions! Cup Kings win Finale League ${RUN}`);

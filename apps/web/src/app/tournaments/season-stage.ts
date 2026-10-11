@@ -20,6 +20,7 @@ export type StageKey = "setup" | "registration" | "auction" | "season" | "finish
 export interface StageInput {
   readonly slug: string;
   readonly status: string;
+  readonly teamFormation?: "auction" | "organizer" | "team_entry";
   readonly endsOn: string | null;
   readonly auctionUnit: "inr" | "points";
   readonly settlement: "settling" | "settled" | null;
@@ -69,7 +70,9 @@ export function seasonStage(season: StageInput, today: string): StageKey {
     return over ? "finished" : "season";
   }
   if (season.status === "registration_closed") {
-    return "auction";
+    return season.teamFormation !== undefined && season.teamFormation !== "auction"
+      ? "season"
+      : "auction";
   }
   if (season.status === "registration_open") {
     return "registration";
@@ -106,6 +109,14 @@ export function nextStep(season: StageInput, today: string): NextStep | null {
         urgent: false,
       };
     case "registration":
+      if (season.teamFormation === "team_entry") {
+        return {
+          label: "Review teams",
+          href: `${base}/teams`,
+          why: "Captains can submit teams while sign-ups are open",
+          urgent: false,
+        };
+      }
       return counts.pending > 0
         ? {
             label: `Review ${formatCount(counts.pending)}`,

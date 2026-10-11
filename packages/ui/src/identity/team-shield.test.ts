@@ -27,6 +27,12 @@ describe("the default team shield (0111)", () => {
     expect(shieldTones(hue("2563EB")).rim).not.toBe(hue("FFFFFF"));
   });
 
+  it("quotes the chief colour so the SVG remains decodable XML", () => {
+    const svg = shieldSvg(hue("2563EB"));
+    expect(svg).toContain(`fill="${hue("FFFFFF")}" opacity="0.12"`);
+    expect(svg).not.toContain("fill=hue(");
+  });
+
   it("is shape only — no text for the rasterizer to shape", () => {
     expect(shieldSvg(hue("2563EB"))).not.toContain("<text");
   });

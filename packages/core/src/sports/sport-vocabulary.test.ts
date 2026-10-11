@@ -171,6 +171,18 @@ function styleOffences(stripped: string): string[] {
   return [...hits];
 }
 
+// LS-1 C01 architect resolution: scoring has a fixed two-value wire contract.
+// Exempt only its canonical tuple; copies elsewhere in this file still fail.
+const SCORING_TYPES = "packages/core/src/scoring/types.ts";
+const SCORING_HAND_DECLARATION =
+  /^export\s+const\s+BATTING_HANDS\s*=\s*\[\s*"right"\s*,\s*"left"\s*,?\s*\]\s+as\s+const\s*;[ \t]*$/m;
+
+function sourceStyleOffences(path: string, stripped: string): string[] {
+  return styleOffences(
+    path === SCORING_TYPES ? stripped.replace(SCORING_HAND_DECLARATION, " ") : stripped,
+  );
+}
+
 describe("a sport's words live in its pack and nowhere else", () => {
   /*
    * Read and strip the tree ONCE. Each check used to walk and read every file
@@ -212,11 +224,52 @@ describe("a sport's words live in its pack and nowhere else", () => {
   it("finds no batting or bowling style token outside the pack", () => {
     const offenders: string[] = [];
     for (const file of scanned) {
-      for (const hit of styleOffences(file.code)) {
+      for (const hit of sourceStyleOffences(file.path, file.code)) {
         offenders.push(`${file.path} — ${hit}`);
       }
     }
     expect(offenders, "read styles from the sport pack").toEqual([]);
+  });
+
+  it("permits only the canonical scoring hand tuple, with copies still guarded", () => {
+    const declaration = 'export const BATTING_HANDS = ["right", "left"] as const;';
+    expect(sourceStyleOffences(SCORING_TYPES, declaration)).toEqual([]);
+    expect(
+      sourceStyleOffences(
+        SCORING_TYPES,
+        'export const BATTING_HANDS = [\n "right",\n "left",\n] as const;',
+      ),
+    ).toEqual([]);
+    expect(sourceStyleOffences("packages/core/src/scoring/other.ts", declaration)).toHaveLength(2);
+    expect(
+      sourceStyleOffences(SCORING_TYPES, declaration.replace('"left"', '"left", "both"')),
+    ).toHaveLength(3);
+    expect(
+      sourceStyleOffences(SCORING_TYPES, declaration.replace("BATTING_HANDS", "OTHER_HANDS")),
+    ).toHaveLength(2);
+    expect(sourceStyleOffences(SCORING_TYPES, declaration.replace(" as const", ""))).toHaveLength(
+      2,
+    );
+    expect(
+      sourceStyleOffences(
+        SCORING_TYPES,
+        declaration.replace('["right", "left"]', '["left", "right"]'),
+      ),
+    ).toHaveLength(2);
+    expect(
+      sourceStyleOffences(SCORING_TYPES, `${declaration}\nconst COPY = ["right", "left"];`),
+    ).toHaveLength(2);
+    expect(sourceStyleOffences(SCORING_TYPES, `${declaration}\n${declaration}`)).toHaveLength(2);
+    expect(
+      sourceStyleOffences(SCORING_TYPES, `${declaration}\nconst COPY = "right_arm_fast";`),
+    ).toEqual(['"right_arm_fast"']);
+    expect(matches(`${declaration}\nconst ROLES = ["batter", "bowler"];`, QUOTED_ROLE)).toEqual([
+      '"batter"',
+      '"bowler"',
+    ]);
+    const actual = code(readFileSync(resolve(REPO, SCORING_TYPES), "utf8"));
+    expect(actual.match(SCORING_HAND_DECLARATION)).not.toBeNull();
+    expect(sourceStyleOffences(SCORING_TYPES, actual)).toEqual([]);
   });
 
   /*

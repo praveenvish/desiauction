@@ -1762,6 +1762,154 @@ const FIXTURE_CHANGED: EmailTemplateSpec = {
   },
 };
 
+function matchNoticeTemplate(
+  kind: "match.result" | "match.award" | "match.confirm_request",
+): EmailTemplateSpec {
+  const award = kind === "match.award";
+  const confirm = kind === "match.confirm_request";
+  return {
+    locked: [],
+    kind,
+    format: "layout",
+    editable: true,
+    editableFields: LAYOUT_FIELDS,
+    languages: ["en", "hi"],
+    variants: DEFAULT_VARIANT,
+    variables: [],
+    actions: [{ id: "match", description: "The authenticated recipient's match resolver." }],
+    defaults: {
+      en: one(
+        layout({
+          subject: confirm
+            ? "Please confirm the match result"
+            : award
+              ? "You received a match award"
+              : "Your match result is ready",
+          preheader: "Open your match to see the result and awards.",
+          heading: confirm
+            ? "Please confirm the match result"
+            : award
+              ? "You received a match award"
+              : "Your match result is ready",
+          paragraphs: [
+            confirm
+              ? "The opposing team recorded this match. Sign in to check the result and confirm it or report a discrepancy."
+              : award
+                ? "You were selected for a match award. Open the match to see your award and points."
+                : "The result of your match has been published. Open the match to see the scorecard and awards.",
+          ],
+          actions: { match: "See the match" },
+          footnote: confirm
+            ? "You received this because you manage the opposing team. The confirmation link expires after seven days."
+            : "You received this because you played in this match.",
+        }),
+      ),
+      hi: one(
+        layout({
+          subject: confirm
+            ? "कृपया मैच के परिणाम की पुष्टि करें"
+            : award
+              ? "आपको मैच पुरस्कार मिला है"
+              : "आपके मैच का परिणाम तैयार है",
+          preheader: "परिणाम और पुरस्कार देखने के लिए अपना मैच खोलें।",
+          heading: confirm
+            ? "कृपया मैच के परिणाम की पुष्टि करें"
+            : award
+              ? "आपको मैच पुरस्कार मिला है"
+              : "आपके मैच का परिणाम तैयार है",
+          paragraphs: [
+            confirm
+              ? "विरोधी टीम ने मैच दर्ज किया है। परिणाम जाँचने और पुष्टि करने या अंतर बताने के लिए साइन इन करें।"
+              : award
+                ? "आपको मैच पुरस्कार के लिए चुना गया है। अपना पुरस्कार और अंक देखने के लिए मैच खोलें।"
+                : "आपके मैच का परिणाम प्रकाशित हो गया है। स्कोरकार्ड और पुरस्कार देखने के लिए मैच खोलें।",
+          ],
+          actions: { match: "मैच देखें" },
+          footnote: confirm
+            ? "आप विरोधी टीम के प्रबंधक हैं। पुष्टि का लिंक सात दिनों के बाद समाप्त होगा।"
+            : "आपको यह संदेश इसलिए मिला है क्योंकि आपने इस मैच में भाग लिया था।",
+        }),
+      ),
+    },
+  };
+}
+
+const PLAYER_CLAIM_INVITE: EmailTemplateSpec = {
+  locked: [],
+  kind: "player.claim_invite",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: DEFAULT_VARIANT,
+  variables: [],
+  actions: [{ id: "career", description: "The recipient’s authenticated career." }],
+  defaults: {
+    en: one(
+      layout({
+        subject: "Your match stats are ready",
+        preheader: "Sign in with your mobile number to see your match stats.",
+        heading: "Keep your match stats",
+        paragraphs: [
+          "Your club linked the guest registration you played under to your mobile number. Sign in to see your recorded performances. The match records stay unchanged.",
+        ],
+        actions: { career: "See my stats" },
+        footnote:
+          "You received this because a scorer or organizer added your real mobile number to a guest registration.",
+      }),
+    ),
+    hi: one(
+      layout({
+        subject: "आपके मैच के आँकड़े तैयार हैं",
+        preheader: "मैच के आँकड़े देखने के लिए अपने मोबाइल नंबर से साइन इन करें।",
+        heading: "अपने मैच के आँकड़े देखें",
+        paragraphs: [
+          "आपके क्लब ने आपके अतिथि पंजीकरण को आपके मोबाइल नंबर से जोड़ा है। दर्ज प्रदर्शन देखने के लिए साइन इन करें। मैच के रिकॉर्ड नहीं बदलते।",
+        ],
+        actions: { career: "मेरे आँकड़े देखें" },
+        footnote:
+          "स्कोरर या आयोजक ने आपके अतिथि पंजीकरण में वास्तविक मोबाइल नंबर जोड़ा है, इसलिए आपको यह संदेश मिला है।",
+      }),
+    ),
+  },
+};
+
+const TOSS_REMINDER: EmailTemplateSpec = {
+  locked: [],
+  kind: "match.toss_reminder",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: DEFAULT_VARIANT,
+  variables: [],
+  actions: [{ id: "match", description: "The gated live match page." }],
+  defaults: {
+    en: one(
+      layout({
+        subject: "The toss has happened",
+        preheader: "Your requested toss reminder.",
+        heading: "The toss has happened",
+        paragraphs: [
+          "You asked for a reminder when the toss happened. Open the match to follow the updates.",
+        ],
+        actions: { match: "Open match" },
+        footnote: "You requested this one-time toss reminder.",
+      }),
+    ),
+    hi: one(
+      layout({
+        subject: "टॉस हो गया है",
+        preheader: "आपका माँगा हुआ टॉस रिमाइंडर।",
+        heading: "टॉस हो गया है",
+        paragraphs: ["आपने टॉस होने पर रिमाइंडर माँगा था। अपडेट देखने के लिए मैच खोलें।"],
+        actions: { match: "मैच खोलें" },
+        footnote: "आपने यह एक बार का टॉस रिमाइंडर माँगा था।",
+      }),
+    ),
+  },
+};
+
 const MATCH_DAY: EmailTemplateSpec = {
   kind: "match.day",
   format: "layout",
@@ -3536,6 +3684,11 @@ export const EMAIL_TEMPLATES: Readonly<Record<EmailNotificationKind, EmailTempla
   "schedule.published": SCHEDULE_PUBLISHED,
   "fixture.changed": FIXTURE_CHANGED,
   "match.day": MATCH_DAY,
+  "match.toss_reminder": TOSS_REMINDER,
+  "match.result": matchNoticeTemplate("match.result"),
+  "match.confirm_request": matchNoticeTemplate("match.confirm_request"),
+  "player.claim_invite": PLAYER_CLAIM_INVITE,
+  "match.award": matchNoticeTemplate("match.award"),
   "season.champion": SEASON_CHAMPION,
   "finance.document.issued": FINANCE,
   "review.platform_ask": PLATFORM_ASK,

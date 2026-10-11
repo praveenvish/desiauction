@@ -82,7 +82,7 @@ export function isPosterSize(value: string): value is PosterSize {
  * money). `top` and `season` read the whole auction, which is why they are
  * organizer-only upstream: a rival owner may not publish another team's prices.
  */
-export const POSTER_KINDS = ["player", "team", "reveal", "top", "season"] as const;
+export const POSTER_KINDS = ["player", "team", "reveal", "top", "season", "result"] as const;
 export type PosterKind = (typeof POSTER_KINDS)[number];
 
 export function isPosterKind(value: string): value is PosterKind {
@@ -99,7 +99,71 @@ export const POSTER_KIND_SIZES: Record<PosterKind, readonly PosterSize[]> = {
   reveal: ["square", "portrait", "story"],
   top: ["square", "portrait", "story"],
   season: ["portrait", "story"],
+  result: ["square", "portrait", "story"],
 };
+
+export interface ResultPosterInput {
+  competitionName: string;
+  competitionLogoUrl: string | null;
+  fixtureNumber: string;
+  headline: string;
+  margin: string;
+  trustLabel: string;
+  teams: readonly { name: string; score: string; color: string | null }[];
+  playerOfMatch: {
+    name: string;
+    photoUrl: string | null;
+    figures: string;
+    shots: readonly { angle: number; runs: number }[];
+  } | null;
+}
+
+export interface ResultPoster {
+  competitionName: string;
+  competitionLogoUrl: string | null;
+  fixtureLabel: string;
+  headline: string;
+  margin: string;
+  trustLabel: string;
+  teams: { name: string; score: string; color: string | null }[];
+  playerOfMatch: {
+    name: string;
+    monogram: string;
+    photoUrl: string | null;
+    figures: string;
+    shots: { angle: number; runs: number }[];
+  } | null;
+}
+
+/** Sanitized identities and consent-gated images are supplied by the export gate. */
+export function buildResultPoster(input: ResultPosterInput): ResultPoster {
+  return {
+    competitionName: clamp(input.competitionName, 48),
+    competitionLogoUrl: input.competitionLogoUrl,
+    fixtureLabel: `MATCH ${clamp(input.fixtureNumber.replace(/^match\s+/i, ""), 16)}`,
+    headline: clamp(input.headline, 64),
+    margin: clamp(input.margin, 96),
+    trustLabel: clamp(input.trustLabel, 48),
+    teams: input.teams.map((team) => ({
+      name: clamp(team.name, 32),
+      score: clamp(team.score, 32),
+      color: normalizeHexColor(team.color),
+    })),
+    playerOfMatch: input.playerOfMatch
+      ? {
+          name: clamp(input.playerOfMatch.name, 32),
+          monogram: monogramOf(input.playerOfMatch.name),
+          photoUrl: input.playerOfMatch.photoUrl,
+          figures: clamp(input.playerOfMatch.figures, 96),
+          shots: input.playerOfMatch.shots
+            .filter(
+              (shot) => Number.isFinite(shot.angle) && Number.isFinite(shot.runs) && shot.runs > 0,
+            )
+            .map(({ angle, runs }) => ({ angle, runs })),
+        }
+      : null,
+  };
+}
 
 /** Top-N is a choice from three, not a free number: 7 rows has no layout. */
 export const TOP_BUY_COUNTS = [3, 5, 10] as const;

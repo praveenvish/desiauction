@@ -1,3 +1,4 @@
+import { ScoringSignOutForm } from "../../../components/scoring-sign-out-form";
 import Link from "next/link";
 import { formatAmount, formatPaiseINR, paise } from "@desiauction/core";
 import { Button, ButtonLink, Card } from "@desiauction/ui";
@@ -88,12 +89,12 @@ export default async function OwnerJoinPage({ params }: { params: Promise<{ toke
           </>
         )}
 
-        <form action={switchAccount} className="join-identity">
+        <ScoringSignOutForm logout={switchAccount} className="join-identity">
           <span>Signed in as {viewerLabel}. Not you?</span>{" "}
           <button type="submit" className="join-linkbutton" data-testid="owner-join-switch-account">
             Sign out
           </button>
-        </form>
+        </ScoringSignOutForm>
       </div>
     </main>
   );

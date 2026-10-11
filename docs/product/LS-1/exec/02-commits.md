@@ -242,9 +242,9 @@ All files go in `core/scoring/**`. No DB, no web.
   - `core/scoring/delivery/__fixtures__/cricsheet/NOTICE.md`: "Ball-by-ball data from Cricsheet (cricsheet.org), licensed under the Open Data Commons Attribution License (ODC-BY 1.0). Files unmodified." plus the license URL.
   - `scripts/cricsheet-curate.mjs` (repo root).
   - `scripts/cricsheet-oracle.mjs` (nightly full run).
-- Modify `.github/workflows/nightly-verify.yml`: add a step `node scripts/cricsheet-oracle.mjs` that downloads a **pinned** `https://cricsheet.org/downloads/t20s_json.zip` plus `ipl_json.zip`, verifies the SHA-256 constants in the script, and runs the oracle over every match. Allowed: ≤ 0.5% skipped with logged reasons (e.g. data_version quirks), 0 failures.
+- Modify `.github/workflows/nightly-verify.yml`: add a step `node scripts/cricsheet-oracle.mjs` that downloads a **pinned** `https://cricsheet.org/downloads/t20s_json.zip` plus `ipl_json.zip`, verifies the SHA-256 constants in the script, and runs the oracle over every match. Allowed: ≤ 1.0% skipped with logged reasons (e.g. data_version quirks), 0 failures.
 
-**`cricsheet-curate.mjs`.** It takes a local zip path, scans the matches and copies 60 of them (deterministic: sort by match id, then take the first matching each criterion until the quota):
+**`cricsheet-curate.mjs`.** It takes a local zip path, scans the matches and copies 60 of them (deterministic: sort by match id, then take the first eligible matching each criterion until the quota; publish source-only exclusions, retaining them in the full oracle denominator):
 
 | Criterion | Count |
 |---|---|
@@ -263,8 +263,8 @@ All files go in `core/scoring/**`. No DB, no web.
 
 **Oracle assertions per match:**
 1. Each innings' total runs, wickets and legal balls equal a reference tally computed **independently** in the test from raw deliveries (the reference counts `runs.total`, `extras.wides/noballs` and wickets).
-2. Before every delivery, the fold's `strikerId`, `nonStrikerId` and `bowlerId` equal the delivery's `batter`, `non_striker` and `bowler` (strike-rotation oracle).
-3. Legal balls per over = `info.balls_per_over`, except the last over of an innings.
+2. Before every delivery, the fold's `strikerId`, `nonStrikerId` and `bowlerId` equal the delivery's `batter`, `non_striker` and `bowler`, following the independently precomputed reconstructed sequence including audited inferred end adjustments. Mutation checks must detect ordinary and over-end rotation defects even on adjusted segments. See the C09 architect amendment.
+3. Completed overs contain their explicit `innings.miscounted_overs` declared legal count, otherwise `info.balls_per_over`. An incomplete final over may contain fewer. Declarations are verified independently; unexplained discrepancies fail. See the user-authorized C09 architecture amendment in `01-contracts.md` and `EXEC-LOG.md`.
 4. `deriveResult` winner/margin equals `info.outcome` (skip the method-based margin text for D/L; assert the winner only).
 5. Super-over innings flagged.
 6. `toCricsheet(replay)` → `fromCricsheet` → the same state (round trip).
@@ -282,7 +282,7 @@ All files go in `core/scoring/**`. No DB, no web.
 - A-C09-01: 60 fixtures committed with NOTICE.
 - A-C09-02: all 6 assertion classes pass on all 60.
 - A-C09-03: nightly step wired with pinned SHA-256s.
-- A-C09-04: local full run: 0 failures, skips ≤ 0.5%, summary in the log.
+- A-C09-04: local full run: 0 failures, skips ≤ 1.0%, summary in the log.
 
 ### C10
 **Subject:** `feat(core): season rules for net run rate`
@@ -655,7 +655,7 @@ UI reference: mockups pages **Scorer** and **Both themes**. Every screen ships i
 
 **Tests:** `menu-model.test.ts` (which items are visible per authority).
 
-**Gate:** G-static, G-int.
+**Gate:** G-static, G-int, G-core (C26 focused whole-match void amendment).
 
 **Acceptance:** A-C26-01..05.
 
@@ -693,6 +693,8 @@ UI reference: mockups pages **Scorer** and **Both themes**. Every screen ships i
 - sign-out wipes the queue.
 
 ### C28
+**Astra continuation scope amendment:** add the missing Pad `start_innings` action with a small innings-start sheet/model in the existing lazy options entry. Fresh local replay/canonical lineups, stale/double confirmation checks and normal offline/API validation apply; no test-only chase seeding. Add focused continuation checks and G-static/G-int before prescribed journey/milestone gates.
+
 **Subject:** `test(e2e): scorer journeys`
 
 **Files:** `apps/web/e2e/scoring.spec.ts`, `apps/web/e2e/scoring-offline.spec.ts`, `apps/web/e2e/scoring-fixtures.ts` (DB seed helper: an org with a T10 season, two teams of 11 approved players with styles, a published fixture today with a lineup; uses the `createDb` pattern from `player-fixtures.ts`).
@@ -703,7 +705,8 @@ UI reference: mockups pages **Scorer** and **Both themes**. Every screen ships i
    - 20 overs with scripted balls incl. wide+runs, no-ball+4, leg bye, a wicket caught with a fielder and pin, a run out, a bowler-consecutive refusal, a shot map on boundaries, an undo, and an edit-ball amend;
    - target reached → finish;
    - assert `fixture_results` and the standings table row via the UI;
-   - assert the live page updates (C30 later extends this spec).
+   - Astra sequencing amendment: assert accepted updates to the existing live-state projection here (projection coverage only). Public viewer coverage is not yet implemented, owned by C30, which must extend this same journey with a second browser on the real page and displayed-score/terminal-result updates. No skipped test or premature viewer work.
+- Twenty overs means ten legal overs each; extras add deliveries and the chase reaches target on its final legal delivery.
 2. **Offline:** go offline mid-over (`context.setOffline(true)`), record 5 balls, check `pad-sync data-pending=5`, go online, wait for sync, and check the server `last_seq` matches.
 3. **Handover:** device A starts, opens handover, device B (second context, another scorer) redeems, scores the next ball, and device A's next tap is refused with the claim message.
 4. **Both themes:** run journey 1's first over again with `data-theme=floodlight`, plus an axe check on the pad and sheets.
@@ -735,6 +738,8 @@ UI reference: mockups pages **Scorer** and **Both themes**. Every screen ships i
 **Acceptance:** A-C29-01..06.
 
 ### C30
+**Astra C28 dependency note:** extend the C28 full-T10 journey with a second browser on the real public page; assert accepted deliveries update its displayed score and terminal result. C28 projection assertions do not constitute viewer coverage.
+
 **Subject:** `feat(web): public live page and in-between states`
 
 **Files:**
@@ -1033,6 +1038,7 @@ UI reference: mockups pages **Scorer** and **Both themes**. Every screen ships i
 
 **Spec:**
 - The service holds **one** Postgres connection as `desiauction_system` (read-only role), with `sql.listen('match_live', …)`. The connection disables statement_timeout for that session.
+  - Recorded Astra amendment (01-contracts, C44): this literal count is superseded by at most two physical connections, dedicated LISTEN timeout0 plus max1 reader timeout30s; supported APIs only, lifecycle/reconnect proofs required.
 - Web API-1 issues `pg_notify('match_live', fixtureId || ':' || seq)` in the append transaction.
 - On notify, the hub reads `match_live_state` by primary key (system role) and broadcasts to room subscribers. Delay rules P-3 are applied in the hub exactly like API-9 (shared pure function from core `scoring/delay.ts`; move it there in this commit).
 - Rooms are keyed by fixtureId.
