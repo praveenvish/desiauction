@@ -1,3 +1,4 @@
+import { START_CLUB_LOGIN } from "../../../lib/start-intent";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -81,7 +82,7 @@ export default async function PickTimePage({
           <p className="prose-p">
             We have your request and we&apos;ll come back to you within a working day with times
             that work. In the meantime you can{" "}
-            <Link href="/login" className="prose-link">
+            <Link href={START_CLUB_LOGIN} className="prose-link">
               start your auction
             </Link>{" "}
             — it&apos;s free during beta, and you don&apos;t need us to begin.

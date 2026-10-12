@@ -42,7 +42,7 @@ export function ToolShell({ page, children }: { page: ToolPage; children: ReactN
         size="compact"
         eyebrow={
           <Link href="/tools" className="sport-crumb">
-            Free tools · {page.name}
+            Back to free tools
           </Link>
         }
         title={page.headline}

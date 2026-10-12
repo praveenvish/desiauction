@@ -228,7 +228,7 @@ export default defineConfig({
         NODE_OPTIONS: "--max-old-space-size=8192",
         // Its OWN build directory: sharing .next with a developer's server on
         // :3000 corrupts the webpack pack cache for both.
-        NEXT_DIST_DIR: ".next-e2e",
+        NEXT_DIST_DIR: process.env["NEXT_DIST_DIR"] ?? ".next-e2e",
         // Codes to the dev inbox, never to a real mailbox. A developer whose
         // .env.local carries live Resend credentials would otherwise have the
         // suite send actual email to test addresses on every run — and the

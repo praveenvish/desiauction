@@ -1,8 +1,8 @@
 "use client";
 
-import { scoringSignOut } from "../../lib/scoring-sign-out";
+import { SignOutDialog } from "../../components/sign-out-dialog";
 import { Button, Field, IconTile, IconUser } from "@desiauction/ui";
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 import { personContact } from "../../lib/person-label";
 import { track } from "../../lib/telemetry";
@@ -27,6 +27,7 @@ export function OnboardingPanel({
   email: string | null;
   next: string;
 }) {
+  const [signOutOpen, setSignOutOpen] = useState(false);
   const [state, formAction, pending] = useActionState(updateProfileAction, {});
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -90,12 +91,21 @@ export function OnboardingPanel({
             type="button"
             className="onboarding-signout"
             data-testid="onboarding-signout"
-            onClick={() => void scoringSignOut(logoutAction)}
+            onClick={() => {
+              setSignOutOpen(true);
+            }}
           >
             Not you? Sign out
           </button>
         </p>
       </form>
+      <SignOutDialog
+        open={signOutOpen}
+        onClose={() => {
+          setSignOutOpen(false);
+        }}
+        logout={logoutAction}
+      />
     </>
   );
 }

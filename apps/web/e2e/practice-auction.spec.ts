@@ -177,6 +177,8 @@ test("a practice runs in the season's own room, touches nothing, and hands over 
     COLD,
   );
   await organizer.getByTestId("cockpit-open-auction").click();
+  await expect(organizer.getByTestId("cockpit-open-auction")).toHaveCount(0, COLD);
+  await expect(organizer.getByTestId("auction-command-recovery")).toHaveCount(0, COLD);
   await organizer.goto(`/seasons/${slug}/auction/live`);
   await inRoom(organizer);
   await expect(organizer.getByTestId("connection-state")).toHaveText("Connected", {
@@ -204,6 +206,7 @@ test("a practice runs in the season's own room, touches nothing, and hands over 
   await organizer.waitForTimeout(900);
   await organizer.mouse.up();
   await expect(organizer.getByTestId("ceremony")).toBeVisible({ timeout: 20_000 });
+  await expect(organizer.getByTestId("auction-command-recovery")).toHaveCount(0, COLD);
 
   // --- Nothing reached the season: no squad, no sale -------------------------
   await organizer.goto(`${seasonUrl}/teams`);
@@ -221,7 +224,7 @@ test("a practice runs in the season's own room, touches nothing, and hands over 
   await hydrated(organizer);
   await card.getByTestId("practice-again").click();
   await organizer.getByTestId("confirm-practice-again").click();
-  await expect(organizer.getByText("A fresh practice is ready")).toBeVisible(COLD);
+  await expect(organizer.getByText("A new practice is ready.", { exact: true })).toBeVisible(COLD);
   for (const { team } of owners) {
     await expect(teamList.locator("li", { hasText: team })).toContainText("Not bidding yet");
   }

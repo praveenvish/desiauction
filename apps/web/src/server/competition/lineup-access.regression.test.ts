@@ -13,6 +13,7 @@ import {
   orgMembers,
   paddles,
   people,
+  teamManagers,
   type DbHandle,
 } from "@desiauction/db";
 import { inArray } from "drizzle-orm";
@@ -148,6 +149,21 @@ describe("mayPickLineup", () => {
   it("grants nothing for a released paddle or a revoked invite", async () => {
     expect(await may(person.released, teamB)).toBe(false);
     expect(await may(person.revoked, teamA)).toBe(false);
+  });
+
+  it("a current captain/manager assignment alone grants no lineup write", async () => {
+    await db.insert(teamManagers).values({
+      id: newId(),
+      orgId,
+      competitionId: comp.id,
+      teamId: teamA,
+      personId: person.member,
+      role: "captain",
+      source: "organizer",
+      createdBy: person.organizer,
+    });
+    expect(await may(person.member, teamA)).toBe(false);
+    expect(await may(person.member, teamB)).toBe(false);
   });
 
   it("refuses a club member who owns no team", async () => {

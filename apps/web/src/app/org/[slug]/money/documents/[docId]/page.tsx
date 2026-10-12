@@ -1,3 +1,4 @@
+import { financeRegisterReturn } from "../../../../../../lib/finance-navigation";
 import { ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
@@ -19,10 +20,12 @@ export const metadata = { title: "Document" };
  */
 export default async function DocumentPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string; docId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { slug, docId } = await params;
+  const [{ slug, docId }, selections] = await Promise.all([params, searchParams]);
   const workspace = await documentWorkspace(slug, docId);
   if (workspace === null) {
     notFound();
@@ -36,7 +39,11 @@ export default async function DocumentPage({
               What it says, what it was made from, and everywhere it went
             </p>
           </header>
-          <DocumentPanel slug={slug} workspace={workspace} />
+          <DocumentPanel
+            slug={slug}
+            workspace={workspace}
+            returnHref={financeRegisterReturn(slug, selections["register"])}
+          />
         </div>
       </main>
     </ToastProvider>

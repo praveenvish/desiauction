@@ -162,8 +162,10 @@ export default async function PlayerProfilePage({
   // whether the card works.
   const refSuffix = typeof ref === "string" && ref !== "" ? `?ref=${encodeURIComponent(ref)}` : "";
   // The words that travel with the link — the same sentence the card draws.
-  const cricketCareer = await publicCricketCareer(slug, number);
-  const poster = await posterView(slug, number);
+  const [cricketCareer, poster] = await Promise.all([
+    publicCricketCareer(slug, number),
+    posterView(slug, number),
+  ]);
   const shareModel =
     poster === null
       ? null
@@ -341,7 +343,9 @@ export default async function PlayerProfilePage({
       <PageBody>
         {cricketCareer ? (
           <>
-            <Link href={`/c/${slug}/p/${number}/insights`}>Player insights</Link>
+            <ButtonLink href={`/c/${slug}/p/${number}/insights`} variant="secondary">
+              Explore cricket insights
+            </ButtonLink>
             <CricketCareerSection career={cricketCareer} />
           </>
         ) : null}

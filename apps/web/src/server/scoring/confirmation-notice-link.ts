@@ -6,7 +6,12 @@ import { confirmationNoticeAddress } from "./confirmation-notice-state";
 import { confirmationToken } from "./confirmation-token";
 import { confirmationContext } from "./confirmation";
 
-export async function resolveConfirmationNoticeLink(
+export async function withConfirmationNoticeContext<T>(
+  run: (
+    db: import("@desiauction/db").Db,
+    context: NonNullable<Awaited<ReturnType<typeof confirmationContext>>>,
+    token: string,
+  ) => Promise<T>,
   personId: string,
   raw: unknown,
   boundaries: ReminderBoundaries = reminderBoundaries,
@@ -39,6 +44,22 @@ export async function resolveConfirmationNoticeLink(
   if (!owned) return null;
   return boundaries.inOrg(personId, owned.orgId, async (db) => {
     const token = confirmationToken(owned.address, owned.issuedAt);
-    return (await confirmationContext(db, personId, token, now)) ? `/match/confirm/${token}` : null;
+    const context = await confirmationContext(db, personId, token, now);
+    return context ? run(db, context, token) : null;
   });
+}
+
+export async function resolveConfirmationNoticeLink(
+  personId: string,
+  raw: unknown,
+  boundaries: ReminderBoundaries = reminderBoundaries,
+  now = new Date(),
+) {
+  return withConfirmationNoticeContext(
+    (_db, _context, token) => Promise.resolve(`/match/confirm/${token}`),
+    personId,
+    raw,
+    boundaries,
+    now,
+  );
 }

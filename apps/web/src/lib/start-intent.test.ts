@@ -34,3 +34,24 @@ describe("registration intent", () => {
     expect(isRegisterNext(undefined)).toBe(false);
   });
 });
+
+describe("bounded Home intent", () => {
+  it("retains combined and season-only intents after redirect validation", async () => {
+    const { homeIntentFromNext } = await import("./start-intent");
+    expect(homeIntentFromNext(safeNext("/home?season=s1&start=club"))).toBe(
+      "/home?start=club&season=s1",
+    );
+    expect(homeIntentFromNext(safeNext("/home?season=s1"))).toBe("/home?season=s1");
+    expect(isStartClub("/home?start=club&season=s1")).toBe(true);
+  });
+  it("ignores repeated and unsupported parameters without claiming other routes", async () => {
+    const { homeIntentFromNext, homeIntentPath } = await import("./start-intent");
+    expect(homeIntentFromNext("/home?start=club&start=club&season=a&season=b&role=admin")).toBe(
+      "/home",
+    );
+    expect(homeIntentPath({ start: ["club"], season: ["a", "b"] })).toBe("/home");
+    expect(homeIntentFromNext("/home-other?start=club")).toBeNull();
+    expect(homeIntentFromNext("/join/token?start=club")).toBeNull();
+    expect(homeIntentFromNext(safeNext("//evil.example/home?start=club"))).toBe("/home");
+  });
+});

@@ -4,6 +4,7 @@ import { formatPaiseINR, paise } from "@desiauction/core";
 import {
   Badge,
   Button,
+  ButtonLink,
   Card,
   EmptyState,
   useToast,
@@ -19,6 +20,7 @@ import {
   type DocumentWorkspace,
   type FinopsResult,
 } from "../../../../../../server/financial-operations/actions";
+import { financeDocumentHref } from "../../../../../../lib/finance-navigation";
 import { CorrectionForm } from "./correction-form";
 import { DOC_KIND_LABEL } from "../../../../../../server/financial-operations/register";
 import { DELIVERY_LANE_LABEL } from "../../../../../../server/financial-operations/deliveries";
@@ -72,7 +74,15 @@ function when(atMs: number): string {
   return formatDateTime(atMs);
 }
 
-export function DocumentPanel({ slug, workspace }: { slug: string; workspace: DocumentWorkspace }) {
+export function DocumentPanel({
+  slug,
+  workspace,
+  returnHref,
+}: {
+  slug: string;
+  workspace: DocumentWorkspace;
+  returnHref: string;
+}) {
   const router = useRouter();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
@@ -97,6 +107,14 @@ export function DocumentPanel({ slug, workspace }: { slug: string; workspace: Do
 
   return (
     <div data-testid="document-panel" data-hydrated={hydrated ? "true" : "false"}>
+      <ButtonLink
+        href={returnHref}
+        variant="secondary"
+        size="touch"
+        data-testid="back-to-documents"
+      >
+        Back to documents
+      </ButtonLink>
       {/* --- The transaction --------------------------------------------------- */}
       <Card>
         <div className="competition-title-row">
@@ -117,7 +135,15 @@ export function DocumentPanel({ slug, workspace }: { slug: string; workspace: Do
         {document.corrects === null ? null : (
           <p className="section-note" data-testid="corrects">
             This corrects{" "}
-            <Link href={`/org/${slug}/money/documents/${document.corrects}`}>another document</Link>
+            <Link
+              href={financeDocumentHref(
+                slug,
+                document.corrects,
+                new URLSearchParams(returnHref.split("?")[1] ?? ""),
+              )}
+            >
+              another document
+            </Link>
             . The original is never altered.
           </p>
         )}

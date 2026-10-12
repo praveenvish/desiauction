@@ -38,13 +38,10 @@ import {
   closeCaseAction,
   computeObligationsAction,
   openCaseAction,
-  recordPaymentAction,
-  refundPaymentAction,
   reopenCaseAction,
   settleCaseAction,
   verifyCaseAction,
   voidCaseAction,
-  waiveObligationAction,
   type ActionResult,
   type ConsoleTeam,
   type ConsoleView,
@@ -59,6 +56,13 @@ import "./money.css";
 import "./season-money.css";
 import { useHydrated } from "../../../../lib/use-hydrated";
 import { release } from "../../../../lib/release";
+import {
+  FinancialRecovery,
+  focusFinancialRecovery,
+  useFinancialWork,
+  type FinancialAct,
+  type FinancialWork,
+} from "./financial-work";
 
 /**
  * PX-7 E1 — the Settlement console.
@@ -247,6 +251,32 @@ export function MoneyPanel({ slug, console: view }: { slug: string; console: Con
   const { outcome, report, ref: outcomeRef } = useOutcomeFocus();
   // A click before hydration is a no-op; the surface says when it is live.
   const hydrated = useHydrated();
+  const finance = useFinancialWork(
+    slug,
+    view.case
+      ? {
+          actorId: view.viewer.personId,
+          orgId: view.competition.orgId,
+          caseId: view.case.caseId,
+        }
+      : null,
+  );
+  const financialAct: FinancialAct = async (draft, done) => {
+    const result = await finance.run(draft);
+    if (!result) return false;
+    if (result.outcome === "accepted") {
+      toast({ title: done, tone: "success" });
+      report(done, true);
+      return true;
+    }
+    const message =
+      result.outcome === "unknown"
+        ? "Outcome unconfirmed. Your original action is saved for review."
+        : result.message;
+    announce(message, "assertive");
+    report(message, false);
+    return false;
+  };
 
   /**
    * One command runner: every action reports, then re-reads the server truth.
@@ -326,19 +356,32 @@ export function MoneyPanel({ slug, console: view }: { slug: string; console: Con
         readiness={readiness}
         viewer={viewer}
         competitionName={competition.name}
-        busy={busy}
+        finance={finance}
+        busy={busy || finance.busy}
         act={act}
       />
 
       {outcomeNote}
 
+      <FinancialRecovery
+        work={finance}
+        names={
+          new Map([
+            ...teams.map((team) => [team.id, team.name] as const),
+            ...settlementCase.payments.map(
+              (payment) => [payment.paymentId, payment.teamName] as const,
+            ),
+          ])
+        }
+      />
+
       <Teams
-        slug={slug}
         settlementCase={settlementCase}
         teams={byId}
         viewer={viewer}
-        busy={busy}
-        act={act}
+        busy={busy || finance.busy}
+        finance={finance}
+        financialAct={financialAct}
       />
 
       {/* Always rendered once there is a case: "no payments yet" is a fact worth
@@ -349,8 +392,10 @@ export function MoneyPanel({ slug, console: view }: { slug: string; console: Con
         teams={byId}
         canCollect={viewer.canCollect}
         canOverride={viewer.canOverride}
-        busy={busy}
+        busy={busy || finance.busy}
         act={act}
+        finance={finance}
+        financialAct={financialAct}
       />
     </div>
   );
@@ -496,6 +541,7 @@ function CaseHero({
   readiness,
   viewer,
   competitionName,
+  finance,
   busy,
   act,
 }: {
@@ -504,6 +550,7 @@ function CaseHero({
   readiness: { ready: boolean; status: string; blockers: readonly string[] } | null;
   viewer: ConsoleView["viewer"];
   competitionName: string;
+  finance: FinancialWork;
   busy: boolean;
   act: Act;
 }) {
@@ -560,6 +607,13 @@ function CaseHero({
         <p className="mn-say" data-tone={financial.outstanding > 0 ? "owed" : "clear"}>
           {say}
         </p>
+        {financial.reinstated > 0 ? (
+          <p className="section-note" data-testid="refund-reinstatement-note">
+            Collected tracks amounts applied to dues. Refunds restore dues separately rather than
+            subtracting from this collection history. {ledgerINR(financial.reinstated)} in dues has
+            been restored after refunds; outstanding shows what remains.
+          </p>
+        ) : null}
         {total > 0 ? (
           <Bar share={accounted} tone={financial.outstanding > 0 ? "gold" : "green"} />
         ) : null}
@@ -608,6 +662,7 @@ function CaseHero({
         settlementCase={settlementCase}
         readiness={readiness}
         viewer={viewer}
+        finance={finance}
         busy={busy}
         act={act}
       />
@@ -660,6 +715,7 @@ function NextStep({
   settlementCase,
   readiness,
   viewer,
+  finance,
   busy,
   act,
 }: {
@@ -667,6 +723,7 @@ function NextStep({
   settlementCase: CaseView;
   readiness: { ready: boolean; status: string; blockers: readonly string[] } | null;
   viewer: ConsoleView["viewer"];
+  finance: FinancialWork;
   busy: boolean;
   act: Act;
 }) {
@@ -680,6 +737,26 @@ function NextStep({
    */
   const [confirming, setConfirming] = useState<"settle" | "close" | null>(null);
   const caseId = settlementCase.caseId;
+
+  if (finance.requiresReview) {
+    return (
+      <Next tone="amber" icon={<IconAlert size={18} />} title="Review your saved financial action">
+        <p className="section-note">
+          A saved payment, refund or waiver needs review before you start another one. Check its
+          original details and exact recorded outcome below; the case figures still come from the
+          books.
+        </p>
+        <Button
+          size="touch"
+          onClick={focusFinancialRecovery}
+          disabled={finance.busy}
+          data-testid="goto-financial-review"
+        >
+          Review saved work
+        </Button>
+      </Next>
+    );
+  }
 
   if (settlementCase.status === "opened") {
     return (
@@ -1171,27 +1248,23 @@ function CaseMenu({
 // --- Teams --------------------------------------------------------------------------
 
 function Teams({
-  slug,
   settlementCase,
   teams,
   viewer,
   busy,
-  act,
+  finance,
+  financialAct,
 }: {
-  slug: string;
   settlementCase: CaseView;
   teams: ReadonlyMap<string, ConsoleTeam>;
   viewer: ConsoleView["viewer"];
   busy: boolean;
-  act: Act;
+  finance: FinancialWork;
+  financialAct: FinancialAct;
 }) {
   const [waiving, setWaiving] = useState<ObligationView | null>(null);
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
-  // PRR P1-2: one stable key per waive intent, re-minted each time the dialog
-  // opens, so a timeout-then-retry dedupes server-side but a genuine second
-  // waiver of the same amount is a new intent.
-  const [intentKey, setIntentKey] = useState(() => crypto.randomUUID());
   // The payment form's team, lifted here so a card's "Record payment" can pick it.
   const [payTeam, setPayTeam] = useState("");
   const payAmountRef = useRef<HTMLDivElement>(null);
@@ -1281,6 +1354,10 @@ function Teams({
                     disabled={busy}
                     aria-label={`Record a payment from ${obligation.teamName}`}
                     onClick={() => {
+                      if (finance.requiresReview) {
+                        focusFinancialRecovery();
+                        return;
+                      }
                       setPayTeam(obligation.teamId);
                       payAmountRef.current?.querySelector("input")?.focus();
                       payAmountRef.current?.scrollIntoView({ block: "center" });
@@ -1298,9 +1375,16 @@ function Teams({
                     disabled={busy || clear}
                     onClick={() => {
                       setWaiving(obligation);
-                      setAmount("");
-                      setReason("");
-                      setIntentKey(crypto.randomUUID());
+                      const saved = finance.newWork
+                        ? undefined
+                        : finance.records.findLast(
+                            (record) =>
+                              record.outcome === "unknown" &&
+                              record.intent.kind === "waiver" &&
+                              record.intent.targetId === obligation.teamId,
+                          );
+                      setAmount(saved?.intent.amount ?? "");
+                      setReason(saved?.intent.reason ?? "");
                     }}
                     data-testid={`waive-${obligation.teamId}`}
                   >
@@ -1315,13 +1399,13 @@ function Teams({
 
       {canCollect ? (
         <Collect
-          slug={slug}
           settlementCase={settlementCase}
           teamId={payTeam}
           setTeamId={setPayTeam}
           amountRef={payAmountRef}
           busy={busy}
-          act={act}
+          finance={finance}
+          financialAct={financialAct}
         />
       ) : null}
 
@@ -1344,19 +1428,11 @@ function Teams({
               </Button>
               <Button
                 variant="danger"
-                disabled={busy || amount.trim() === "" || reason.trim() === ""}
+                disabled={busy || finance.locked || amount.trim() === "" || reason.trim() === ""}
                 onClick={() => {
                   const target = waiving;
-                  void act(
-                    () =>
-                      waiveObligationAction(
-                        slug,
-                        settlementCase.caseId,
-                        target.teamId,
-                        amount,
-                        reason,
-                        intentKey,
-                      ),
+                  void financialAct(
+                    { kind: "waiver", targetId: target.teamId, amount, method: "", reason },
                     "Waived. The books were updated.",
                   ).then((ok) => {
                     if (ok) {
@@ -1376,6 +1452,23 @@ function Teams({
             you give, it posts to the books, and it cannot be undone — only reopened. They still owe{" "}
             {ledgerINR(waiving.outstanding)}.
           </p>
+          {finance.requiresReview ? (
+            <div>
+              <p role="status">
+                The original outcome is unconfirmed. Its saved details are kept for review.
+              </p>
+              <Button
+                variant="secondary"
+                size="touch"
+                onClick={() => {
+                  setWaiving(null);
+                  focusFinancialRecovery();
+                }}
+              >
+                Review saved work
+              </Button>
+            </div>
+          ) : null}
           <Field
             label="Amount to waive (₹)"
             inputMode="decimal"
@@ -1384,6 +1477,7 @@ function Teams({
               setAmount(event.target.value);
             }}
             required
+            disabled={finance.requiresReview}
             data-testid="waive-amount"
           />
           <Field
@@ -1393,6 +1487,7 @@ function Teams({
               setReason(event.target.value);
             }}
             required
+            disabled={finance.requiresReview}
             data-testid="waive-reason"
           />
         </Dialog>
@@ -1404,36 +1499,31 @@ function Teams({
 // --- Collect ------------------------------------------------------------------------
 
 function Collect({
-  slug,
   settlementCase,
   teamId,
   setTeamId,
   amountRef,
   busy,
-  act,
+  finance,
+  financialAct,
 }: {
-  slug: string;
   settlementCase: CaseView;
   teamId: string;
   setTeamId: (teamId: string) => void;
   amountRef: RefObject<HTMLDivElement | null>;
   busy: boolean;
-  act: Act;
+  finance: FinancialWork;
+  financialAct: FinancialAct;
 }) {
   const owing = settlementCase.obligations.filter((obligation) => obligation.outstanding > 0);
   const [method, setMethod] = useState("manual:cash");
   const [amount, setAmount] = useState("");
-  /*
-   * THE INTENT KEY — one per payment the operator means to record.
-   *
-   * The server derives both the payment id and the command id from this key, so
-   * a double-click, a retried server action or a flaky network replays the SAME
-   * intent and the writer dedupes it instead of creating a second payment and a
-   * second gateway order. It is regenerated only AFTER a payment lands, which is
-   * what makes the next one genuinely new — recording two identical amounts for
-   * one team on purpose still works, because that is a fresh key.
-   */
-  const [intentKey, setIntentKey] = useState(() => crypto.randomUUID());
+  const saved = finance.newWork
+    ? undefined
+    : finance.records.findLast(
+        (record) => record.outcome === "unknown" && record.intent.kind === "payment",
+      );
+  const restored = finance.newWork ? undefined : saved;
 
   if (owing.length === 0) {
     return null;
@@ -1451,13 +1541,23 @@ function Collect({
       <div className="money-form mn-form">
         <Select
           label="Which team paid?"
-          value={teamId}
+          value={restored?.intent.targetId ?? teamId}
+          disabled={finance.locked}
           onChange={(event) => {
             setTeamId(event.target.value);
           }}
           data-testid="pay-team"
         >
           <option value="">Choose a team</option>
+          {restored &&
+          !owing.some((obligation) => obligation.teamId === restored.intent.targetId) ? (
+            <option value={restored.intent.targetId}>
+              {settlementCase.obligations.find(
+                (obligation) => obligation.teamId === restored.intent.targetId,
+              )?.teamName ?? "Original team"}{" "}
+              — original saved target
+            </option>
+          ) : null}
           {owing.map((obligation) => (
             <option key={obligation.teamId} value={obligation.teamId}>
               {obligation.teamName} — owes {ledgerINR(obligation.outstanding)}
@@ -1466,7 +1566,8 @@ function Collect({
         </Select>
         <Select
           label="How did it arrive?"
-          value={method}
+          value={restored?.intent.method ?? method}
+          disabled={finance.locked}
           onChange={(event) => {
             setMethod(event.target.value);
           }}
@@ -1482,7 +1583,8 @@ function Collect({
           <Field
             label="Amount (₹)"
             inputMode="decimal"
-            value={amount}
+            value={restored?.intent.amount ?? amount}
+            disabled={finance.locked}
             onChange={(event) => {
               setAmount(event.target.value);
             }}
@@ -1491,21 +1593,17 @@ function Collect({
         </div>
         <Button
           onClick={() => {
-            void act(
-              () =>
-                recordPaymentAction(slug, settlementCase.caseId, teamId, method, amount, intentKey),
+            void financialAct(
+              { kind: "payment", targetId: teamId, method, amount, reason: "" },
               "Payment recorded. Attest it once the money is in hand.",
             ).then((ok) => {
               if (ok) {
                 setAmount("");
                 setTeamId("");
-                // Only a payment that actually landed starts a new intent; a
-                // failed attempt keeps its key so retrying it stays idempotent.
-                setIntentKey(crypto.randomUUID());
               }
             });
           }}
-          disabled={busy || teamId === "" || amount.trim() === ""}
+          disabled={busy || finance.locked || teamId === "" || amount.trim() === ""}
           data-testid="record-payment"
           size="touch"
         >
@@ -1526,6 +1624,8 @@ function Payments({
   canOverride,
   busy,
   act,
+  finance,
+  financialAct,
 }: {
   slug: string;
   settlementCase: CaseView;
@@ -1534,13 +1634,12 @@ function Payments({
   canOverride: boolean;
   busy: boolean;
   act: Act;
+  finance: FinancialWork;
+  financialAct: FinancialAct;
 }) {
   const [refunding, setRefunding] = useState<PaymentView | null>(null);
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
-  // PRR P1-2: one stable key per refund intent, re-minted each time the dialog
-  // opens — a lost-answer retry dedupes, a deliberate second refund does not.
-  const [intentKey, setIntentKey] = useState(() => crypto.randomUUID());
 
   if (settlementCase.payments.length === 0) {
     return (
@@ -1577,9 +1676,16 @@ function Payments({
             act={act}
             onRefund={() => {
               setRefunding(payment);
-              setAmount("");
-              setReason("");
-              setIntentKey(crypto.randomUUID());
+              const saved = finance.newWork
+                ? undefined
+                : finance.records.findLast(
+                    (record) =>
+                      record.outcome === "unknown" &&
+                      record.intent.kind === "refund" &&
+                      record.intent.targetId === payment.paymentId,
+                  );
+              setAmount(saved?.intent.amount ?? "");
+              setReason(saved?.intent.reason ?? "");
             }}
           />
         ))}
@@ -1611,11 +1717,11 @@ function Payments({
               </Button>
               <Button
                 variant="danger"
-                disabled={busy || amount.trim() === "" || reason.trim() === ""}
+                disabled={busy || finance.locked || amount.trim() === "" || reason.trim() === ""}
                 onClick={() => {
                   const target = refunding;
-                  void act(
-                    () => refundPaymentAction(slug, target.paymentId, amount, reason, intentKey),
+                  void financialAct(
+                    { kind: "refund", targetId: target.paymentId, amount, method: "", reason },
                     "Refunded. The money was put back on what the team owes.",
                   ).then((ok) => {
                     if (ok) {
@@ -1639,6 +1745,23 @@ function Payments({
               : ""}
             .
           </p>
+          {finance.requiresReview ? (
+            <div>
+              <p role="status">
+                The original outcome is unconfirmed. Its saved details are kept for review.
+              </p>
+              <Button
+                variant="secondary"
+                size="touch"
+                onClick={() => {
+                  setRefunding(null);
+                  focusFinancialRecovery();
+                }}
+              >
+                Review saved work
+              </Button>
+            </div>
+          ) : null}
           <Field
             label="Amount to refund (₹)"
             inputMode="decimal"
@@ -1647,6 +1770,7 @@ function Payments({
               setAmount(event.target.value);
             }}
             required
+            disabled={finance.requiresReview}
             data-testid="refund-amount"
           />
           <Field
@@ -1656,6 +1780,7 @@ function Payments({
               setReason(event.target.value);
             }}
             required
+            disabled={finance.requiresReview}
             data-testid="refund-reason"
           />
         </Dialog>

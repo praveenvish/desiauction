@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@desiauction/ui";
 import type { MatchEvent } from "@desiauction/core/scoring";
 import type { RallyScoringSetup } from "../../../../server/scoring/home";
-import { bindScoringActor, scoringWrite } from "../../storage";
+import { bindScoringActor, scoringWrite, scoringWorkGuard } from "../../storage";
 import { scoringDevice } from "../queue";
 import { readHistory } from "../history";
 import { scoringEventId } from "./setup-model";
@@ -52,8 +52,9 @@ export function RallySetup({ setup, actorId }: { setup: RallyScoringSetup; actor
     setBusy(true);
     setError(null);
     try {
-      await bindScoringActor(actorId);
+      const check = scoringWorkGuard(await bindScoringActor(actorId));
       const deviceId = await scoringDevice();
+      check();
       // Future choices are device proposals, never canonical appearances.
       await scoringWrite([
         [
@@ -62,6 +63,7 @@ export function RallySetup({ setup, actorId }: { setup: RallyScoringSetup; actor
         ],
       ]);
       if (!pending.current) {
+        check();
         const result = await post(`/api/score/${setup.fixtureId}/start`, {
           deviceId,
           formatKey,
@@ -72,10 +74,12 @@ export function RallySetup({ setup, actorId }: { setup: RallyScoringSetup; actor
           })),
         });
         if (result.phase !== "not_started") {
+          check();
           router.push(`/score/${setup.fixtureId}`);
           return;
         }
         const history = await readHistory(setup.fixtureId);
+        check();
         const state = rallyEngine.replay(history.events);
         const payloads: { type: MatchEvent["type"]; payload: unknown }[] = [];
         if (!state.format)
@@ -124,9 +128,11 @@ export function RallySetup({ setup, actorId }: { setup: RallyScoringSetup; actor
         setLocked(true);
         pending.current = { deviceId, attempt: history.attempt, events };
       }
+      check();
       const response = await post(`/api/score/${setup.fixtureId}/events`, pending.current);
       const rejected = response.acks?.find((ack) => ack.status === "rejected");
       if (rejected) throw new Error(rejected.message ?? "Check the selected players.");
+      check();
       router.push(`/score/${setup.fixtureId}`);
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "Check match setup.");
@@ -135,7 +141,8 @@ export function RallySetup({ setup, actorId }: { setup: RallyScoringSetup; actor
     }
   }
   return (
-    <main className="score-setup rally-setup">
+    <main className="score-setup rally-setup family-setup">
+      <p className="score-cap">{setup.fixtureNumber} · Match setup</p>
       <h1>Set up {setup.teams.map((team) => team.name).join(" vs ")}</h1>
       <fieldset className="score-condition-group">
         <legend>Match format</legend>

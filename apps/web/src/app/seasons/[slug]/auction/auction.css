@@ -4098,3 +4098,59 @@ details.squad-team[open] .squad-team-caret {
   gap: var(--space-2);
   color: var(--text-primary);
 }
+
+/* Task identity stays compact above the room; operational status remains in
+   the existing shell strip and the bid/gavel action retains its own bar. */
+.auction-task-context {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+.auction-task-identity {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-3);
+  row-gap: var(--space-1);
+}
+.auction-task-identity strong {
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+.auction-task-identity span,
+.auction-task-context p {
+  margin: 0;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+.auction-recovery-card {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-inline-start: var(--space-1) solid var(--accent-line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+  overflow-wrap: anywhere;
+}
+.auction-recovery-card h2 {
+  margin: 0;
+  color: var(--text-heading);
+  font-family: var(--font-text);
+  font-size: var(--text-base-size);
+}
+.auction-recovery-card p {
+  margin: 0 0 var(--space-2);
+  color: var(--text-secondary);
+  max-width: 75ch;
+}
+.auction-recovery-card button {
+  min-height: 44px;
+  max-width: 100%;
+  white-space: normal;
+}

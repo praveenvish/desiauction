@@ -86,7 +86,19 @@ export default async function AwardsPage({
   return (
     <main className="season-awards">
       <p>Completed verified and confirmed matches. Super overs are excluded.</p>
-      <p>Whole-season award picks</p>
+      <Link
+        className="season-awards-return"
+        href={
+          view.canManage ? `/seasons/${encodeURIComponent(slug)}` : `/c/${encodeURIComponent(slug)}`
+        }
+      >
+        Back to season
+      </Link>
+      <h2>Whole-season award picks</h2>
+      <p>
+        These picks use the whole eligible season. Conditions below filter the leaderboard, not the
+        award winners.
+      </p>
       <section className="season-awards-cards" aria-label="Season award picks">
         {kinds.map(([kind, label]) => {
           const selected = view.selected.find(
@@ -107,7 +119,9 @@ export default async function AwardsPage({
             ? (view.names[registrationId] ?? "Player")
             : personId
               ? (view.scorerNames[personId] ?? "Scorer")
-              : "No pick yet";
+              : selected
+                ? "No winner selected"
+                : "No eligible automatic pick";
           const player = view.awardPlayers.find((row) => row.registrationId === registrationId);
           const scorer = view.scorers.find((row) => row.personId === personId);
           return (
@@ -231,7 +245,7 @@ export default async function AwardsPage({
                 <th scope="col">Player</th>
                 <th scope="col">Matches</th>
                 <th scope="col">{tab}</th>
-                <th scope="col">Per match</th>
+                <th scope="col">MVP points / match</th>
                 {tab === "Runs" && (
                   <>
                     <th scope="col">Innings</th>
@@ -354,6 +368,14 @@ function RaidAwards({
   return (
     <main className="season-awards">
       <h1>Kabaddi season awards</h1>
+      <Link
+        className="season-awards-return"
+        href={
+          view.canManage ? `/seasons/${encodeURIComponent(slug)}` : `/c/${encodeURIComponent(slug)}`
+        }
+      >
+        Back to season
+      </Link>
       <p>{view.matchCount} completed verified and confirmed matches.</p>
       <section className="season-awards-cards" aria-label="Season award picks">
         {(
@@ -371,7 +393,13 @@ function RaidAwards({
           return (
             <article className="season-award-card" key={kind}>
               <h2>{label}</h2>
-              <strong>{winner ? (view.names[winner] ?? "Player") : "No pick yet"}</strong>
+              <strong>
+                {winner
+                  ? (view.names[winner] ?? "Player")
+                  : override
+                    ? "No winner selected"
+                    : "No eligible automatic pick"}
+              </strong>
               {winner && <p>{view.teamNames[winner]}</p>}
               <p>{override ? "Organizer pick" : "Computed from eligible matches"}</p>
               {override && (

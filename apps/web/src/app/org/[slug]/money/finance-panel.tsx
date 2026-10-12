@@ -13,6 +13,7 @@ import {
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useFilterQuery } from "../../../../lib/use-filter-query";
+import { financeDocumentHref } from "../../../../lib/finance-navigation";
 import { ledgerINR } from "../../../../lib/inr";
 import { useMemo } from "react";
 
@@ -410,7 +411,11 @@ export function FinancePanel({ slug, workspace }: { slug: string; workspace: Fin
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <RegisterLine key={row.docId} slug={slug} row={row} />
+                  <RegisterLine
+                    key={row.docId}
+                    href={financeDocumentHref(slug, row.docId, params)}
+                    row={row}
+                  />
                 ))}
               </tbody>
             </table>
@@ -421,7 +426,7 @@ export function FinancePanel({ slug, workspace }: { slug: string; workspace: Fin
   );
 }
 
-function RegisterLine({ slug, row }: { slug: string; row: RegisterRow }) {
+function RegisterLine({ href, row }: { href: string; row: RegisterRow }) {
   return (
     <tr data-testid={`doc-${row.docId}`}>
       <td data-label="Number">
@@ -430,7 +435,7 @@ function RegisterLine({ slug, row }: { slug: string; row: RegisterRow }) {
             digit — which made this 5.0 × 15px: below the 24 × 24 floor of
             WCAG 2.2 SC 2.5.8, and the ONLY route into a document. axe stays
             silent on it because `target-size` is not in the wcag21aa tag set. */}
-        <Link className="doc-link" href={`/org/${slug}/money/documents/${row.docId}`}>
+        <Link className="doc-link" href={href}>
           {row.kind === "correction" ? "CN " : ""}
           {row.formatted}
         </Link>

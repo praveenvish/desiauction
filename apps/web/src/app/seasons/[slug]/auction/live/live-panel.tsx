@@ -21,7 +21,8 @@ import {
   type LiveAuctionView,
 } from "../../../../../server/auction/live-actions";
 import { CeremonyStage } from "../ceremony-stage";
-import { useIntentIds } from "../use-intent-ids";
+import { useAuctionCommands } from "../use-auction-commands";
+import { CommandRecovery } from "../command-recovery";
 import {
   AuctionSummaryCard,
   AuctionTimeline,
@@ -93,75 +94,34 @@ export function LivePanel({
    * is not a reason to take the gavel away from the auctioneer. The pending
    * key names the ONE control that is actually working.
    */
-  const [pending, setPending] = useState<string | null>(null);
   const [roomTab, setRoomTab] = useState("bids");
-  const intents = useIntentIds();
+  const commands = useAuctionCommands(
+    view.viewer.personId,
+    view.auctionId,
+    snapshot?.auctionId === view.auctionId ? version : null,
+    view.practice?.realAuctionId ?? view.auctionId,
+  );
   const hydrated = useHydrated();
 
-  /**
-   * THE ROUND TRIP CAN FAIL, AND IT USED TO FAIL SILENTLY FOREVER.
-   *
-   * `submitAuctionCommand` is defended at its far end: engine-client gives the
-   * engine two seconds and answers `engine_unreachable` rather than throwing.
-   * The near end — the browser's request to the server action itself — was not.
-   * A phone that loses signal in the hall, a server restart, a proxy hiccup:
-   * the promise REJECTS, and with `setPending(null)` sitting on the happy path
-   * it never ran. The control stayed disabled for the rest of the session and
-   * nothing was said. On the raise button, whose only disabled treatment is
-   * `opacity: .55`, that is a bidder tapping a dimmed rectangle and never
-   * learning whether their money moved.
-   *
-   * `finally` gives the control back no matter what, and the catch says the one
-   * thing the bidder needs to know: the bid did NOT land.
-   */
+  // Persist an actor/room-bound intent before dispatch; unknown outcomes require review.
   const send = useCallback(
     async (key: string, type: string, payload: Record<string, unknown>, done?: string) => {
-      setPending(key);
-      let ack;
-      try {
-        // Reuses this intent's id if a previous attempt ended without an answer,
-        // so the retry is de-duplicated by the engine instead of re-executed.
-        //
-        // THE PAYLOAD IS PART OF THE KEY, and leaving it out was the defect
-        // (audit PA-1 §6). `useIntentIds` has always supported payload-keyed
-        // slots and its comment explains precisely why they are needed — but
-        // both calls here passed the control name alone, so every bid shared
-        // one slot called "bid". After a lost answer that slot survives, and the
-        // next press — a different amount, or the NEXT LOT — arrived carrying
-        // the previous id. The engine, correctly, returned the cached ack for
-        // the earlier command. The bidder was told "accepted" for a bid that
-        // never landed, on a player they did not buy.
-        ack = await submitAuctionCommand(
-          slug,
-          intents.idFor(key, payload),
-          type,
-          payload,
-          view.auctionId,
-        );
-      } catch {
-        // DO NOT CLAIM THE COMMAND FAILED. A rejected promise means the ANSWER
-        // did not come back; it does not mean the request never arrived. The
-        // server action can reach the engine and have the reply lost on the way
-        // home, in which case the bid IS recorded. Telling a bidder "that didn't
-        // go through" there would invite them to bid against themselves.
-        //
-        // So the message states only what is known — the answer is missing — and
-        // points at the one thing that is authoritative: the bid feed, which is
-        // server truth streamed over the socket, not this optimistic client.
+      if (stale || offline) {
         toast({
-          title:
-            "Lost the connection before the auction answered — check the bid feed before bidding again.",
+          title: "Wait for the auction to reconnect before sending an action.",
           tone: "danger",
         });
         return false;
-      } finally {
-        setPending(null);
       }
-      // An ack — accepted OR refused — is a definitive answer, so this intent is
-      // over and the next press starts a new one. Settled by the same
-      // (control, payload) slot it was minted under, or the entry leaks and the
-      // slot is never reused for an identical retry.
-      intents.settle(key, payload);
+      const outcome = await commands.dispatch(key, type, payload, (id, immutable) =>
+        submitAuctionCommand(slug, id, type, immutable, view.auctionId),
+      );
+      if (commands.stopped) return false;
+      if (outcome.kind === "unknown" || outcome.kind === "not-started") {
+        toast({ title: outcome.message, tone: "danger" });
+        return false;
+      }
+      const ack = outcome.ack;
       if (ack.accepted) {
         if (done !== undefined) {
           toast({ title: done, tone: "success" });
@@ -175,9 +135,9 @@ export function LivePanel({
       }
       return false;
     },
-    [slug, toast, intents, router, view.auctionId],
+    [slug, toast, commands, router, view.auctionId, stale, offline],
   );
-  const bidBusy = pending === "bid";
+  const bidBusy = commands.blocked("PlaceBid", {});
 
   // DA-02: which of my paddles is bidding. A conductor running the night from
   // one laptop holds several; the room used to bind to the first one for ever.
@@ -221,45 +181,23 @@ export function LivePanel({
     const payload = shortSquads
       ? { overrideSquadMinimum: true, reason: overrideReason.trim() }
       : {};
-    let ack;
-    try {
-      // Same intent discipline as `send`: closing the night twice because the
-      // first answer was lost is exactly the mistake the engine can prevent, but
-      // only if the retry carries the id the first attempt used.
-      //
-      // KEYED ON THE PAYLOAD, for the reason the comment below the call already
-      // gives and this line used to defeat. Settling on any answer handles a
-      // refusal; it cannot handle a LOST one. With the payload omitted, an
-      // unanswered plain close left its slot occupied, and the conductor's next
-      // attempt — the one carrying the override — inherited that id and was
-      // handed the cached `squad_below_minimum` refusal. The override could
-      // never take effect and the night could not be closed from this panel.
-      ack = await submitAuctionCommand(
-        slug,
-        intents.idFor("complete", payload),
-        "CompleteAuction",
-        payload,
-        view.auctionId,
-      );
-    } catch {
-      // Same rule as `send` above: an unanswered request is not a failed one,
-      // and "the night is still open" would be a claim this code cannot make.
-      toast({
-        title:
-          "Lost the connection before the auction answered — reload to see whether the night closed.",
-        tone: "danger",
-      });
+    if (stale || offline) {
+      toast({ title: "Wait for the auction to reconnect before finishing.", tone: "danger" });
       return;
     }
-    /*
-     * An ack ends the intent — and here that matters twice over. A refusal for
-     * `squad_below_minimum` sends the conductor back into the dialog to record
-     * an override, and the command they then send carries a DIFFERENT payload.
-     * Reusing the id for it would hand back the cached refusal and the override
-     * could never take effect, so the slot is cleared on any answer, not just a
-     * successful one.
-     */
-    intents.settle("complete", payload);
+    const outcome = await commands.dispatch(
+      "complete",
+      "CompleteAuction",
+      payload,
+      (id, immutable) =>
+        submitAuctionCommand(slug, id, "CompleteAuction", immutable, view.auctionId),
+    );
+    if (commands.stopped) return;
+    if (outcome.kind === "unknown" || outcome.kind === "not-started") {
+      toast({ title: outcome.message, tone: "danger" });
+      return;
+    }
+    const ack = outcome.ack;
     if (ack.accepted) {
       setCompleteOpen(false);
       setShortSquads(false);
@@ -275,10 +213,7 @@ export function LivePanel({
   };
 
   const bid = async (amount: number) => {
-    // The button's `disabled` is the only thing that stopped a second tap, and
-    // it arrives a render late: `setPending` is asynchronous, so two taps inside
-    // one frame both got here. Guarding on the in-flight key closes that window
-    // in the click handler itself rather than relying on React having repainted.
+    // Runtime exclusion also closes the same-frame window before React repaints.
     if (bidBusy) {
       return;
     }
@@ -581,6 +516,16 @@ export function LivePanel({
       data-testid="live-panel"
       data-hydrated={hydrated ? "true" : "false"}
     >
+      <CommandRecovery
+        commands={commands}
+        slug={slug}
+        currentRoom={(minimum) =>
+          snapshot?.auctionId === view.auctionId &&
+          snapshot.version >= minimum &&
+          !stale &&
+          !offline
+        }
+      />
       <AuctionAnnouncer snapshot={snapshot} ceremony={ceremony} remainingMs={remainingMs} />
       {/* The ribbon rides in the Live shell's header, as it already did on
           /spectate. Two sticky bars used to sit at top: 0 and OVERLAP (measured
@@ -714,6 +659,7 @@ export function LivePanel({
                 rules={view.rules}
                 teams={view.teams}
                 myPaddleNumber={myPaddle?.paddleNumber ?? null}
+                bidScope={`${view.viewer.personId}:${view.auctionId}:${myPaddle?.paddleId ?? "none"}`}
                 squadSigned={mySquadSigned}
                 remainingMs={remainingMs}
                 lotDurationMs={lotDurationMs}
@@ -768,6 +714,7 @@ export function LivePanel({
                 rules={view.rules}
                 teams={view.teams}
                 myPaddleNumber={myPaddle?.paddleNumber ?? null}
+                bidScope={`${view.viewer.personId}:${view.auctionId}:${myPaddle?.paddleId ?? "none"}`}
                 squadSigned={mySquadSigned}
                 remainingMs={remainingMs}
                 lotDurationMs={lotDurationMs}
@@ -891,7 +838,7 @@ export function LivePanel({
                   <Button
                     variant="ghost"
                     onClick={() => void release()}
-                    loading={pending === "release"}
+                    loading={commands.pending("release")}
                     data-testid="release-paddle"
                   >
                     Hand back paddle
@@ -916,7 +863,7 @@ export function LivePanel({
                   </Select>
                   <Button
                     onClick={() => void claim()}
-                    loading={pending === "claim"}
+                    loading={commands.pending("claim")}
                     disabled={claimTeam === ""}
                     data-testid="claim-paddle"
                   >
@@ -1012,7 +959,7 @@ export function LivePanel({
                 <Button
                   variant="secondary"
                   onClick={() => void send("queue", "QueueLots", {}, "Lots queued")}
-                  loading={pending === "queue"}
+                  loading={commands.pending("queue")}
                   disabled={readOnly}
                   data-testid="conduct-queue"
                 >
@@ -1027,7 +974,7 @@ export function LivePanel({
                       "Lot opened",
                     )
                   }
-                  loading={pending === "open-lot"}
+                  loading={commands.pending("open-lot")}
                   disabled={
                     readOnly || (snapshot?.queue.length ?? 0) === 0 || lot !== null || notTakingBids
                   }
@@ -1044,7 +991,7 @@ export function LivePanel({
                   onConfirm={() => {
                     void send("close-lot", "CloseLot", { lotId: lot?.lotId ?? "" }, "Lot closed");
                   }}
-                  disabled={readOnly || lot === null || pending === "close-lot"}
+                  disabled={readOnly || lot === null || commands.pending("close-lot")}
                   testId="conduct-close-lot"
                   describedBy="live-gavel-hint"
                   resetKey={gavelResetKey(lot)}
@@ -1058,7 +1005,7 @@ export function LivePanel({
                   <Button
                     variant="ghost"
                     onClick={() => void send("pause", "PauseAuction", {}, "Paused")}
-                    loading={pending === "pause"}
+                    loading={commands.pending("pause")}
                     disabled={readOnly}
                     data-testid="conduct-pause"
                   >
@@ -1069,7 +1016,7 @@ export function LivePanel({
                   <Button
                     variant="ghost"
                     onClick={() => void send("resume", "ResumeAuction", {}, "Resumed")}
-                    loading={pending === "resume"}
+                    loading={commands.pending("resume")}
                     disabled={readOnly}
                     data-testid="conduct-resume"
                   >
@@ -1093,7 +1040,7 @@ export function LivePanel({
                   onClick={() =>
                     void send("recover", "RecoverAuction", {}, "Recovered — state verified")
                   }
-                  loading={pending === "recover"}
+                  loading={commands.pending("recover")}
                   data-testid="conduct-recover"
                 >
                   Recover
@@ -1168,7 +1115,16 @@ export function LivePanel({
             </Button>
             <Button
               onClick={() => void confirmComplete()}
-              disabled={shortSquads && overrideReason.trim() === ""}
+              loading={commands.pending("complete")}
+              disabled={
+                stale ||
+                offline ||
+                (shortSquads && overrideReason.trim() === "") ||
+                commands.blocked(
+                  "CompleteAuction",
+                  shortSquads ? { overrideSquadMinimum: true, reason: overrideReason.trim() } : {},
+                )
+              }
               data-testid="confirm-complete"
             >
               {shortSquads ? "Close short — on the record" : "Complete auction"}

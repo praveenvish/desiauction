@@ -129,3 +129,40 @@ describe("the one next step /home leads with", () => {
     expect(chooseNextStep(EMPTY)).toBeNull();
   });
 });
+
+it("a conductor's live duty precedes their owner room", () => {
+  const step = chooseNextStep({
+    ...EMPTY,
+    ownedTeam: team("live"),
+    conducting: {
+      competitionSlug: "conducted",
+      competitionName: "Conducted",
+      auctionStatus: "paused",
+    },
+  });
+  expect(step?.key).toBe("auctioneer-live");
+});
+
+it("retains completed result cards without recommending another confirmation", () => {
+  const confirmation = {
+    id: "team-revision",
+    kind: "confirm" as const,
+    scope: { fixtureId: "fixture", teamId: "team" },
+    priority: "result" as const,
+    dueAt: null,
+    state: "completed",
+    title: "Team response recorded",
+    context: "Season · match · team",
+    explanation: "Another eligible manager responded",
+    action: "Review result",
+    href: "/inbox?confirmation=notice",
+    completion: "Team response accepted",
+    retention: "server" as const,
+  };
+  expect(chooseNextStep({ ...EMPTY, tasks: [confirmation] })).toBeNull();
+  expect(chooseNextStep({ ...EMPTY, tasks: [{ ...confirmation, state: "resolved" }] })).toBeNull();
+  expect(
+    chooseNextStep({ ...EMPTY, tasks: [{ ...confirmation, state: "ready", priority: "today" }] })
+      ?.cta.href,
+  ).toBe(confirmation.href);
+});

@@ -75,7 +75,7 @@ import {
 } from "./sessions";
 import { describeUserAgent } from "./user-agent";
 import { cache } from "react";
-import { isStartClub } from "../../lib/start-intent";
+import { homeIntentFromNext } from "../../lib/start-intent";
 
 /**
  * SECURE, EXCEPT ON THE REHEARSAL SERVER — which is not a server that serves people.
@@ -412,8 +412,9 @@ export async function verifyOtpAction(
     }
     // "Create your tournament" rides through onboarding: the name gate in the
     // /home layout cannot see a query string, and would drop it.
-    if (isStartClub(target)) {
-      redirect(`/onboarding?next=${encodeURIComponent(target)}`);
+    const homeIntent = homeIntentFromNext(target);
+    if (homeIntent !== null) {
+      redirect(`/onboarding?next=${encodeURIComponent(homeIntent)}`);
     }
   }
   redirect(target);
@@ -554,8 +555,9 @@ export async function verifyEmailLoginAction(
     if (target === "/home") {
       redirect("/onboarding");
     }
-    if (isStartClub(target)) {
-      redirect(`/onboarding?next=${encodeURIComponent(target)}`);
+    const homeIntent = homeIntentFromNext(target);
+    if (homeIntent !== null) {
+      redirect(`/onboarding?next=${encodeURIComponent(homeIntent)}`);
     }
   }
   redirect(target);
@@ -922,7 +924,8 @@ export async function updateProfileAction(
     // onboarding that is a page they had never opened, and (nameless) not the
     // step they owe the product. `/home` remains the only invented default
     // (PX-1 01 §5); this is the page the person was on, not a new landing.
-    redirect(fromOnboarding ? "/login?next=/onboarding" : "/login?next=/account");
+    const resume = `/onboarding?next=${encodeURIComponent(safeNext(formString(formData, "next")))}`;
+    redirect(fromOnboarding ? `/login?next=${encodeURIComponent(resume)}` : "/login?next=/account");
   }
   const raw = formString(formData, "name");
   const name = raw.trim().replace(/\s+/g, " ");

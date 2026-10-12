@@ -273,6 +273,7 @@ const PNG_1PX = Buffer.from(
 test("an organizer adds one player by hand, then imports their photo by filename", async ({
   page,
 }) => {
+  test.setTimeout(180_000);
   /*
    * SCOPED TO THIS TEST, and that is the fix.
    *
@@ -292,12 +293,13 @@ test("an organizer adds one player by hand, then imports their photo by filename
   await page.getByTestId("new-org").click();
   await page.getByLabel("Club name").filter({ visible: true }).fill(`Hand Org ${STAMP}`);
   await page.getByRole("button", { name: "Create club" }).click();
-  await expect(page.getByTestId("org-name")).toBeVisible();
+  await expect(page.getByTestId("org-name")).toBeVisible(COLD);
 
   await page.goto("/seasons");
   await page.getByTestId("new-season").click();
   await page.getByLabel("Season name").filter({ visible: true }).fill(`Hand Cup ${STAMP}`);
   await page.getByRole("button", { name: "Create season" }).click();
+  await expect(page.getByTestId("competition-status")).toHaveText("draft", COLD);
   await page.getByTestId("open-dashboard").click();
   await expect(page.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true", COLD);
 

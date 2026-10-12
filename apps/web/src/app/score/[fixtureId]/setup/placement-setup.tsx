@@ -8,7 +8,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@desiauction/ui";
 import type { PlacementScoringSetup } from "../../../../server/scoring/home";
-import { bindScoringActor } from "../../storage";
+import { bindScoringActor, scoringWorkGuard } from "../../storage";
 import { scoringDevice } from "../queue";
 export function PlacementSetup({
   setup,
@@ -41,8 +41,10 @@ export function PlacementSetup({
     setBusy(true);
     setError(null);
     try {
-      await bindScoringActor(actorId);
+      const check = scoringWorkGuard(await bindScoringActor(actorId));
       const deviceId = await scoringDevice();
+      check();
+      check();
       const response = await fetch(`/api/score/${setup.fixtureId}/start`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -64,6 +66,7 @@ export function PlacementSetup({
       if (value.phase === "not_started" || pending.current) {
         if (!pending.current) {
           const history = await readHistory(setup.fixtureId);
+          check();
           const state = placementEngine.replay(history.events);
           const format = lobbyFormat(rounds, setup.format.points);
           const payloads: { type: MatchEvent["type"]; payload: unknown }[] = [];
@@ -117,6 +120,7 @@ export function PlacementSetup({
           }
         }
         if (pending.current) {
+          check();
           const accepted = await fetch(`/api/score/${setup.fixtureId}/events`, {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -132,6 +136,7 @@ export function PlacementSetup({
             throw new Error(rejected?.message ?? result.message ?? "Check the starting players.");
         }
       }
+      check();
       router.push(`/score/${setup.fixtureId}`);
     } catch (error) {
       setError(error instanceof Error ? error.message : "Match setup could not be saved.");
@@ -140,7 +145,8 @@ export function PlacementSetup({
     }
   }
   return (
-    <main className="score-home placement-setup" data-testid="placement-setup">
+    <main className="score-home placement-setup family-setup" data-testid="placement-setup">
+      <p className="score-cap">{setup.fixtureNumber} · Lobby setup</p>
       <h1>Lobby setup · {setup.fixtureNumber}</h1>
       <label>
         Rounds

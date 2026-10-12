@@ -18,6 +18,8 @@ import type { CompetitionSummary } from "./competitions";
 export interface PlayerDeskContext {
   /** `team.manage` — marks and team moves. Reviewing is the page's own gate. */
   canManageTeams: boolean;
+  /** Actual formation; presentation never infers an auction from an unassigned player. */
+  teamFormation: NonNullable<CompetitionSummary["teamFormation"]>;
   /** An auction exists and has not been abandoned. */
   auctionExists: boolean;
   /** The auction has left `scheduled`: pool, marks, role and band are frozen. */
@@ -53,11 +55,15 @@ export async function playerDeskContext(
   const pack = sportPackFor(competition.sport);
   return {
     canManageTeams,
+    teamFormation: competition.teamFormation ?? "auction",
     auctionExists: auction !== null && auction.status !== "abandoned",
     rosterLocked,
     auctionDone:
       auction !== null && (auction.status === "completed" || auction.status === "reconciled"),
-    handEntry: canManage && (auction === null || auction.status === "abandoned"),
+    handEntry:
+      (competition.teamFormation === undefined || competition.teamFormation === "auction") &&
+      canManage &&
+      (auction === null || auction.status === "abandoned"),
     bands: Object.keys(auction?.config.basePriceBands ?? DEFAULT_AUCTION_CONFIG.basePriceBands),
     roles: pack.roles.values.map((value) => ({ key: value.key, label: value.label })),
     rolesRequired: pack.roles.required,

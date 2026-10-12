@@ -30,6 +30,7 @@ import { storage } from "../media";
 import { completeAuctionOnce } from "./auction-notify";
 import { isSeasonAuctioneer, lockSeasonAppointments } from "./auctioneers";
 import { engineWsUrl, sendEngineCommand } from "./engine-client";
+import { fetchEngineSnapshot } from "./engine-reads";
 import { endPractice } from "./practice-engine";
 import {
   preSignedPlayers,
@@ -906,6 +907,32 @@ export async function submitAuctionCommand(
       ? await issueUnlessAuctioneer(gate, commandId, payload, send)
       : await send();
   return ack;
+}
+
+/** Revalidate the exact room and current participant; this is not a command receipt. */
+export async function auctionRecoveryContext(slug: string, auctionId: string) {
+  const gate = await liveGate(slug, { room: true });
+  if (
+    gate === null ||
+    gate.auction.id !== auctionId ||
+    (!gate.canConduct && !gate.canManage && gate.myTeamIds.length === 0)
+  )
+    return null;
+  const serialized = await fetchEngineSnapshot(gate.auction.id);
+  if (serialized === null) return null;
+  try {
+    const current = JSON.parse(serialized) as { auctionId?: unknown; version?: unknown };
+    if (
+      current.auctionId !== gate.auction.id ||
+      typeof current.version !== "number" ||
+      !Number.isSafeInteger(current.version) ||
+      current.version < 0
+    )
+      return null;
+    return { personId: gate.personId, auctionId: gate.auction.id, version: current.version };
+  } catch {
+    return null;
+  }
 }
 
 export interface PracticeRoomState {

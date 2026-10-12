@@ -127,19 +127,25 @@ const ledger = (amount: number, unit: MoneyUnit): string => moneyFormat(unit).le
 export default async function MyProfilePage({
   searchParams,
 }: {
-  searchParams: Promise<{ sport?: string }>;
+  searchParams: Promise<{ sport?: string | string[] }>;
 }) {
-  const session = await currentSession();
+  const [query, session] = await Promise.all([searchParams, currentSession()]);
+  const selectedSport =
+    typeof query.sport === "string" && SPORTS.some((pack) => pack.key === query.sport)
+      ? query.sport
+      : undefined;
+  const destination = selectedSport
+    ? `/me?${new URLSearchParams({ sport: selectedSport }).toString()}`
+    : "/me";
   if (session === null) {
-    redirect("/login?next=/me");
+    redirect(`/login?${new URLSearchParams({ next: destination }).toString()}`);
   }
   if (session.name === null || session.name.trim() === "") {
-    redirect("/onboarding");
+    redirect(`/onboarding?${new URLSearchParams({ next: destination }).toString()}`);
   }
   // Today in IST — fixture kickoffs and season dates are local calendar text.
   const today = istCalendarDate();
   const [
-    query,
     career,
     matches,
     upcomingMatches,
@@ -151,7 +157,6 @@ export default async function MyProfilePage({
     cricketCareer,
     previousCareer,
   ] = await Promise.all([
-    searchParams,
     playerCareer(session.personId),
     playerMatches(session.personId),
     playerUpcomingMatches(session.personId, today),
@@ -462,7 +467,9 @@ export default async function MyProfilePage({
           )
         }
       />
-      <Link href="/me/insights">Player insights</Link>
+      <ButtonLink href="/me/insights" variant="secondary">
+        My cricket insights
+      </ButtonLink>
       <CricketCareerSection career={cricketCareer} />
       <PreviousCareerForm summary={previousCareer} />
 

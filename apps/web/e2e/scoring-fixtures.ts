@@ -48,6 +48,8 @@ export async function seedScoringFixture(
       | "cricket"
       | "badminton"
       | "table_tennis"
+      | "volleyball"
+      | "pickleball"
       | "kabaddi"
       | "football"
       | "hockey"
@@ -58,6 +60,8 @@ export async function seedScoringFixture(
     kickoffTime?: string;
     teamManaged?: boolean;
     minorPlayer?: boolean;
+    language?: "en" | "hi";
+    longNames?: boolean;
   } = {},
 ): Promise<ScoringFixture> {
   const handle = createDb(DB_URL, { max: 1 });
@@ -74,7 +78,12 @@ export async function seedScoringFixture(
     const actorToken = randomBytes(32).toString("base64url");
     const nextActorToken = randomBytes(32).toString("base64url");
     await db.insert(people).values([
-      { id: actorId, name: "LS1 scorer", email: `${actorId}@example.test` },
+      {
+        id: actorId,
+        name: "LS1 scorer",
+        email: `${actorId}@example.test`,
+        language: options.language,
+      },
       { id: nextActorId, name: "LS1 next scorer", email: `${nextActorId}@example.test` },
     ]);
     await db.insert(organizations).values({
@@ -119,7 +128,9 @@ export async function seedScoringFixture(
       for (let index = 0; index < 11; index++) {
         const personId = newId(),
           id = newId(),
-          name = `${prefix} player ${index + 1}`;
+          name = options.longNames
+            ? `${prefix} player ${String(index + 1)} · लंबा खिलाड़ी नाम for layout validation`
+            : `${prefix} player ${String(index + 1)}`;
         ids.push(id);
         names.push(name);
         await db.insert(people).values({ id: personId, name, clubOrgId: orgId });
@@ -141,9 +152,13 @@ export async function seedScoringFixture(
               : "defender"
             : options.sport === "basketball"
               ? "point_guard"
-              : index === 1
-                ? "wicket_keeper"
-                : "batter",
+              : options.sport === "volleyball"
+                ? "attacker"
+                : options.sport === "pickleball"
+                  ? "all_court"
+                  : index === 1
+                    ? "wicket_keeper"
+                    : "batter",
           battingStyle: "right_hand",
           bowlingStyle: "right_arm_medium",
         });
@@ -429,7 +444,7 @@ export async function firstScoringOver(
   await page.getByTestId("pad-wicket").click();
   const wicket = page.getByRole("dialog", { name: "Wicket", exact: true });
   await wicket.getByRole("button", { name: "Caught", exact: true }).click();
-  await wicket.getByRole("button", { name: fixture.awayNames[7], exact: true }).click();
+  await wicket.getByRole("button", { name: fixture.awayNames[7]!, exact: true }).click();
   await wicket
     .getByRole("button", { name: "Place optional fielding pin", exact: true })
     .click({ position: { x: 80, y: 80 } });
@@ -468,6 +483,7 @@ export async function firstScoringOver(
 export async function followupScoringFixture(
   source: ScoringFixture,
   seq: number,
+  options: { sameDay?: boolean } = {},
 ): Promise<ScoringFixture> {
   const handle = createDb(DB_URL, { max: 1 });
   try {
@@ -485,6 +501,7 @@ export async function followupScoringFixture(
       awayTeamId: source.awayId,
       fixtureNumber: `Match ${String(seq)}`,
       seq,
+      ...(options.sameDay ? { kickoffAt: original.kickoffAt } : {}),
       status: "published",
       publishedAt: new Date(),
       createdBy: source.actorId,

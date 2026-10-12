@@ -1,3 +1,4 @@
+import { insightHref, type InsightQuery } from "../lib/insight-navigation";
 import Link from "next/link";
 import { PlayerPortrait } from "@desiauction/ui";
 import { styleLabel } from "@desiauction/core";
@@ -8,7 +9,7 @@ import type { InsightAggregate, InsightFilter } from "../server/insights/sample"
 import "./scoring/charts.css";
 import "./cricket-insights.css";
 
-export type InsightSearch = Record<string, string | string[] | undefined>;
+export type InsightSearch = InsightQuery;
 export function insightFilters(query: InsightSearch): InsightFilter {
   const filter: InsightFilter = {};
   for (const key of ["ballType", "timeOfDay", "formatKey", "pitch", "groundType"] as const) {
@@ -17,6 +18,59 @@ export function insightFilters(query: InsightSearch): InsightFilter {
   }
   return filter;
 }
+const insightConditions = [
+  {
+    name: "ballType",
+    title: "Ball",
+    options: [
+      ["leather", "Leather"],
+      ["tennis", "Tennis"],
+      ["tape", "Tape"],
+      ["rubber", "Rubber"],
+    ],
+  },
+  {
+    name: "timeOfDay",
+    title: "Light",
+    options: [
+      ["day", "Day"],
+      ["day_night", "Day–night"],
+      ["night", "Night"],
+    ],
+  },
+  {
+    name: "formatKey",
+    title: "Format",
+    options: [
+      ["t20", "T20"],
+      ["t10", "T10"],
+      ["odi", "ODI"],
+      ["six_over", "Six overs"],
+      ["tennis_gully", "Tennis gully"],
+      ["box_6", "Box"],
+    ],
+  },
+  {
+    name: "pitch",
+    title: "Pitch",
+    options: [
+      ["turf", "Turf"],
+      ["matting", "Matting"],
+      ["astroturf", "Astroturf"],
+      ["cement", "Cement"],
+    ],
+  },
+  {
+    name: "groundType",
+    title: "Ground",
+    options: [
+      ["full", "Full ground"],
+      ["half", "Half ground"],
+      ["box", "Box"],
+      ["indoor", "Indoor"],
+    ],
+  },
+] as const;
 const metric = (value: number | null) => (value === null ? "—" : value.toFixed(1));
 const label = (key: string | null) => (key === null ? "Not recorded" : key.replaceAll("_", " "));
 function Sample({ value }: { value: BatterInsights["sample"] }) {
@@ -79,9 +133,7 @@ export function RecordedShots({ rows }: { rows: InsightAggregate[] }) {
               y2={100 - Math.cos(radians) * radius}
               className={`insight-shot insight-shot-${String(boundary)}`}
             >
-              <title>
-                {row.deliveries} recorded shots · {row.runs} runs · {angle} degrees
-              </title>
+              <title>{`${String(row.deliveries)} recorded shots · ${String(row.runs)} runs · ${String(angle)} degrees`}</title>
             </line>
           );
         })}
@@ -100,8 +152,12 @@ export function CricketInsights({
   basePath,
   query,
   profile,
+  scope = "public",
+  profileHref,
 }: {
   name: string;
+  scope?: "self" | "public";
+  profileHref?: string;
   profile?:
     { seed: string; photoUrl?: string | null; description?: string | undefined } | undefined;
   batter: BatterInsights;
@@ -111,20 +167,17 @@ export function CricketInsights({
 }) {
   const bowling = query.view === "bowling";
   const current = bowling ? bowler : batter;
-  const link = (changes: Record<string, string>) => {
-    const parameters = new URLSearchParams();
-    for (const key of ["view", "ballType", "timeOfDay", "formatKey", "pitch", "groundType"]) {
-      const value = query[key];
-      if (typeof value === "string") parameters.set(key, value);
-    }
-    for (const [key, value] of Object.entries(changes)) {
-      if (value) parameters.set(key, value);
-      else parameters.delete(key);
-    }
-    return `${basePath}?${parameters.toString()}`;
-  };
+  const link = (changes: Record<string, string>) => insightHref(basePath, query, changes);
   return (
     <div className="cricket-insights">
+      {profileHref && (
+        <Link className="insight-back" href={profileHref}>
+          Back to my profile
+        </Link>
+      )}
+      <p className="insight-scope">
+        {scope === "self" ? "My cricket insights · private view" : "Public player insights"}
+      </p>
       <header className="insight-heading">
         <p>{bowling ? "Bowling insights" : "Batting insights"}</p>
         <div className="insight-player">
@@ -151,52 +204,43 @@ export function CricketInsights({
       </nav>
       <form className="insight-filters" action={basePath}>
         <input type="hidden" name="view" value={bowling ? "bowling" : "batting"} />
-        <label>
-          Ball
-          <select
-            name="ballType"
-            defaultValue={typeof query.ballType === "string" ? query.ballType : ""}
-          >
-            <option value="">All</option>
-            <option value="leather">Leather</option>
-            <option value="tennis">Tennis</option>
-          </select>
-        </label>
-        <label>
-          Light
-          <select
-            name="timeOfDay"
-            defaultValue={typeof query.timeOfDay === "string" ? query.timeOfDay : ""}
-          >
-            <option value="">All</option>
-            <option value="day">Day</option>
-            <option value="night">Night</option>
-          </select>
-        </label>
-        <label>
-          Format
-          <select
-            name="formatKey"
-            defaultValue={typeof query.formatKey === "string" ? query.formatKey : ""}
-          >
-            <option value="">All</option>
-            <option value="t20">T20</option>
-            <option value="t10">T10</option>
-            <option value="odi">ODI</option>
-            <option value="six_over">Six overs</option>
-            <option value="tennis_gully">Tennis gully</option>
-            <option value="box_6">Box</option>
-          </select>
-        </label>
+        {insightConditions.map((condition) => {
+          const value = query[condition.name];
+          const selected = typeof value === "string" && value.length <= 40 ? value : "";
+          return (
+            <div className="insight-condition-control" key={condition.name}>
+              <label htmlFor={`insight-${condition.name}`}>{condition.title}</label>
+              <select
+                id={`insight-${condition.name}`}
+                name={condition.name}
+                defaultValue={selected}
+              >
+                <option value="">All</option>
+                {selected && !condition.options.some(([key]) => key === selected) && (
+                  <option value={selected}>Selected: {selected.replaceAll("_", " ")}</option>
+                )}
+                {condition.options.map(([key, title]) => (
+                  <option key={key} value={key}>
+                    {title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          );
+        })}
         <button type="submit">Apply filters</button>
-        <Link href={basePath}>Clear</Link>
+        <Link
+          href={link({ ballType: "", timeOfDay: "", formatKey: "", pitch: "", groundType: "" })}
+        >
+          Clear conditions
+        </Link>
       </form>
       <dl className="insight-stats">
         {(bowling
           ? [
               ["Wickets", String(bowler.wickets)],
               ["Economy", metric(bowler.economy)],
-              ["Dot balls", `${metric(bowler.dotPercent)}%`],
+              ["Dot balls", bowler.dotPercent === null ? "—" : `${metric(bowler.dotPercent)}%`],
             ]
           : [
               ["Runs", String(batter.runs)],
@@ -210,9 +254,12 @@ export function CricketInsights({
           </div>
         ))}
       </dl>
+      <p className="insight-footnote">
+        — means a figure cannot be calculated from the available records. It does not mean zero.
+      </p>
       <div className="insight-grid">
         <section data-testid="insights-wagon" className="insight-card">
-          <h3>{bowling ? "Where batters score" : "Where you score"}</h3>
+          <h3>{bowling ? "Where batters score" : "Scoring directions"}</h3>
           <RecordedShots rows={current.shots} />
           <details>
             <summary>Runs by area</summary>
@@ -227,7 +274,7 @@ export function CricketInsights({
           </details>
         </section>
         <section data-testid="insights-vs-type" className="insight-card">
-          <h3>{bowling ? "How you take wickets" : "Against bowling types"}</h3>
+          <h3>{bowling ? "Recorded wickets" : "Against bowling types"}</h3>
           {bowling ? (
             <Bars
               rows={bowler.dismissals.map((row) => ({
@@ -321,7 +368,7 @@ export function CricketInsights({
         </section>
         {!bowling ? (
           <section className="insight-card insight-wide">
-            <h3>How and where you get out</h3>
+            <h3>Recorded dismissals and positions</h3>
             <Bars
               rows={batter.dismissals.map((row) => ({
                 key: row.kind,
@@ -348,7 +395,7 @@ export function CricketInsights({
                     r={5}
                     className="insight-dismissal"
                   >
-                    <title>{row.deliveries} dismissals at this recorded position</title>
+                    <title>{`${String(row.deliveries)} dismissals at this recorded position`}</title>
                   </circle>
                 );
               })}

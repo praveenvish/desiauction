@@ -10,6 +10,8 @@ export interface DialogProps {
   "data-testid"?: string;
   /** Fired on Escape, backdrop click, or programmatic close. */
   onClose: () => void;
+  /** An irreversible operation is running; keep its outcome and recovery visible. */
+  closeDisabled?: boolean;
   title: string;
   children: ReactNode;
   /** Action row — usually Buttons; the last one should be the primary. */
@@ -47,6 +49,7 @@ function firstField(node: HTMLDialogElement): HTMLElement | null {
 export function Dialog({
   open,
   onClose,
+  closeDisabled = false,
   title,
   children,
   footer,
@@ -86,7 +89,12 @@ export function Dialog({
         .filter(Boolean)
         .join(" ")}
       aria-labelledby={titleId}
-      onClose={onClose}
+      onCancel={(event) => {
+        if (closeDisabled) event.preventDefault();
+      }}
+      onClose={() => {
+        if (!closeDisabled) onClose();
+      }}
       onClick={(event) => {
         // A click on the backdrop targets the dialog element itself — but so
         // does a click on the dialog's own padding or the gap beside a footer
@@ -103,7 +111,7 @@ export function Dialog({
           event.clientX <= rect.right &&
           event.clientY >= rect.top &&
           event.clientY <= rect.bottom;
-        if (!inside) {
+        if (!inside && !closeDisabled) {
           onClose();
         }
       }}
@@ -129,6 +137,7 @@ export function Dialog({
           type="button"
           className={styles["close"]}
           onClick={onClose}
+          disabled={closeDisabled}
           aria-label={`Close ${title}`}
         >
           <IconClose />

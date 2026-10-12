@@ -8,6 +8,7 @@ import { useState } from "react";
 import { DepthDemo } from "./depth-demo";
 import { IdentityDemo } from "./identity-demo";
 import { MotionDemo } from "./motion-demo";
+import { RefinementDemo } from "./refinement-demo";
 import { PrimitivesDemo } from "./primitives-demo";
 import { PublicKitDemo } from "./public-kit-demo";
 import { TheatreDemo } from "./theatre-demo";
@@ -244,6 +245,7 @@ export default function GalleryPage() {
           <IdentityDemo />
           <MotionDemo />
           <PrimitivesDemo />
+          <RefinementDemo />
           <DepthDemo />
           <TheatreDemo />
           <PublicKitDemo />

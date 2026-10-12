@@ -13,13 +13,11 @@ import {
   fixtures,
   matches,
   matchEvents,
-  matchConfirmations,
   people,
   registrations,
-  teamManagers,
   type Db,
 } from "@desiauction/db";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   appendTrustEvidence,
   effectiveTrustDecisions,
@@ -38,6 +36,7 @@ import {
 } from "./family-state";
 import { overlappingPlay, playWindow } from "./trust-facts";
 import { writeLiveState } from "./live-state";
+import { linkedTrustEvidence } from "./linked-trust-evidence";
 import { SCORING_SYSTEM_ACTOR } from "./system-actor";
 
 /** Caller holds the match lock; no elevated write and no award/result redispatch. */
@@ -113,41 +112,7 @@ export async function updateMatchTrust(
     pace.liveScored &&
     (!isTimedState(state) || timedLiveMinimum(state));
   const authority = historicalAuthority(evidence, state.eventHistory);
-  const confirmations = await db
-    .select()
-    .from(matchConfirmations)
-    .where(
-      and(
-        eq(matchConfirmations.fixtureId, fixtureId),
-        eq(matchConfirmations.orgId, match.orgId),
-        eq(matchConfirmations.competitionId, match.competitionId),
-      ),
-    );
-  const currentManagers = isPlacementState(state)
-    ? await db
-        .select({ personId: teamManagers.personId, teamId: teamManagers.teamId })
-        .from(teamManagers)
-        .where(
-          and(
-            eq(teamManagers.orgId, match.orgId),
-            eq(teamManagers.competitionId, match.competitionId),
-            inArray(teamManagers.teamId, state.teamIds),
-            isNull(teamManagers.revokedAt),
-          ),
-        )
-    : [];
-  const linked = evidence.filter(
-    (row) =>
-      row.action !== "match.trust.confirmation" ||
-      ((!isPlacementState(state) ||
-        currentManagers.some(
-          (manager) => manager.personId === row.actor && manager.teamId === row.meta.teamId,
-        )) &&
-        confirmations.some(
-          (confirmation) =>
-            row.meta.confirmationId === confirmation.id && row.meta.teamId === confirmation.teamId,
-        )),
-  );
+  const linked = await linkedTrustEvidence(db, match, state, evidence);
   const decisions = effectiveTrustDecisions(linked, revision);
   const opposing =
     authority.representedTeamId === fixture.homeTeamId

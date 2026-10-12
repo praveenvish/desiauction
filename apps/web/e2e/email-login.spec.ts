@@ -81,6 +81,7 @@ test("a verified email is a second way into the same account", async ({ page }) 
     .getByRole("button", { name: /Sign out/ })
     .first()
     .click();
+  await page.getByTestId("sign-out-confirm").click();
   await expect(page).toHaveURL(/\/(login|$)/, { timeout: 20_000 });
 
   await page.goto("/login?method=email");

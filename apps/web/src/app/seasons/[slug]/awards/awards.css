@@ -167,3 +167,18 @@
     font-size: 26px;
   }
 }
+
+.season-awards-return {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  justify-self: start;
+  color: var(--text-heading);
+}
+.season-award-card {
+  overflow-wrap: anywhere;
+}
+.season-awards-table th,
+.season-awards-table td {
+  font-variant-numeric: tabular-nums;
+}

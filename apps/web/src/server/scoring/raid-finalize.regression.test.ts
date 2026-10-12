@@ -21,6 +21,7 @@ import { raidEngine, NEW_SEASON_SCORING_RULES, scoreKabaddi } from "@desiauction
 import { and, eq, inArray } from "drizzle-orm";
 import { env } from "../../env";
 import { purgeOrg } from "../test-support/purge-org";
+import { prepareScoring } from "./prepare";
 import { startScoredMatch } from "./start";
 import { appendScoringRequest, persistedMatchEvent, type ClientEvent } from "./append";
 import { persistSeasonAwards } from "../insights/season";
@@ -483,4 +484,36 @@ it("C51 restart clears effective raids and scoring credit, while retaining accep
     .where(eq(matchPlayerLines.fixtureId, id));
   expect(lines.find((line) => line.registrationId === reg(0))).toMatchObject({ points: "0.00" });
   expect(lines.find((line) => line.registrationId === reg(1))).toMatchObject({ points: "1.00" });
+});
+
+it("E07 preparation recognizes accepted raid halves without clock or raids and resets on restart", async () => {
+  const id = await setup();
+  const prepare = (personId = actor) =>
+    withTenantDb(app, { personId, orgId }, (db) => prepareScoring(db, id, personId));
+  expect(await prepare()).toMatchObject({ ok: true, preparation: "unstarted", attempt: 1 });
+  await append(id, [event("half_started", { half: 1 })]);
+  const first = await prepare();
+  expect(first).toMatchObject({ ok: true, preparation: "started", attempt: 1 });
+  if (!first.ok) throw new Error("Missing raid preparation");
+  const state = raidEngine.replay(first.events);
+  expect(state).toMatchObject({ half: 1, running: false, raids: [] });
+  const otherActor = persons[0];
+  if (!otherActor) throw new Error("Missing denied actor");
+  expect(await prepare(otherActor)).toMatchObject({ ok: false });
+  await append(id, [event("half_ended", {})]);
+  expect(await prepare()).toMatchObject({ preparation: "started" });
+  await append(id, [event("half_started", { half: 2 })]);
+  expect(await prepare()).toMatchObject({ preparation: "started" });
+  await append(id, [event("half_ended", {}), event("finish", {})]);
+  expect(await prepare()).toMatchObject({ preparation: "started" });
+  const restarted = await setup();
+  await append(restarted, [
+    event("half_started", { half: 1 }),
+    event("restart", { reason: "New attempt preparation proof" }),
+  ]);
+  expect(
+    await withTenantDb(app, { personId: actor, orgId }, (db) =>
+      prepareScoring(db, restarted, actor),
+    ),
+  ).toMatchObject({ ok: true, preparation: "unstarted", attempt: 2 });
 });

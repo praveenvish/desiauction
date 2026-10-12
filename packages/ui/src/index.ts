@@ -185,3 +185,6 @@ export { BrandGlyph } from "./shell/icons";
 export * from "./icons/icons";
 // The sport glyphs live in their own module (see the note at its head).
 export * from "./icons/sports";
+
+export { TaskWorkspace, TaskState } from "./shell/task-workspace";
+export type { TaskWorkspaceProps, TaskStateProps } from "./shell/task-workspace";

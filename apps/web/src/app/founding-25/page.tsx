@@ -1,3 +1,4 @@
+import { START_CLUB_LOGIN } from "../../lib/start-intent";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { IconCamera, IconShieldCheck } from "@desiauction/ui";
@@ -82,7 +83,7 @@ export default function FoundingTwentyFivePage() {
             </p>
             <p className="demo-footnote">
               Only want the platform? It&apos;s free for every tournament during beta —{" "}
-              <Link href="/login">set up yours</Link>.
+              <Link href={START_CLUB_LOGIN}>set up yours</Link>.
             </p>
           </SideCard>
         </>

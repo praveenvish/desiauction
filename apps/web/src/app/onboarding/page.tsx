@@ -24,17 +24,20 @@ export const metadata = { title: "Welcome" };
 export default async function OnboardingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>;
+  searchParams: Promise<{ next?: string | string[] }>;
 }) {
+  const params = await searchParams;
+  const next = typeof params.next === "string" ? params.next : undefined;
+  const destination = safeNext(next);
   const session = await currentSession();
   if (session === null) {
-    redirect("/login?next=/onboarding");
+    const resume =
+      next === undefined ? "/onboarding" : `/onboarding?next=${encodeURIComponent(destination)}`;
+    redirect(`/login?next=${encodeURIComponent(resume)}`);
   }
   // Where the gate interrupted them. Console segments that know their own
   // address pass it (see `requireOnboarded`); /home stays the invented default,
   // and `safeNext` folds anything attacker-shaped back to it.
-  const { next } = await searchParams;
-  const destination = safeNext(next);
   const nameDone = session.name !== null && session.name.trim() !== "";
   if (nameDone) {
     redirect(destination);

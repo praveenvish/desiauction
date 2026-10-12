@@ -308,6 +308,48 @@ export async function scoringHomeForPerson(personId: string, now = new Date()) {
       a.fixtureNumber.localeCompare(b.fixtureNumber),
   );
 }
+/** Home may recommend a held match; eligibility alone never asserts ownership. */
+export async function scoringResponsibilitiesForPerson(personId: string, now = new Date()) {
+  const result: {
+    setup: FamilyScoringSetup;
+    orgId: string;
+    competitionId: string;
+    heldByCaller: boolean;
+  }[] = [];
+  for (const orgId of await scoringOrgIds(personId)) {
+    const rows = await withTenantDb(dbHandle, { personId, orgId }, async (db) => {
+      const eligible = await scoringHome(db, personId, scoringDay(now), now);
+      if (eligible.length === 0) return [];
+      const claims = await db
+        .select({
+          fixtureId: fixtures.id,
+          personId: matches.scorerPersonId,
+          competitionId: fixtures.competitionId,
+        })
+        .from(fixtures)
+        .leftJoin(matches, eq(matches.fixtureId, fixtures.id))
+        .where(
+          inArray(
+            fixtures.id,
+            eligible.map((setup) => setup.fixtureId),
+          ),
+        );
+      const held = new Set(
+        claims.filter((claim) => claim.personId === personId).map((claim) => claim.fixtureId),
+      );
+      return eligible.flatMap((setup) => {
+        const competitionId = claims.find(
+          (claim) => claim.fixtureId === setup.fixtureId,
+        )?.competitionId;
+        return competitionId
+          ? [{ setup, orgId, competitionId, heldByCaller: held.has(setup.fixtureId) }]
+          : [];
+      });
+    });
+    result.push(...rows);
+  }
+  return result;
+}
 export async function scoringSetupForPerson(fixtureId: string, personId: string) {
   for (const orgId of await scoringOrgIds(personId)) {
     const setup = await withTenantDb(dbHandle, { personId, orgId }, (db) =>

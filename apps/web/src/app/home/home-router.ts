@@ -9,9 +9,25 @@
  * because "not an organizer" had quietly come to mean "a member".
  */
 
-export type HomeSection = "newcomer" | "owner" | "auctioneer" | "organizer" | "player" | "member";
+export type HomeSection =
+  | "newcomer"
+  | "owner"
+  | "auctioneer"
+  | "organizer"
+  | "player"
+  | "member"
+  | "scorer"
+  | "manager"
+  | "finance"
+  | "operator"
+  | "documents";
 
 export interface HomeFacts {
+  scores?: boolean;
+  managesTeam?: boolean;
+  finance?: boolean;
+  operator?: boolean;
+  hasDocuments?: boolean;
   /** Holds `org:owner` or `org:staff` anywhere. */
   manages: boolean;
   /** Owns at least one team. */
@@ -35,10 +51,15 @@ export interface HomeFacts {
  */
 export function homeSections(facts: HomeFacts): HomeSection[] {
   const sections: HomeSection[] = [];
+  if (facts.scores) sections.push("scorer");
+  if (facts.managesTeam) sections.push("manager");
   if (facts.owns) sections.push("owner");
   if (facts.conducts) sections.push("auctioneer");
   if (facts.manages) sections.push("organizer");
   if (facts.plays) sections.push("player");
+  if (facts.finance) sections.push("finance");
+  if (facts.operator) sections.push("operator");
+  if (facts.hasDocuments) sections.push("documents");
   if (sections.length === 0 && facts.belongsToClub) sections.push("member");
   // Nothing at all: ask which they are, rather than rendering an empty
   // dashboard's skeleton at them.
