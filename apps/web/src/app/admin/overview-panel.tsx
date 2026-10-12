@@ -115,8 +115,8 @@ export function OverviewPanel({
           hint={
             // The Live now card's own count (the board's rule), not a second one.
             live.running.length > 0
-              ? `${formatCount(live.running.length)} live now`
-              : "None live now"
+              ? `${formatCount(live.running.length)} live on first page`
+              : "None live on first page"
           }
           // No door here: "Open the live board" on the Live now card is it.
         />
@@ -318,12 +318,12 @@ function LiveNow({ live }: { live: LiveBoardView }) {
       title="Live now"
       description={
         shown.length === 0
-          ? `No auction is running right now.${
+          ? `No running auction on the first page.${
               live.stale.length > 0
-                ? ` ${countNoun(live.stale.length, "auction")} marked live or paused ${live.stale.length === 1 ? "has" : "have"} been silent for over 12 hours.`
+                ? ` ${countNoun(live.stale.length, "auction")} marked live or paused ${live.stale.length === 1 ? "has" : "have"} been silent for over 12 hours on this page.`
                 : ""
             }`
-          : `${countNoun(live.running.length, "auction")} running`
+          : `${countNoun(live.running.length, "auction")} running on first page`
       }
       action={
         <Link href="/admin/live" className="adm-link" data-testid="admin-live-board-link">
@@ -366,9 +366,10 @@ function LiveNow({ live }: { live: LiveBoardView }) {
               );
             })}
           </ul>
-          {live.running.length > shown.length ? (
+          {live.running.length > shown.length || live.pagination?.hasNext ? (
             <p className="adm-foot">
-              And {formatCount(live.running.length - shown.length)} more on the live board.
+              And {formatCount(live.running.length - shown.length)} more on the first page.
+              {live.pagination?.hasNext ? " Further pages are available on the live board." : ""}
             </p>
           ) : null}
         </>
@@ -548,11 +549,11 @@ function StatusList({
             <span key={line.status} className="adm-chips">
               {rooms.running > 0 ? (
                 <Pill tone={ROOM_TONE.active} dot>
-                  Running · {formatCount(rooms.running)}
+                  Running on first page · {formatCount(rooms.running)}
                 </Pill>
               ) : null}
               <Pill tone={ROOM_TONE.stale} dot testId="admin-stuck-live">
-                {STUCK_LABEL} · {formatCount(rooms.silent)}
+                {STUCK_LABEL} on first page · {formatCount(rooms.silent)}
               </Pill>
             </span>
           );

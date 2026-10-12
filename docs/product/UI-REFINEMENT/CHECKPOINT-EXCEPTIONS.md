@@ -27,3 +27,7 @@ E13 and E14 are **PENDING**. E13 includes the recorded unordered 200-room admini
 Physical devices, physical browser zoom, manual assistive technology, product/operator/participant acceptance and field/CRO results remain pending. This commit is a recoverable engineering checkpoint, not a release certificate. No PR, push, merge or deployment is authorized. Historical E10 is an unsafe financial rollback; preserve the E11 safety floor described in CONTRACTS and E11-EVIDENCE.
 
 One-off exact-owned demo harness copies under `apps/web/e2e/.ui-e12-owned-demo/` are retained outside this commit. Synthetic session cookies, local environment files, databases, compiled builds and `/tmp` diagnostics are not committed. Evidence filenames are local receipts and are not guaranteed portable; durable gate summaries are in this documentation.
+
+## Follow-up blocker audit
+
+The subsequent user-authorized E13/E14 blocker audit repaired the unordered200-room omission through bounded ordered pagination and corrected sampled-engine warning claims. See [E13-BLOCKER-EVIDENCE.md](E13-BLOCKER-EVIDENCE.md) for exact tests/build/browser evidence. Full E13/E14 remain pending; the frozen E12 performance exception is unchanged.

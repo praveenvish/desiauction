@@ -23,7 +23,7 @@ Astra approved separate Build and Acceptance statuses: complete available engine
 | E10 | BUILD-PASS | PENDING | Exact source/build/browser/privacy/renderer/route checks passed; E10-EVIDENCE.md |
 | E11 | BUILD-PASS | PENDING | Exact financial recovery, authority, source/assets, compatible rollback, native/accessibility and84-load metrics passed; E11-EVIDENCE.md |
 | E12 | FROZEN — EXCEPTION | PENDING | User-authorized local checkpoint; warm-load gate failed and deferred, see CHECKPOINT-EXCEPTIONS.md |
-| E13 | PENDING | PENDING | Not started |
+| E13 | PARTIAL — BLOCKER FIXES | PENDING | Ordered bounded live-room pagination and truthful sampled warnings verified; remaining gates in E13-BLOCKER-EVIDENCE.md |
 | E14 | PENDING | PENDING | Not started |
 
 ## E00 baseline and safe environment
@@ -603,3 +603,15 @@ Human explicitly authorizes stopping prolonged E12 investigation, freezing the t
 
 
 Frozen checkpoint precommit: full repository format PASS /tmp/ui-refinement-frozen-checkpoint-format.log; git diff whitespace check PASS; production source fingerprint exactly matches retained E12 lazy build (2249 files/source1d562967...) /tmp/ui-refinement-frozen-source.json. Focused artifact/credential pattern scan over244 proposed paths found no flagged secrets/binaries/environment/session fixture artifacts /tmp/ui-refinement-commit-safety-review.json; limited scan, not full E14 acceptance. Excluded exact-owned temporary demo copies retained in worktree. Recurring continue-ui-refinement automation deleted under human freeze instruction; no further automated investigation. Local checkpoint commit authorized now despite explicitly deferred E12 timing gate.
+
+
+User authorizes checking/addressing concrete E13/E14 blockers after frozen E12 checkpoint. Focused scope: bounded ordered live-board pagination, native page navigation/polling retention and truthful sampled-engine warnings; preserve current staff gate/read-only semantics/money units/engine probe limits. Applicable gates: real isolated >200-room complete traversal/no duplicates/order/cap/read-only and existing admin projections/model regressions; source type/strict lint/format, build/budgets and actual staff/denied/native pagination proof before any E13 PASS. E14 full suite and external acceptance remain pending; no release claim or new Astra calls.
+
+
+E13 focused blocker repair: full-relation pulse/event/ID ordering before bounded50-row pages, explicit Previous/Next native navigation with page-specific polling and scoped counts; original200 silent cutoff removed without raising a cap. Engine probe warning no longer infers all rooms cannot bid from sampled failures. Isolated real205-room traversal/order/no-duplicate/no-omission plus existing projections/model PASS14 /tmp/ui-e13-live-regressions-isolated.log. Initial sandbox EPERM beforefixture setup retained /tmp/ui-e13-live-regressions.log. Source type/strictfocusedlint/wholeformat/motion/dependencies PASS /tmp/ui-e13-*.log. Existing test teardown purges only fresh spec-owned organization/person IDs. E13 remains not full PASS; fresh build/native staff/denied/pagination required.
+
+
+First E13 compiled candidate2H5G5zNXPZQ-lmJ1-aOfR production137/sourceassets920/budgets/compilerrestore PASS. Native actual phone/laptop boththemes/paging/poll retention/currentrevocation404/axe0/pageerrors[] PASS /tmp/ui-e13-native, exactfreshperson/session/grant cleaned afterservicesstop (receiptowned.json). Capture review found pagination links below44px house touch convention and residual empty-state/global phrasing; promote links to existing44px ButtonLink and scope empty/overview-status text to page. Fresh affected final build/native check required; preserve firstcandidate receipts.
+
+
+Final E13 focused candidateQLMclVcmVr8WDaYp6dU-W/source5cfdc475... production137/budgets/recursiveassets920/compilerrestore PASS. Actual final native4theme/viewport observations,44px controls/keyboardNext/nativePrevious/page2pollretention/axe0/reflow/errors[]/currentgrantrevocation404 and six anonymousdev/private404noindex boundaries PASS /tmp/ui-e13-final-native.log/evidence. Managedteardown and exact newactor/session/grantcleanup complete; accessauditrows retained. E13-BLOCKER-EVIDENCE.md records resolved200-room omission/sampledwarning and fullE13/E14 stillpending. FrozenE12 exception unchanged. Follow-up localcommit authorized by human request to address blockers; no release claim.
