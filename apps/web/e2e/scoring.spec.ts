@@ -698,6 +698,7 @@ test("the first over and sheets in floodlight remain accessible with touch targe
 test("C43 captain brief, sponsor, transparent stings, qualified STAT and big-screen board", async ({
   page,
   browser,
+  browserName,
 }) => {
   test.setTimeout(240000);
   const fixture = await seedScoringFixture({ publicDelaySeconds: 0 });
@@ -775,7 +776,8 @@ test("C43 captain brief, sponsor, transparent stings, qualified STAT and big-scr
     const stingStarted = Date.now();
     await viewer.screenshot({
       path: test.info().outputPath("overlay-four-1920.png"),
-      omitBackground: true,
+      // Firefox does not implement alpha screenshots; CSS transparency is asserted above.
+      omitBackground: browserName !== "firefox",
     });
     await expect(viewer.locator(".overlay-sting")).toHaveCount(0);
     expect(Date.now() - stingStarted).toBeGreaterThanOrEqual(3000);
@@ -806,7 +808,8 @@ test("C43 captain brief, sponsor, transparent stings, qualified STAT and big-scr
       );
       await viewer.screenshot({
         path: test.info().outputPath(`overlay-stat-${theme}-1920.png`),
-        omitBackground: true,
+        // Firefox does not implement alpha screenshots; CSS transparency is asserted above.
+        omitBackground: browserName !== "firefox",
       });
     }
     await viewer.clock.install();
