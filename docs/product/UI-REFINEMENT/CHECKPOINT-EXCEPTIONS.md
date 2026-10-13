@@ -31,3 +31,8 @@ One-off exact-owned demo harness copies under `apps/web/e2e/.ui-e12-owned-demo/`
 ## Follow-up blocker audit
 
 The subsequent user-authorized E13/E14 blocker audit repaired the unordered200-room omission through bounded ordered pagination and corrected sampled-engine warning claims. See [E13-BLOCKER-EVIDENCE.md](E13-BLOCKER-EVIDENCE.md) for exact tests/build/browser evidence. Full E13/E14 remain pending; the frozen E12 performance exception is unchanged.
+
+
+## 13 October E12 closure
+
+The historical frozen exception above is superseded for the **amended local E12 engineering gate** by actual observed evidence in [E12-EVIDENCE.md](E12-EVIDENCE.md). E12 is now BUILD-PASS; all96 fixed observations/24cells pass, errors zero and CLS below0.1. The warm definition is explicitly settled HTTP-quiescent reload, independently reviewed and proven at actual arrivals; cold/startup thresholds are unchanged. Earlier failed comparisons remain failures, their unavailable old temporary receipts remain unavailable, and general repeatability is not established. No cause for all old failures is claimed. Broader E13/full E14 and external acceptance remain pending; no release is authorized.

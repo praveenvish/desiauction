@@ -21,16 +21,16 @@ For every row, record: reviewer, baseline capture, all existing actions and info
 | `/compare/[slug]` | [page source](<../../../apps/web/src/app/compare/[slug]/page.tsx>) | Pending |
 | `/compare` | [page source](<../../../apps/web/src/app/compare/page.tsx>) | Pending |
 | `/contact` | [page source](<../../../apps/web/src/app/contact/page.tsx>) | Pending |
-| `/features` | [page source](<../../../apps/web/src/app/features/page.tsx>) | Pending |
+| `/features` | [page source](<../../../apps/web/src/app/features/page.tsx>) | E12 local BUILD-PASS; state/function/64-theme-width/metrics: [evidence](E12-EVIDENCE.md); external acceptance pending |
 | `/for/[slug]` | [page source](<../../../apps/web/src/app/for/[slug]/page.tsx>) | Pending |
 | `/for` | [page source](<../../../apps/web/src/app/for/page.tsx>) | Pending |
-| `/founding-25` | [page source](<../../../apps/web/src/app/founding-25/page.tsx>) | Pending |
-| `/` | [page source](<../../../apps/web/src/app/page.tsx>) | Pending |
+| `/founding-25` | [page source](<../../../apps/web/src/app/founding-25/page.tsx>) | E12 local BUILD-PASS; state/function/64-theme-width/metrics: [evidence](E12-EVIDENCE.md); external acceptance pending |
+| `/` | [page source](<../../../apps/web/src/app/page.tsx>) | E12 local BUILD-PASS; state/function/64-theme-width/metrics: [evidence](E12-EVIDENCE.md); external acceptance pending |
 | `/pricing` | [page source](<../../../apps/web/src/app/pricing/page.tsx>) | Pending |
 | `/releases` | [page source](<../../../apps/web/src/app/releases/page.tsx>) | Pending |
-| `/schedule-demo/booked` | [page source](<../../../apps/web/src/app/schedule-demo/booked/page.tsx>) | Pending |
-| `/schedule-demo` | [page source](<../../../apps/web/src/app/schedule-demo/page.tsx>) | Pending |
-| `/schedule-demo/pick` | [page source](<../../../apps/web/src/app/schedule-demo/pick/page.tsx>) | Pending |
+| `/schedule-demo/booked` | [page source](<../../../apps/web/src/app/schedule-demo/booked/page.tsx>) | E12 local BUILD-PASS; state/function/64-theme-width/metrics: [evidence](E12-EVIDENCE.md); external acceptance pending |
+| `/schedule-demo` | [page source](<../../../apps/web/src/app/schedule-demo/page.tsx>) | E12 local BUILD-PASS; state/function/64-theme-width/metrics: [evidence](E12-EVIDENCE.md); external acceptance pending |
+| `/schedule-demo/pick` | [page source](<../../../apps/web/src/app/schedule-demo/pick/page.tsx>) | E12 local BUILD-PASS; state/function/64-theme-width/metrics: [evidence](E12-EVIDENCE.md); external acceptance pending |
 | `/security` | [page source](<../../../apps/web/src/app/security/page.tsx>) | Pending |
 | `/sports/[slug]` | [page source](<../../../apps/web/src/app/sports/[slug]/page.tsx>) | Pending |
 | `/sports` | [page source](<../../../apps/web/src/app/sports/page.tsx>) | Pending |
@@ -162,13 +162,13 @@ For every row, record: reviewer, baseline capture, all existing actions and info
 | `/guides` | [page source](<../../../apps/web/src/app/guides/page.tsx>) | Pending |
 | `/help/[slug]` | [page source](<../../../apps/web/src/app/help/[slug]/page.tsx>) | Pending |
 | `/help/category/[slug]` | [page source](<../../../apps/web/src/app/help/category/[slug]/page.tsx>) | Pending |
-| `/help` | [page source](<../../../apps/web/src/app/help/page.tsx>) | Pending |
+| `/help` | [page source](<../../../apps/web/src/app/help/page.tsx>) | E12 local BUILD-PASS; state/function/64-theme-width/metrics: [evidence](E12-EVIDENCE.md); external acceptance pending |
 | `/legal/[slug]` | [page source](<../../../apps/web/src/app/legal/[slug]/page.tsx>) | Pending |
 | `/legal` | [page source](<../../../apps/web/src/app/legal/page.tsx>) | Pending |
 | `/rules-guidelines` | [page source](<../../../apps/web/src/app/rules-guidelines/page.tsx>) | Pending |
 | `/search` | [page source](<../../../apps/web/src/app/search/page.tsx>) | Pending |
 | `/support` | [page source](<../../../apps/web/src/app/support/page.tsx>) | Pending |
-| `/tools` | [page source](<../../../apps/web/src/app/tools/page.tsx>) | Pending |
+| `/tools` | [page source](<../../../apps/web/src/app/tools/page.tsx>) | E12 local BUILD-PASS; state/function/64-theme-width/metrics: [evidence](E12-EVIDENCE.md); external acceptance pending |
 | `/tools/purse-calculator` | [page source](<../../../apps/web/src/app/tools/purse-calculator/page.tsx>) | Pending |
 | `/tools/registration-form` | [page source](<../../../apps/web/src/app/tools/registration-form/page.tsx>) | Pending |
 | `/tools/snake-draft` | [page source](<../../../apps/web/src/app/tools/snake-draft/page.tsx>) | Pending |
