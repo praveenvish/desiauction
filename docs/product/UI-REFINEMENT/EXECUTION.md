@@ -1,6 +1,6 @@
 # DesiAuction interface execution plan
 
-> Current checkpoint disposition: the user authorized freezing E12 with its failed warm-load gate documented and committing locally. E12 is not BUILD-PASS; E13/E14 and external acceptance remain pending. See [CHECKPOINT-EXCEPTIONS.md](CHECKPOINT-EXCEPTIONS.md). This later authorization supersedes the earlier commit timing requirement.
+> Current checkpoint disposition: E12 completed its reviewed amended local engineering gate on 13 October; see [E12-EVIDENCE.md](E12-EVIDENCE.md). E13/E14 and external acceptance remain pending. The user authorizes verified local commits, with no push or deployment. Earlier failed E12 measurements and the historical freeze remain recorded in [CHECKPOINT-EXCEPTIONS.md](CHECKPOINT-EXCEPTIONS.md).
 
 Executable planning contract approved by Astra · 11 October 2026 · Implementation authorised; E00 in progress
 
