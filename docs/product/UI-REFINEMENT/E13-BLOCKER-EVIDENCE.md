@@ -1,5 +1,7 @@
 # E13 focused blocker repairs and E14 outstanding gates
 
+> Historical focused checkpoint below. E12 and the broader E13 local engineering gates subsequently passed; see [E12-EVIDENCE.md](E12-EVIDENCE.md) and [E13-EVIDENCE.md](E13-EVIDENCE.md). E14 remains in progress. Earlier temporary raw receipts were lost and are not claimed retained or fresh. External acceptance and release remain pending.
+
 User authorized checking and addressing concrete E13/E14 blockers after the E12 frozen checkpoint. This is a focused follow-up, not full E13 or E14 BUILD-PASS.
 
 ## Addressed

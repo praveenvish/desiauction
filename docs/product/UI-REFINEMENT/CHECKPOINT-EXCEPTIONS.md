@@ -36,3 +36,8 @@ The subsequent user-authorized E13/E14 blocker audit repaired the unordered200-r
 ## 13 October E12 closure
 
 The historical frozen exception above is superseded for the **amended local E12 engineering gate** by actual observed evidence in [E12-EVIDENCE.md](E12-EVIDENCE.md). E12 is now BUILD-PASS; all96 fixed observations/24cells pass, errors zero and CLS below0.1. The warm definition is explicitly settled HTTP-quiescent reload, independently reviewed and proven at actual arrivals; cold/startup thresholds are unchanged. Earlier failed comparisons remain failures, their unavailable old temporary receipts remain unavailable, and general repeatability is not established. No cause for all old failures is claimed. Broader E13/full E14 and external acceptance remain pending; no release is authorized.
+
+
+## 13 October final local closure
+
+E13 and E14 local engineering are now BUILD-PASS; the earlier pending statements are historical. E13-EVIDENCE and E14-EVIDENCE bind their actual gates, preserved failures, missing historical raw and exact final compatible recovery floor. All141entries are reconciled in E14-ROUTE-REGISTER. EXTERNAL-ACCEPTANCE names outstanding human/device/staging/field approvals, all PENDING. No production-readiness/release or remote publication is authorized.

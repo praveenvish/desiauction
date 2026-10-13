@@ -1,6 +1,6 @@
 # DesiAuction interface execution plan
 
-> Current checkpoint disposition: E12 completed its reviewed amended local engineering gate on 13 October; see [E12-EVIDENCE.md](E12-EVIDENCE.md). E13/E14 and external acceptance remain pending. The user authorizes verified local commits, with no push or deployment. Earlier failed E12 measurements and the historical freeze remain recorded in [CHECKPOINT-EXCEPTIONS.md](CHECKPOINT-EXCEPTIONS.md).
+> Current disposition: E00–E14 local engineering BUILD-PASS on 13 October. See [E14-EVIDENCE.md](E14-EVIDENCE.md), [E14-ROUTE-REGISTER.md](E14-ROUTE-REGISTER.md) and [EXTERNAL-ACCEPTANCE.md](EXTERNAL-ACCEPTANCE.md). Human/device/physical zoom/manual AT/mail-client/projector/field/CRO and production key/asset continuity remain PENDING. Verified local commits are authorized; no push or deployment. Earlier failures and missing historical raw evidence remain documented.
 
 Executable planning contract approved by Astra · 11 October 2026 · Implementation authorised; E00 in progress
 
