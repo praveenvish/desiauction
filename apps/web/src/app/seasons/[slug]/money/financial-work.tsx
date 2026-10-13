@@ -322,6 +322,7 @@ export function FinancialRecovery({
           </h3>
           <dl>
             <div>
+              {/* rupees-always: saved settlement intents are INR; points seasons never mount this panel. */}
               <dt>Original amount (₹)</dt>
               <dd>{record.intent.amount}</dd>
             </div>
