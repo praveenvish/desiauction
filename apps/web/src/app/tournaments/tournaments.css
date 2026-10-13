@@ -1981,3 +1981,10 @@ a.tx-desk:hover strong {
   justify-self: start;
   white-space: nowrap;
 }
+
+@media (max-width: 719px) {
+  .tx-now-name,
+  .tx-edition-id strong {
+    overflow-wrap: anywhere;
+  }
+}

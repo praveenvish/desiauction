@@ -1,4 +1,4 @@
-import { expect, type Browser, type Page } from "@playwright/test";
+import { expect, type Browser, type BrowserContextOptions, type Page } from "@playwright/test";
 import { appendFile, readFile } from "node:fs/promises";
 import { replayAuction } from "@desiauction/core";
 import {
@@ -164,10 +164,21 @@ export async function settled(page: Page) {
     .poll(async () => (await recovery(page)).filter((item) => item.state !== "reviewed").length)
     .toBe(0);
 }
-export async function stage(browser: Browser, longNames = false, timerSeconds = 120) {
+export async function stage(
+  browser: Browser,
+  longNames = false,
+  timerSeconds = 120,
+  contextOptions: Pick<BrowserContextOptions, "serviceWorkers"> = {},
+) {
   const data = await seedScoringFixture({ longNames });
-  const conductorContext = await browser.newContext({ baseURL: "http://localhost:3050" });
-  const ownerContext = await browser.newContext({ baseURL: "http://localhost:3050" });
+  const conductorContext = await browser.newContext({
+    baseURL: "http://localhost:3050",
+    ...contextOptions,
+  });
+  const ownerContext = await browser.newContext({
+    baseURL: "http://localhost:3050",
+    ...contextOptions,
+  });
   try {
     await scoringSession(conductorContext, data.actorToken);
     await scoringSession(ownerContext, data.nextActorToken);
