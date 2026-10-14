@@ -493,6 +493,22 @@ export function applyTransition(state: MatchState, input: MatchEvent): ApplyResu
         closeIfComplete(next, innings);
         next.innings = [...state.innings];
         next.innings[index] = innings;
+        // Penalty runs to the side that batted first (Law 41) raise the chase
+        // target, unless the target was revised by hand or by DLS. A chase that
+        // had already "reached" the old target is open again if it now falls short.
+        const chase = state.innings[index + 1];
+        if (
+          chase &&
+          chase.superOver === innings.superOver &&
+          chase.battingTeamId !== teamId &&
+          chase.targetMethod === null
+        ) {
+          const updated = copyInnings(chase);
+          updated.target = innings.runs + 1;
+          if (updated.closed === "target" && updated.runs < updated.target) updated.closed = null;
+          closeIfComplete(next, updated);
+          next.innings[index + 1] = updated;
+        }
       }
       next.penaltyRuns = [...state.penaltyRuns, { teamId, runs, inningsNo: previous?.no ?? null }];
       break;

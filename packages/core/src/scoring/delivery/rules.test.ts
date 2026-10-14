@@ -360,6 +360,32 @@ describe("innings closures, targets and super overs", () => {
     );
     expect(innings(startNext(state)).target).toBe(6);
   });
+  it("R-16 penalty runs to the side that batted first raise the chase target mid-chase", () => {
+    let state = fullMatch();
+    state = apply(state, payload(state, 6, {}, 6));
+    state = startNext(dotsToEnd(state));
+    expect(innings(state).target).toBe(7);
+    state = transition(state, "penalty_runs", { teamId: "home", runs: 5, reason: "fielding" });
+    expect(innings(state)).toMatchObject({ target: 12, closed: null });
+    state = apply(state, payload(state, 6, {}, 6));
+    state = apply(state, payload(state, 1));
+    expect(innings(state)).toMatchObject({ runs: 7, closed: null });
+    state = dotsToEnd(state);
+    expect(resultOf(state)).toMatchObject({ winnerTeamId: "home", marginText: "by 4 runs" });
+  });
+  it("R-16 a revised target is not moved by later penalty runs", () => {
+    let state = fullMatch();
+    state = apply(state, payload(state, 6, {}, 6));
+    state = startNext(dotsToEnd(state));
+    state = transition(state, "revise", {
+      inningsNo: 2,
+      maxBalls: 6,
+      targetRuns: 9,
+      method: "dls",
+    });
+    state = transition(state, "penalty_runs", { teamId: "home", runs: 5, reason: "fielding" });
+    expect(innings(state).target).toBe(9);
+  });
   it("R-17 a revision sets the quota and manual or DLS target", () => {
     const state = startNext(dotsToEnd(fullMatch()));
     const revised = transition(state, "revise", {
