@@ -1,4 +1,4 @@
-import { sportPack } from "@desiauction/core";
+import { canonicalJson, sportPack } from "@desiauction/core";
 import { scoringEngine, unsupportedScoringMessage } from "./engine";
 import {
   isRallyState,
@@ -362,23 +362,38 @@ export async function appendScoringEvents(
     }
     if (
       !refusal &&
-      !isDeliveryState(next) &&
       !isPlacementState(next) &&
       next.teams &&
       (next.teams.home !== fixture.homeTeamId || next.teams.away !== fixture.awayTeamId)
     )
       refusal = "bad_payload";
+    // Every attempt of a cricket match keeps the format frozen when scoring
+    // started: a restart re-sends match_started and may not change it.
     if (
       !refusal &&
-      !isDeliveryState(next) &&
+      isDeliveryState(next) &&
+      candidate.type === "match_started" &&
+      next.format &&
+      canonicalJson(next.format) !== canonicalJson(match.format)
+    )
+      refusal = "bad_payload";
+    if (
+      !refusal &&
       (candidate.type === "rubber_started" ||
+        candidate.type === "player_added" ||
+        candidate.type === "match_started" ||
         candidate.type === "substitute" ||
         candidate.type === "sub" ||
         candidate.type === "lineup_confirmed" ||
         candidate.type === "amend")
     ) {
-      const wanted =
-        candidate.type === "lineup_confirmed" || candidate.type === "amend"
+      // Every player the match can name must be an approved registration of
+      // that team in this season, for every sport, cricket included.
+      const wanted = isDeliveryState(next)
+        ? Object.entries(next.lineups).flatMap(([teamId, lineup]) =>
+            [...lineup.battingOrder, ...lineup.substitutes].map((id) => ({ id, teamId })),
+          )
+        : candidate.type === "lineup_confirmed" || candidate.type === "amend"
           ? Object.entries(next.squads).flatMap(([teamId, ids]) =>
               ids.map((id) => ({ id, teamId })),
             )

@@ -374,6 +374,60 @@ describe("API-1 append events", () => {
     expect((await storedEvents(id)).map((item) => item.eventId)).not.toContain(bad.eventId);
     expect((await storedEvents(id)).map((item) => item.eventId)).not.toContain(later.eventId);
   });
+  it("refuses a cricket player added from another season, even an approved one", async () => {
+    const id = await setup();
+    const elsewhere = newId();
+    const elsewhereTeam = newId();
+    const outsider = newId();
+    const outsiderRegistration = newId();
+    await owner.db.insert(competitions).values({
+      id: elsewhere,
+      orgId,
+      name: "Another cup",
+      slug: `append-other-${elsewhere}`,
+      sport: "cricket",
+      createdBy: organiser,
+    });
+    await owner.db
+      .insert(teams)
+      .values({
+        id: elsewhereTeam,
+        orgId,
+        competitionId: elsewhere,
+        name: "Other",
+        createdBy: organiser,
+      });
+    await owner.db
+      .insert(people)
+      .values({
+        id: outsider,
+        name: "Other Season Player",
+        email: `append-${outsider}@example.test`,
+      });
+    await owner.db.insert(registrations).values({
+      id: outsiderRegistration,
+      personId: outsider,
+      orgId,
+      competitionId: elsewhere,
+      teamId: elsewhereTeam,
+      registrationNumber: "APP-OTHER",
+      status: "approved",
+    });
+    try {
+      const added = event("player_added", { teamId: home, registrationId: outsiderRegistration });
+      const result = await append(id, [added]);
+      expect(result).toMatchObject({
+        ok: true,
+        acks: [{ status: "rejected", reason: "bad_payload" }],
+      });
+      expect((await storedEvents(id)).map((item) => item.eventId)).not.toContain(added.eventId);
+    } finally {
+      await owner.db.delete(registrations).where(eq(registrations.id, outsiderRegistration));
+      await owner.db.delete(teams).where(eq(teams.id, elsewhereTeam));
+      await owner.db.delete(competitions).where(eq(competitions.id, elsewhere));
+      await owner.db.delete(people).where(eq(people.id, outsider));
+    }
+  });
   it("refuses a non-holder, wrong device and wrong attempt", async () => {
     const id = await setup();
     const entry = event("style_set", { registrationId: reg(0), battingHand: "right" });
