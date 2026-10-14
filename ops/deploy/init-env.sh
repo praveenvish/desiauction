@@ -48,6 +48,7 @@ APP_PW="$(secret)"
 SYSTEM_PW="$(secret)"
 ENGINE_PW="$(secret)"
 RUNNER_PW="$(secret)"
+LIVE_PW="$(secret)"
 ENGINE_SECRET="$(secret 32)"
 S3_USER="da-$(secret 6)"
 S3_PW="$(secret)"
@@ -167,7 +168,8 @@ EOF
 write live.env <<EOF
 NODE_ENV=production
 PORT=4100
-SYSTEM_DATABASE_URL=postgres://desiauction_system:$SYSTEM_PW@db:5432/$DB
+# F07: the live service may only call the two P-1 functions (0127).
+LIVE_DATABASE_URL=postgres://desiauction_live:$LIVE_PW@db:5432/$DB
 LIVE_ALLOWED_ORIGINS=$ORIGINS
 TRUSTED_PROXY_COUNT=1
 # Every socket on the live process, across rooms (F05).

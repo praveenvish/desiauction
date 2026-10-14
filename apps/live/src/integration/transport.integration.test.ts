@@ -7,7 +7,7 @@ import { parseEnv } from "../env.js";
 import { state } from "../test-state.js";
 import { socketLoad } from "../../../../scripts/live-load.mjs";
 const env = parseEnv({
-  SYSTEM_DATABASE_URL: "postgres://desiauction_system:test@127.0.0.1:15437/ls1_c29_clean",
+  LIVE_DATABASE_URL: "postgres://desiauction_live:test@127.0.0.1:15437/ls1_c29_clean",
   LIVE_ALLOWED_ORIGINS: "https://allowed.test",
 });
 const gate = { t: "sub", fixtureId: "01ARZ3NDEKTSV4RRFFQ69G5FAV", gate: { s: "cup" } };
@@ -58,7 +58,7 @@ it("health/readiness, exact origin/path, socket cap, gated snapshot and 1KiB cei
 
 it("skips the per-client cap when no trustworthy address exists, instead of lumping clients", async () => {
   const proxied = parseEnv({
-    SYSTEM_DATABASE_URL: "postgres://desiauction_system:test@127.0.0.1:15437/ls1_c29_clean",
+    LIVE_DATABASE_URL: "postgres://desiauction_live:test@127.0.0.1:15437/ls1_c29_clean",
     LIVE_ALLOWED_ORIGINS: "https://allowed.test",
     TRUSTED_PROXY_COUNT: "1",
   });
@@ -99,7 +99,7 @@ it("skips the per-client cap when no trustworthy address exists, instead of lump
 
 it("refuses sockets beyond LIVE_MAX_SOCKETS across every client", async () => {
   const capped = parseEnv({
-    SYSTEM_DATABASE_URL: "postgres://desiauction_system:test@127.0.0.1:15437/ls1_c29_clean",
+    LIVE_DATABASE_URL: "postgres://desiauction_live:test@127.0.0.1:15437/ls1_c29_clean",
     LIVE_ALLOWED_ORIGINS: "https://allowed.test",
     LIVE_MAX_SOCKETS: "3",
   });
@@ -129,7 +129,7 @@ it("the socket load mode drives real rooms: 3 rooms × 50 sockets all get a firs
   const read = vi.fn(() => Promise.resolve({ allowed: true, live: state() }));
   const app = createServer(
     parseEnv({
-      SYSTEM_DATABASE_URL: "postgres://desiauction_system:test@127.0.0.1:15437/ls1_c29_clean",
+      LIVE_DATABASE_URL: "postgres://desiauction_live:test@127.0.0.1:15437/ls1_c29_clean",
       LIVE_ALLOWED_ORIGINS: "https://allowed.test",
       TRUSTED_PROXY_COUNT: "1",
     }),

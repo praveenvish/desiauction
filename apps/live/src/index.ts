@@ -4,7 +4,7 @@ import { readLive } from "./reader.js";
 import { createServer } from "./server.js";
 const env = readEnv();
 const notifications: { hub?: (fixtureId: string) => void } = {};
-const database = await liveDatabase(env.SYSTEM_DATABASE_URL, (fixtureId) => {
+const database = await liveDatabase(env.LIVE_DATABASE_URL, (fixtureId) => {
   notifications.hub?.(fixtureId);
 });
 const application = createServer(

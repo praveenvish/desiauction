@@ -883,6 +883,13 @@
       "when": 1794585600000,
       "tag": "0126_ls1_live_history_column",
       "breakpoints": true
+    },
+    {
+      "idx": 126,
+      "version": "7",
+      "when": 1794672000000,
+      "tag": "0127_ls1_live_role_functions",
+      "breakpoints": true
     }
   ]
 }

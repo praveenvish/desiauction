@@ -17,7 +17,7 @@ import { afterAll, expect, it } from "vitest";
 import { liveDatabase } from "../database.js";
 import { readLive } from "../reader.js";
 import { state } from "../test-state.js";
-const { owner: ownerUrl, system: systemUrl } = integrationUrls();
+const { owner: ownerUrl, live: liveUrl } = integrationUrls();
 const owner = createDb(ownerUrl, { max: 1 });
 afterAll(async () => {
   await owner.sql.end();
@@ -31,7 +31,7 @@ const wait = async (predicate: () => boolean | Promise<boolean>) => {
 };
 it("real committed notifications, rollback, two physical connections, reader timeout, reconnect and shutdown", async () => {
   const name = `ls1-live-${newId()}`;
-  const url = new URL(systemUrl);
+  const url = new URL(liveUrl);
   url.searchParams.set("application_name", name);
   const messages: string[] = [];
   const id = newId();
@@ -39,7 +39,7 @@ it("real committed notifications, rollback, two physical connections, reader tim
   try {
     const [setting] = await live.reader
       .sql`select current_setting('statement_timeout') as timeout, current_user as role`;
-    expect(setting).toMatchObject({ timeout: "30s", role: "desiauction_system" });
+    expect(setting).toMatchObject({ timeout: "30s", role: "desiauction_live" });
     const count = async () => {
       const [r] =
         await owner.sql`select count(*)::int as n from pg_stat_activity where application_name = ${name}`;
@@ -94,7 +94,7 @@ it("real system-role P1/P3 reads public/bearer, publication, delay, trust and re
   const notifications: { release?: (id: string) => void } = {};
   const frames: string[] = [];
   const closed: number[] = [];
-  const live = await liveDatabase(systemUrl, (id) => {
+  const live = await liveDatabase(liveUrl, (id) => {
     notifications.release?.(id);
   });
   let readAt = Date.now();

@@ -93,7 +93,7 @@ Run all commands from the repo root. A commit's Gate column lists which gates ap
 
 G-roles commands:
 ```bash
-psql "$DATABASE_URL" -v app_password=ci-app -v system_password=ci-system -v engine_password=ci-engine -v runner_password=ci-runner -f ops/db/create-app-role.sql
+psql "$DATABASE_URL" -v app_password=ci-app -v system_password=ci-system -v engine_password=ci-engine -v runner_password=ci-runner -v live_password=ci-live -f ops/db/create-app-role.sql
 pnpm --filter @desiauction/web grants:verify
 APP_DATABASE_URL=… pnpm --filter @desiauction/web rls:verify
 pnpm posture:verify

@@ -32,7 +32,8 @@
 -- for migrations 0046-0048 that needed nothing (2026-09-07); `pnpm --filter
 -- @desiauction/web grants:verify` is the check that settles it either way.
 --
--- ALL FOUR PASSWORDS, ALWAYS. The script sets ON_ERROR_STOP, so a two-variable
+-- ALL FIVE PASSWORDS, ALWAYS (live_password since F07). The script sets
+-- ON_ERROR_STOP, so a two-variable
 -- invocation ABORTS at the engine role and silently leaves the deployment with
 -- no desiauction_engine, no desiauction_runner and none of the append-only
 -- revokes. That is exactly what the docs and the nightly workflow did, which is
@@ -43,6 +44,7 @@
 --     -v ON_ERROR_STOP=1 \
 --     -v app_password='<app-pw>' -v system_password='<system-pw>' \
 --     -v engine_password='<engine-pw>' -v runner_password='<runner-pw>' \
+--     -v live_password='<live-pw>' \
 --     < ops/db/create-app-role.sql
 --
 -- Then prove it: pnpm --filter @desiauction/web grants:verify
@@ -315,3 +317,20 @@ revoke all on ball_facts from desiauction_engine, desiauction_runner;
 
 -- LS-1 (0125): team managers and match officials are web-tier scoring data.
 revoke all on team_managers, fixture_officials from desiauction_engine, desiauction_runner;
+
+-- F07 (0127): the live service. Internet-facing, so it reads no table at all:
+-- NOBYPASSRLS, no table grants, EXECUTE on the two P-1 functions only. LISTEN
+-- needs no rights. The functions run as desiauction_system (BYPASSRLS,
+-- read-only), never as the superuser that created them.
+select format(
+  'create role desiauction_live login password %L nosuperuser nobypassrls nocreatedb nocreaterole',
+  :'live_password')
+where not exists (select 1 from pg_roles where rolname = 'desiauction_live')
+\gexec
+grant usage on schema public to desiauction_live;
+revoke all on all tables in schema public from desiauction_live;
+revoke all on all sequences in schema public from desiauction_live;
+alter function live_snapshot(char, text, text) owner to desiauction_system;
+alter function live_history_entry(char, text, text, int) owner to desiauction_system;
+grant execute on function live_snapshot(char, text, text) to desiauction_live;
+grant execute on function live_history_entry(char, text, text, int) to desiauction_live;

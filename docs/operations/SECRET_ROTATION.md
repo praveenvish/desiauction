@@ -18,6 +18,7 @@ longer exists and listed seven secrets of the twenty below.
 | `desiauction_app` / `desiauction_system` passwords | `web.env` (`DATABASE_URL`, `SYSTEM_DATABASE_URL`) | See "Database credential rotation" |
 | `desiauction_engine` password | `engine.env` | Same; restarts the engine, so outside a live window only |
 | `desiauction_runner` password | `runner.env` | Same |
+| `desiauction_live` password | `live.env` (`LIVE_DATABASE_URL`) | Same; restarts the live service, so open spectator sockets reconnect. **Hosts created before F07 must add it once** — see DEPLOYMENT.md "Environment variables" |
 | Object storage root (`MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`) | `minio.env`, and as `MEDIA_S3_*` / `FINOPS_S3_*` in `web.env` and `runner.env` | The application uses the ROOT credential, so this restarts storage, web and runner together. Uploads fail for the length of the restart |
 | `PGBACKREST_REPO1_S3_KEY` / `_KEY_SECRET` | `pgbackrest.env` | IAM allows two keys: create, set, restart the `pgbackrest` and `db` services, confirm `pgbackrest check`, delete the old key |
 | **`PGBACKREST_REPO1_CIPHER_PASS`** | `pgbackrest.env` | **NOT ROTATABLE in place.** It encrypts the backup repository; changing it makes every existing backup unreadable. It is generated on the host and exists nowhere else until somebody copies it — see [Escrow](#escrow-the-two-things-that-cannot-be-regenerated) |

@@ -1,22 +1,13 @@
 import { sportPack } from "@desiauction/core";
-import { and, eq } from "drizzle-orm";
-import {
-  fixtures,
-  matches,
-  competitions,
-  liveHistoryEntry,
-  liveHistoryStamps,
-  matchLiveState,
-  scoringPublicAccess,
-  type Db,
-  type ScoringPublicProof,
-} from "@desiauction/db";
+import { sql } from "drizzle-orm";
+import { type Db, type ScoringPublicProof } from "@desiauction/db";
 import {
   engineFor,
   parseSeasonScoringRules,
   delayedHistoryIndex,
   publicLiveProjection,
   type PublicScoringState as PublicLiveState,
+  type TrustLevel,
 } from "@desiauction/core/scoring";
 export async function readLive(
   db: Db,
@@ -24,64 +15,52 @@ export async function readLive(
   proof: ScoringPublicProof,
   nowMs = Date.now(),
 ) {
-  // F05: the snapshot and the ring's timestamps only; the released entry is
-  // fetched on its own, so a tick never moves thirty full snapshots.
-  const [row] = await db
-    .select({
-      state: matchLiveState.state,
-      stamps: liveHistoryStamps,
-      trust: matches.trustLevel,
-      rules: competitions.scoringRules,
-      sport: competitions.sport,
-    })
-    .from(fixtures)
-    .innerJoin(matches, eq(matches.fixtureId, fixtures.id))
-    .innerJoin(competitions, eq(competitions.id, fixtures.competitionId))
-    .innerJoin(
-      matchLiveState,
-      and(
-        eq(matchLiveState.fixtureId, fixtures.id),
-        eq(matchLiveState.orgId, fixtures.orgId),
-        eq(matchLiveState.competitionId, fixtures.competitionId),
-      ),
-    )
-    .where(scoringPublicAccess(fixtureId, proof))
-    .limit(1);
-  if (!row) return { allowed: false, live: null };
-  const pack = sportPack(row.sport);
-  const engine = pack?.scoring ? engineFor(pack.scoring.family) : null;
-  if (!engine) return { allowed: false, live: null };
-  const stored = row.state as PublicLiveState;
-  const delay = parseSeasonScoringRules(row.rules).publicDelaySeconds;
-  const stamps = Array.isArray(row.stamps) ? row.stamps : [];
-  const index = delayedHistoryIndex(stamps, row.trust, delay, nowMs);
-  let entry: { state: PublicLiveState } | undefined;
-  if (index === "current") entry = { state: stored };
-  else if (index !== undefined) {
-    // Access is rechecked in this statement too: a revocation between the two
-    // reads discloses nothing.
-    const [released] = await db
-      .select({ entry: liveHistoryEntry(index) })
-      .from(fixtures)
-      .innerJoin(matches, eq(matches.fixtureId, fixtures.id))
-      .innerJoin(competitions, eq(competitions.id, fixtures.competitionId))
-      .innerJoin(
-        matchLiveState,
-        and(
-          eq(matchLiveState.fixtureId, fixtures.id),
-          eq(matchLiveState.orgId, fixtures.orgId),
-          eq(matchLiveState.competitionId, fixtures.competitionId),
-        ),
-      )
-      .where(scoringPublicAccess(fixtureId, proof))
-      .limit(1);
-    if (!released) return { allowed: false, live: null };
-    const value = released.entry as { state?: unknown } | null;
-    entry =
-      value && typeof value.state === "object" && value.state !== null
-        ? { state: value.state as PublicLiveState }
-        : undefined;
-  }
+  // F07: desiauction_live reads no table; both functions apply P-1 themselves
+  // (0127). F05: the first returns the ring's timestamps, the second only the
+  // entry the delay releases. One REPEATABLE READ snapshot for both, so a write
+  // that rotates the ring between them cannot shift the index onto a newer,
+  // unreleased entry.
+  const slug = proof.s ?? null,
+    token = proof.t ?? null;
+  const read = await db.transaction(
+    async (tx) => {
+      const rows = await tx.execute<{
+        state: unknown;
+        stamps: unknown;
+        trust: TrustLevel;
+        rules: unknown;
+        sport: string;
+      }>(
+        sql`select state, stamps, trust, rules, sport from live_snapshot(${fixtureId}, ${slug}, ${token})`,
+      );
+      const row = rows[0];
+      if (!row) return null;
+      const pack = sportPack(row.sport);
+      const engine = pack?.scoring ? engineFor(pack.scoring.family) : null;
+      if (!engine) return null;
+      const delay = parseSeasonScoringRules(row.rules).publicDelaySeconds;
+      const stamps = Array.isArray(row.stamps) ? row.stamps : [];
+      const index = delayedHistoryIndex(stamps, row.trust, delay, nowMs);
+      let entry: { state: PublicLiveState } | undefined;
+      if (index === "current") entry = { state: row.state as PublicLiveState };
+      else if (index !== undefined) {
+        const [released] = await tx.execute<{ entry: unknown }>(
+          sql`select live_history_entry(${fixtureId}, ${slug}, ${token}, ${index}) as entry`,
+        );
+        const value = released?.entry as { state?: unknown } | null | undefined;
+        if (!value) return null;
+        entry =
+          typeof value.state === "object" && value.state !== null
+            ? { state: value.state as PublicLiveState }
+            : undefined;
+      }
+      return { entry, engine, trust: row.trust, delay };
+    },
+    { isolationLevel: "repeatable read", accessMode: "read only" },
+  );
+  if (!read) return { allowed: false, live: null };
+  const { entry, engine, delay } = read;
+  const row = { trust: read.trust };
   const projected = entry ? publicLiveProjection(entry.state, engine.family) : null;
   if (entry && !projected) return { allowed: false, live: null };
   return {

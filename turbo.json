@@ -21,7 +21,8 @@
         "DATABASE_URL",
         "APP_DATABASE_URL",
         "SYSTEM_DATABASE_URL",
-        "RUNNER_DATABASE_URL"
+        "RUNNER_DATABASE_URL",
+        "LIVE_DATABASE_URL"
       ],
       "cache": false
     },

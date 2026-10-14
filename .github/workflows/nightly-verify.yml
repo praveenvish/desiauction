@@ -98,6 +98,7 @@ jobs:
             --single-transaction -v ON_ERROR_STOP=1 \
             -v app_password='nightly-app' -v system_password='nightly-system' \
             -v engine_password='nightly-engine' -v runner_password='nightly-runner' \
+            -v live_password='nightly-live' \
             -f ops/db/create-app-role.sql
           APP_DATABASE_URL='postgres://desiauction_app:nightly-app@localhost:5433/desiauction' \
             pnpm --filter @desiauction/web rls:verify

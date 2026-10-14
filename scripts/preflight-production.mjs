@@ -83,17 +83,17 @@ const isPostgres = (v) => typeof v === "string" && v.startsWith("postgres");
 const isHttps = (v) => typeof v === "string" && v.startsWith("https://");
 
 check(
-  "LIVE_SYSTEM_DATABASE_URL",
-  isPostgres(liveEnv.SYSTEM_DATABASE_URL) &&
+  "LIVE_DATABASE_URL",
+  isPostgres(liveEnv.LIVE_DATABASE_URL) &&
     (() => {
       try {
-        return new URL(liveEnv.SYSTEM_DATABASE_URL).username === "desiauction_system";
+        return new URL(liveEnv.LIVE_DATABASE_URL).username === "desiauction_live";
       } catch {
         return false;
       }
     })(),
-  "live uses the read-only system role",
-  "set SYSTEM_DATABASE_URL in live.env to desiauction_system",
+  "live uses its own least-privilege role (F07)",
+  "set LIVE_DATABASE_URL in live.env to desiauction_live, then re-run `migrator roles`",
 );
 check(
   "LIVE_ALLOWED_ORIGINS",
