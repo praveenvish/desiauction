@@ -21,16 +21,17 @@ import {
   liveHistoryEntry,
   liveHistoryStamps,
 } from "@desiauction/db";
-import { and, eq, exists, inArray, isNull, ne, or, sql } from "drizzle-orm";
+import { and, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { createHash } from "node:crypto";
 import { styleLabel } from "@desiauction/core";
-import { registrations, organizations, teamManagers } from "@desiauction/db";
+import { registrations, organizations } from "@desiauction/db";
 import { aggregateFacts, withSample } from "../insights/sample";
 import { slowestBowlingMatchup } from "../insights/batter";
 import type { PublicOverlay } from "./overlay-types";
 import { dbHandle, systemDb } from "../db";
 import { isLiveHistoryEntry, type StoredLiveState } from "./live-state";
 import { SCORING_SYSTEM_ACTOR } from "./system-actor";
+import { authorityKind } from "./authority";
 import { resultDetailsProjection, type PublicResultDetails } from "./result-details";
 
 export interface PublicAccessProof {
@@ -491,40 +492,25 @@ export async function publicLiveResult(
     : null;
 }
 /** The scorer holding this match, or a manager of either side: their views do not count. */
+/**
+ * F04: anyone who may score this match (AUTH-1 — organiser, season scorer,
+ * appointed official, either side's manager) or currently holds its claim.
+ * Their views are never counted towards the trust peak.
+ */
 export async function isMatchInsider(
   fixtureId: string,
   personId: string,
   reader: Db = systemDb,
 ): Promise<boolean> {
   const [row] = await reader
-    .select({ id: matches.fixtureId })
+    .select({ fixture: fixtures, scorer: matches.scorerPersonId })
     .from(matches)
     .innerJoin(fixtures, eq(fixtures.id, matches.fixtureId))
-    .where(
-      and(
-        eq(matches.fixtureId, fixtureId),
-        or(
-          eq(matches.scorerPersonId, personId),
-          exists(
-            reader
-              .select({ id: teamManagers.id })
-              .from(teamManagers)
-              .where(
-                and(
-                  eq(teamManagers.personId, personId),
-                  isNull(teamManagers.revokedAt),
-                  or(
-                    eq(teamManagers.teamId, sql`${fixtures.homeTeamId}`),
-                    eq(teamManagers.teamId, sql`${fixtures.awayTeamId}`),
-                  ),
-                ),
-              ),
-          ),
-        ),
-      ),
-    )
+    .where(eq(matches.fixtureId, fixtureId))
     .limit(1);
-  return row !== undefined;
+  if (!row) return false;
+  if (row.scorer === personId) return true;
+  return (await authorityKind(reader, personId, row.fixture)) !== null;
 }
 /** Anonymous metric, gated again inside the app-role tenant transaction. */
 export async function flushPublicViewer(

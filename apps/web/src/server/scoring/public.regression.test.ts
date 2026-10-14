@@ -18,6 +18,7 @@ import {
   organizations,
   people,
   registrations,
+  grants,
   teamManagers,
   teams,
 } from "@desiauction/db";
@@ -978,6 +979,7 @@ it("does not count the scorer holding the match or either side's managers as vie
   expect(await isMatchInsider(id, actor, owner.db)).toBe(true);
   expect(await isMatchInsider(id, manager, owner.db)).toBe(false);
   const managerRow = newId();
+  const seasonScorerGrant = newId();
   await owner.db.insert(teamManagers).values({
     id: managerRow,
     teamId: away,
@@ -991,7 +993,18 @@ it("does not count the scorer holding the match or either side's managers as vie
   try {
     expect(await isMatchInsider(id, manager, owner.db)).toBe(true);
     expect(await isMatchInsider(id, stranger, owner.db)).toBe(false);
+    // A season scorer may score this match too (AUTH-1 arm b).
+    await owner.db.insert(grants).values({
+      id: seasonScorerGrant,
+      personId: stranger,
+      scopeType: "tournament",
+      scopeId: competitionId,
+      capabilitySet: "fixture:scorer",
+      grantedBy: actor,
+    });
+    expect(await isMatchInsider(id, stranger, owner.db)).toBe(true);
   } finally {
     await owner.db.delete(teamManagers).where(eq(teamManagers.id, managerRow));
+    await owner.db.delete(grants).where(eq(grants.id, seasonScorerGrant));
   }
 });
