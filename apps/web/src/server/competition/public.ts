@@ -1844,7 +1844,16 @@ export async function publicSeasonSitemap(limit = 5000): Promise<SeasonSitemapEn
           where f.competition_id = "competitions"."id"
             and f.status in ('published', 'in_progress', 'completed', 'cancelled')),
         (select max(fr.updated_at) from fixture_results fr
-          where fr.competition_id = "competitions"."id"),
+          where fr.competition_id = "competitions"."id"
+            -- P-3 (F03): a scored result still inside its betting delay does
+            -- not move lastmod either — same rule as results.ts releasedToPublic.
+            and not exists (
+              select 1 from matches m
+                join competitions dc on dc.id = m.competition_id
+               where m.fixture_id = fr.fixture_id
+                 and m.trust_level <> 'verified'
+                 and m.finished_at is not null
+                 and m.finished_at + make_interval(secs => coalesce((dc.scoring_rules->>'publicDelaySeconds')::int, 60)) > now())),
         (select max(e.created_at) from auction_events e
            join auctions a on a.id = e.auction_id
           where a.competition_id = "competitions"."id" and a.kind = 'real')

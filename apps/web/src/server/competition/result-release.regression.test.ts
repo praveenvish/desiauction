@@ -14,6 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { env } from "../../env";
 import { purgeOrg } from "../test-support/purge-org";
 import { resultsOf, standingsOf } from "./results";
+import { publicSeasonSitemap } from "./public";
 import { seasonPlayIn } from "./season-play";
 
 /**
@@ -162,5 +163,35 @@ describe("P-3 scored results wait for the betting delay on public pages", () => 
       "public",
     );
     expect(JSON.stringify(play)).not.toContain(fresh);
+  });
+
+  it("does not move the sitemap lastmod until a scored result is released", async () => {
+    const old = new Date("2026-01-01T00:00:00.000Z");
+    await db
+      .update(fixtures)
+      .set({ publishedAt: null, completedAt: null })
+      .where(eq(fixtures.competitionId, competitionId));
+    await db
+      .update(fixtureResults)
+      .set({ updatedAt: old })
+      .where(eq(fixtureResults.competitionId, competitionId));
+    const fresh = await scoredFixture("self_scored", 5);
+    const lastmod = async () =>
+      (await publicSeasonSitemap()).find((entry) => entry.slug === `release-${competitionId}`)
+        ?.lastModified;
+    // The season row itself is touched by trigger (0099); the fresh result,
+    // written after it, must not move lastmod past it while it is held back.
+    const [season] = await db
+      .select({ updatedAt: competitions.updatedAt })
+      .from(competitions)
+      .where(eq(competitions.id, competitionId));
+    const [result] = await db
+      .select({ updatedAt: fixtureResults.updatedAt })
+      .from(fixtureResults)
+      .where(eq(fixtureResults.fixtureId, fresh));
+    expect(result && season && result.updatedAt > season.updatedAt).toBe(true);
+    expect(await lastmod()).toEqual(season?.updatedAt);
+    await db.update(matches).set({ trustLevel: "verified" }).where(eq(matches.fixtureId, fresh));
+    expect(await lastmod()).toEqual(result?.updatedAt);
   });
 });
