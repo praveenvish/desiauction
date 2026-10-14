@@ -215,6 +215,9 @@ jobs:
       OTP_PROVIDER: dev
       PLAYWRIGHT_PRECOMPILED: "1"
       NEXT_DIST_DIR: .next-e2e
+      # Canonical and OG URLs must point at the server the suite runs, or the
+      # specs that fetch them (ls1-screens, the T10 journey) hit :3000.
+      PUBLIC_BASE_URL: http://localhost:3050
       # `next start` runs with NODE_ENV=production, which trips the apps/web boot
       # guard: OTP_PROVIDER=dev (which the suite REQUIRES, so e2e/otp.ts can read
       # codes) is refused in a serving production process. This flag is exactly

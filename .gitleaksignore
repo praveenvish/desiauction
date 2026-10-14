@@ -18,3 +18,8 @@ b723d33622d7ed4db27d69121f341d7fae3e2ff5:packages/messaging/src/web-push.test.ts
 f9772d26b7e72f5b4dadb87f4c30d513fbd1bf63:apps/web/src/server/seo/indexnow.test.ts:generic-api-key:30
 f9772d26b7e72f5b4dadb87f4c30d513fbd1bf63:apps/web/src/server/seo/indexnow.test.ts:generic-api-key:38
 f9772d26b7e72f5b4dadb87f4c30d513fbd1bf63:apps/web/src/server/seo/indexnow.test.ts:generic-api-key:45
+
+# LS-1 plan prose, not credentials: "polls API-9 every 2 s, SIX/FOUR/WICKET stings"
+# matches the generic key pattern (a long slash-joined token after a comma).
+bd4e1c62bc631ee0641f955d534627af464863a5:docs/product/LS-1/exec/EXEC-LOG.md:generic-api-key:1116
+051c0c747197e1c7ac4893fc615f49588c7d98f5:docs/product/LS-1/exec/02-commits.md:generic-api-key:1017

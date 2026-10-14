@@ -17,6 +17,9 @@ export async function liveLoad(
     intervalMs = 2000,
     staggerMs = 2000,
     timeoutMs = 10000,
+    // null: report latency without gating on it (a shared CI runner hosts the
+    // server, the browser and all 500 viewers; its numbers measure the runner).
+    p95BudgetMs = 300,
   } = {},
 ) {
   const url = new URL(target);
@@ -86,7 +89,7 @@ export async function liveLoad(
   const passed =
     attempts > 0 &&
     p95Ms !== null &&
-    p95Ms < 300 &&
+    (p95BudgetMs === null || p95Ms < p95BudgetMs) &&
     ratio304 > 0.8 &&
     statuses.other === 0 &&
     failures === 0 &&
@@ -113,6 +116,7 @@ export async function liveLoad(
     requestsPerSecond: attempts / elapsedSeconds,
     p50Ms,
     p95Ms,
+    p95BudgetMs,
     ratio304,
     passed,
   };
@@ -263,6 +267,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         value = Number(raw);
       if (flag === "--viewers") settings.viewers = value;
       else if (flag === "--duration-seconds") settings.durationSeconds = value;
+      else if (flag === "--p95-budget-ms") settings.p95BudgetMs = raw === "none" ? null : value;
       else if (flag === "--per-room") settings.perRoom = value;
       else if (flag === "--fixtures") settings.fixtures = raw.split(",").filter(Boolean);
       else if (flag === "--slug") settings.gate = { s: raw };

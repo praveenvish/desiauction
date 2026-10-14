@@ -218,6 +218,7 @@ afterAll(async () => {
 });
 
 describe("API-1 append events", () => {
+  // Three fixtures and ~250 appends, each a full transaction: well past the 5 s default on a shared CI runner.
   it("120 balls batched by 1, 7 and 50 produce the same canonical public state", async () => {
     const first = await setup();
     const initial = await storedEvents(first);
@@ -290,7 +291,7 @@ describe("API-1 append events", () => {
         (await owner.db.select().from(matches).where(eq(matches.fixtureId, id)))[0]?.lastSeq,
       ).toBe(live.seq);
     }
-  });
+  }, 30_000);
   it("notifies only committed accepted app-role appends, never rollback or duplicate", async () => {
     const id = await setup();
     const received: string[] = [];

@@ -8,6 +8,7 @@ export function liveLoad(
     intervalMs?: number;
     staggerMs?: number;
     timeoutMs?: number;
+    p95BudgetMs?: number | null;
   },
 ): Promise<Record<string, unknown> & { passed: boolean; p95Ms: number | null }>;
 export function socketLoad(

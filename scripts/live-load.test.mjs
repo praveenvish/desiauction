@@ -86,3 +86,27 @@ test("socket mode refuses an HTTP target, no fixtures or no origin", async () =>
   await assert.rejects(socketLoad("ws://x/live/ws", { fixtures: [], origin: "o" }), /fixture/);
   await assert.rejects(socketLoad("ws://x/live/ws", { fixtures: ["a"] }), /Origin/);
 });
+
+test("a null p95 budget reports latency without failing on it", async () => {
+  const result = await serverRun(
+    (_request, response) => {
+      setTimeout(() => {
+        response.setHeader("ETag", '"15"');
+        response.setHeader("Content-Type", "application/json");
+        response.end(JSON.stringify({ seq: 15, phase: "live" }));
+      }, 40);
+    },
+    (url) =>
+      liveLoad(url, {
+        viewers: 2,
+        durationSeconds: 0.2,
+        intervalMs: 10,
+        staggerMs: 1,
+        p95BudgetMs: null,
+      }),
+  );
+  assert.equal(result.p95BudgetMs, null);
+  assert.ok(result.p95Ms >= 30);
+  // Every reply is a 200 here, so the 304 gate still fails it: only latency is relaxed.
+  assert.equal(result.passed, false);
+});

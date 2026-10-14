@@ -2,6 +2,19 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { scoringSession, seedScoringFixture, readScoringFixture } from "./scoring-fixtures";
 async function capture(page: Page, name: string) {
+  // A goal sting slides in with a transform; measuring mid-flight reads its
+  // overshoot as page overflow. Let finite animations finish (bounded).
+  await page.evaluate(() =>
+    Promise.race([
+      Promise.all(
+        document
+          .getAnimations()
+          .filter((animation) => animation.effect?.getTiming().iterations !== Infinity)
+          .map((animation) => animation.finished.catch(() => undefined)),
+      ),
+      new Promise((resolve) => setTimeout(resolve, 2000)),
+    ]),
+  );
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: test.info().outputPath(`${name}.png`), fullPage: true });
@@ -136,6 +149,8 @@ for (const theme of ["daylight", "floodlight"] as const) {
       }
       await page.getByRole("button", { name: "Finish match", exact: true }).click();
       await expect(page.getByText("Match finished", { exact: true })).toBeVisible();
+      // The finish is queued like any entry; leave the pad only once it is sent.
+      await expect(page.getByRole("status").filter({ hasText: /^Saved$/ })).toHaveText("Saved");
       await page.goto(`/c/${fixture.slug}/m/Match%201`);
       await expect(page.getByTestId("live-result")).toContainText(
         sport === "basketball" ? "3 points" : "1 goals",
