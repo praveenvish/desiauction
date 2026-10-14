@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { istCalendarDate } from "../../lib/format-date";
 import { teamsOf, type CompetitionSummary } from "./competitions";
 import { PUBLIC_FIXTURE_STATUSES, competitionTimeline, fixtureStats } from "./fixtures";
-import { resultsOf, standingsOf } from "./results";
+import { resultsOf, standingsOf, type ResultAudience } from "./results";
 
 /*
  * THE SEASON CHAPTER — the matches and the table, for the Reports page and
@@ -65,13 +65,14 @@ export async function seasonPlayIn(
   db: Db,
   competition: Pick<CompetitionSummary, "id" | "sport">,
   today: string = istCalendarDate(),
+  audience: ResultAudience = "console",
 ): Promise<SeasonPlay> {
   const shape = sportPackFor(competition.sport).fixtureShape === "lobby" ? "lobby" : "duel";
   const [stats, timeline, results, standings, teamRows, scoringMatches] = await Promise.all([
     fixtureStats(db, competition.id, PUBLIC_FIXTURE_STATUSES, today),
     competitionTimeline(db, competition.id, PUBLIC_FIXTURE_STATUSES),
-    resultsOf(db, competition.id),
-    shape === "duel" ? standingsOf(db, competition.id) : Promise.resolve(null),
+    resultsOf(db, competition.id, audience),
+    shape === "duel" ? standingsOf(db, competition.id, today, audience) : Promise.resolve(null),
     teamsOf(db, competition.id),
     db
       .select({ fixtureId: matches.fixtureId })

@@ -220,7 +220,7 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
       .limit(1),
     teamsOf(systemDb, row.id),
     publishedSchedule(systemDb, row.id),
-    seasonPlayIn(systemDb, { id: row.id, sport: row.sport }),
+    seasonPlayIn(systemDb, { id: row.id, sport: row.sport }, undefined, "public"),
     seasonVenueOf(systemDb, row.id),
   ]);
   return {

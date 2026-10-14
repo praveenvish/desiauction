@@ -408,6 +408,33 @@ export interface ResultRow {
   readonly note: string | null;
 }
 
+/** Who a reader serves: the club's own console, or anyone on the public web. */
+export type ResultAudience = "console" | "public";
+
+/**
+ * P-3, the betting delay, applied to results. A scored result reaches the public
+ * web only once its match's delay has passed (season `publicDelaySeconds`,
+ * default 60) unless the match is verified. Without this the season page and
+ * its table published the final outcome the moment the scorer tapped Finish,
+ * ahead of the delayed live page. Typed results have no match row and pass.
+ */
+function releasedToPublic(db: Db, fixtureId: typeof fixtureResults.fixtureId | typeof fixtures.id) {
+  return notExists(
+    db
+      .select({ id: sql`1` })
+      .from(matches)
+      .innerJoin(competitions, eq(competitions.id, matches.competitionId))
+      .where(
+        and(
+          eq(matches.fixtureId, fixtureId),
+          sql`${matches.trustLevel} <> 'verified'`,
+          sql`${matches.finishedAt} is not null`,
+          sql`${matches.finishedAt} + make_interval(secs => coalesce((${competitions.scoringRules}->>'publicDelaySeconds')::int, 60)) > now()`,
+        ),
+      ),
+  );
+}
+
 /** Voided scored fixtures retain historical rows but contribute no authoritative result. */
 function notVoided(db: Db, fixtureId: typeof fixtureResults.fixtureId | typeof fixtures.id) {
   return notExists(
@@ -428,12 +455,20 @@ export async function resultOf(db: Db, fixtureId: string): Promise<ResultRow | n
 }
 
 /** Every recorded result in a competition, keyed by fixture. */
-export async function resultsOf(db: Db, competitionId: string): Promise<Map<string, ResultRow>> {
+export async function resultsOf(
+  db: Db,
+  competitionId: string,
+  audience: ResultAudience = "console",
+): Promise<Map<string, ResultRow>> {
   const rows = await db
     .select()
     .from(fixtureResults)
     .where(
-      and(eq(fixtureResults.competitionId, competitionId), notVoided(db, fixtureResults.fixtureId)),
+      and(
+        eq(fixtureResults.competitionId, competitionId),
+        notVoided(db, fixtureResults.fixtureId),
+        audience === "public" ? releasedToPublic(db, fixtureResults.fixtureId) : undefined,
+      ),
     );
   return new Map(rows.map((row) => [row.fixtureId, toResultRow(row)]));
 }
@@ -536,6 +571,7 @@ export async function standingsOf(
   db: Db,
   competitionId: string,
   today: string = istCalendarDate(),
+  audience: ResultAudience = "console",
 ): Promise<StandingsView> {
   const todayStart = `${today.slice(0, 10)}T00:00`;
   const [seasonRow] = await db
@@ -562,6 +598,7 @@ export async function standingsOf(
         and(
           eq(fixtureResults.competitionId, competitionId),
           notVoided(db, fixtureResults.fixtureId),
+          audience === "public" ? releasedToPublic(db, fixtureResults.fixtureId) : undefined,
         ),
       ),
     db
