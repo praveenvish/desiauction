@@ -19,10 +19,10 @@ import {
   type Db,
   type DbHandle,
 } from "@desiauction/db";
-import { and, eq, inArray, ne, or, sql } from "drizzle-orm";
+import { and, eq, exists, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { createHash } from "node:crypto";
 import { styleLabel } from "@desiauction/core";
-import { registrations, organizations } from "@desiauction/db";
+import { registrations, organizations, teamManagers } from "@desiauction/db";
 import { aggregateFacts, withSample } from "../insights/sample";
 import { slowestBowlingMatchup } from "../insights/batter";
 import type { PublicOverlay } from "./overlay-types";
@@ -457,6 +457,42 @@ export async function publicLiveResult(
         ...(selected.clock ? { clock: selected.clock } : {}),
       }
     : null;
+}
+/** The scorer holding this match, or a manager of either side: their views do not count. */
+export async function isMatchInsider(
+  fixtureId: string,
+  personId: string,
+  reader: Db = systemDb,
+): Promise<boolean> {
+  const [row] = await reader
+    .select({ id: matches.fixtureId })
+    .from(matches)
+    .innerJoin(fixtures, eq(fixtures.id, matches.fixtureId))
+    .where(
+      and(
+        eq(matches.fixtureId, fixtureId),
+        or(
+          eq(matches.scorerPersonId, personId),
+          exists(
+            reader
+              .select({ id: teamManagers.id })
+              .from(teamManagers)
+              .where(
+                and(
+                  eq(teamManagers.personId, personId),
+                  isNull(teamManagers.revokedAt),
+                  or(
+                    eq(teamManagers.teamId, sql`${fixtures.homeTeamId}`),
+                    eq(teamManagers.teamId, sql`${fixtures.awayTeamId}`),
+                  ),
+                ),
+              ),
+          ),
+        ),
+      ),
+    )
+    .limit(1);
+  return row !== undefined;
 }
 /** Anonymous metric, gated again inside the app-role tenant transaction. */
 export async function flushPublicViewer(

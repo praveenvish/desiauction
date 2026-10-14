@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { env } from "../../../../../env";
+import { clientIp } from "../../../../../lib/client-ip";
+import { currentSession } from "../../../../../server/auth/actions";
 import { publicAccessProof } from "../../../../../server/scoring/public";
 import { recordPublicView } from "../../../../../server/scoring/viewer";
 export const dynamic = "force-dynamic";
@@ -12,7 +15,12 @@ export async function POST(request: Request, context: { params: Promise<{ fixtur
   }
   const proof = publicAccessProof(raw);
   const { fixtureId } = await context.params;
-  if (!proof || !(await recordPublicView(fixtureId, proof)))
+  const session = proof ? await currentSession().catch(() => null) : null;
+  const viewer = {
+    clientAddress: clientIp(request.headers, env.TRUSTED_PROXY_COUNT),
+    personId: session?.personId ?? null,
+  };
+  if (!proof || !(await recordPublicView(fixtureId, proof, viewer)))
     return NextResponse.json(
       { error: "not_found" },
       { status: 404, headers: { "Cache-Control": "no-store" } },

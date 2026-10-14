@@ -18,6 +18,7 @@ import {
   organizations,
   people,
   registrations,
+  teamManagers,
   teams,
 } from "@desiauction/db";
 import { eq } from "drizzle-orm";
@@ -30,6 +31,7 @@ import { purgeOrg } from "../test-support/purge-org";
 import { writeLiveState } from "./live-state";
 import {
   flushPublicViewer,
+  isMatchInsider,
   publicLive,
   publicLiveScorecard,
   publicLiveCharts,
@@ -738,7 +740,7 @@ it("retries a failed minute flush with the original count and never overlaps flu
     if (attempts === 1) throw new Error("Transient database failure");
     return flushPublicViewer(who, proofs, count, app);
   }, false);
-  for (let i = 0; i < 4; i++) buckets.record(identity, {}, 1000);
+  for (let i = 0; i < 4; i++) buckets.record(identity, {}, 1000, `viewer-${String(i)}`);
   await Promise.all([buckets.flush(61000), buckets.flush(61000)]);
   expect(attempts).toBe(1);
   await buckets.flush(121000);
@@ -994,4 +996,29 @@ it("C47 HTTP normalizes only the selected legacy delivery entry and strips untru
     .set({ sport: "badminton" })
     .where(eq(competitions.id, competitionId));
   expect(await publicLive(id, {}, now)).toBeNull();
+});
+
+it("does not count the scorer holding the match or either side's managers as viewers", async () => {
+  const { id } = await seed();
+  const manager = playerIds[0] ?? actor;
+  const stranger = playerIds[1] ?? actor;
+  expect(await isMatchInsider(id, actor, owner.db)).toBe(true);
+  expect(await isMatchInsider(id, manager, owner.db)).toBe(false);
+  const managerRow = newId();
+  await owner.db.insert(teamManagers).values({
+    id: managerRow,
+    teamId: away,
+    personId: manager,
+    orgId,
+    competitionId,
+    role: "manager",
+    source: "organizer",
+    createdBy: actor,
+  });
+  try {
+    expect(await isMatchInsider(id, manager, owner.db)).toBe(true);
+    expect(await isMatchInsider(id, stranger, owner.db)).toBe(false);
+  } finally {
+    await owner.db.delete(teamManagers).where(eq(teamManagers.id, managerRow));
+  }
 });

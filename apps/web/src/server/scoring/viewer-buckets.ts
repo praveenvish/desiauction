@@ -2,11 +2,17 @@ import type { PublicAccessProof, PublicViewerIdentity } from "./public";
 interface Bucket {
   identity: PublicViewerIdentity;
   minute: number;
+  /** Distinct viewers this minute: one salted key per client, never the raw address. */
+  viewers: Set<string>;
   count: number;
   proofs: PublicAccessProof[];
   failures: number;
 }
-/** Per-process minute counts, with bounded memory/retries and no overlapping flush. */
+/**
+ * Per-process minute counts of DISTINCT viewers, with bounded memory/retries and no
+ * overlapping flush. Counting requests let one person lift a match's viewer peak
+ * (and so its trust) by pinging repeatedly; a viewer key counts once a minute.
+ */
 export class ViewerBuckets {
   private buckets = new Map<string, Bucket>();
   private timer: ReturnType<typeof setInterval> | undefined;
@@ -19,7 +25,7 @@ export class ViewerBuckets {
     ) => Promise<boolean>,
     private schedule = true,
   ) {}
-  record(identity: PublicViewerIdentity, proof: PublicAccessProof, now: number) {
+  record(identity: PublicViewerIdentity, proof: PublicAccessProof, now: number, viewer: string) {
     const minute = Math.floor(now / 60000);
     const key = `${identity.fixtureId}:${String(minute)}`;
     let bucket = this.buckets.get(key);
@@ -28,10 +34,11 @@ export class ViewerBuckets {
         const oldest = this.buckets.keys().next().value;
         if (oldest) this.buckets.delete(oldest);
       }
-      bucket = { identity, minute, count: 0, proofs: [], failures: 0 };
+      bucket = { identity, minute, viewers: new Set(), count: 0, proofs: [], failures: 0 };
       this.buckets.set(key, bucket);
     }
-    bucket.count = Math.min(2147483647, bucket.count + 1);
+    if (bucket.viewers.size < 100_000) bucket.viewers.add(viewer);
+    bucket.count = bucket.viewers.size;
     if (!bucket.proofs.some((item) => item.t === proof.t && item.s === proof.s)) {
       if (bucket.proofs.length >= 8) bucket.proofs.shift();
       bucket.proofs.push({ ...proof });
