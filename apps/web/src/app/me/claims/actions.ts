@@ -1,11 +1,11 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { currentSession } from "../../../server/auth/actions";
 import { answerGuestClaimOffer } from "../../../server/scoring/guest-claim-offers";
 
 interface ClaimAnswerState {
   error?: string;
-  answered?: "accepted" | "declined";
 }
 
 export async function answerClaim(
@@ -27,5 +27,7 @@ export async function answerClaim(
             : "This offer is no longer open.",
     };
   revalidatePath("/me");
-  return { answered: result.accepted ? "accepted" : "declined" };
+  // The answered card leaves the list on re-render, so the confirmation lives
+  // on the page, not in the card.
+  redirect(`/me/claims?answered=${result.accepted ? "accepted" : "declined"}`);
 }

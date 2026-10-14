@@ -17,7 +17,12 @@ export const metadata: Metadata = {
  * A scorer typed this person's number for a guest player. Nothing has moved:
  * the guest's match stats join this career only if they say it was them (F09).
  */
-export default async function GuestClaimsPage() {
+export default async function GuestClaimsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ answered?: string }>;
+}) {
+  const { answered } = await searchParams;
   const session = await currentSession();
   if (!session) redirect("/login?next=/me/claims");
   const offers = await openGuestClaimOffers(session.personId);
@@ -28,6 +33,13 @@ export default async function GuestClaimsPage() {
           title="Is this you?"
           subtitle="A scorer entered your mobile number for a guest player. Accept only if it was you."
         />
+        {answered === "accepted" || answered === "declined" ? (
+          <p role="status">
+            {answered === "accepted"
+              ? "Done — the match stats are now part of your career."
+              : "Noted. Nothing was changed."}
+          </p>
+        ) : null}
         {offers.length === 0 ? (
           <EmptyState
             headingLevel={2}
@@ -36,7 +48,7 @@ export default async function GuestClaimsPage() {
           />
         ) : (
           offers.map((offer) => (
-            <SectionCard key={offer.noticeId} title={offer.playedAs}>
+            <SectionCard key={offer.noticeId} title={offer.playedAs} aria-label={offer.playedAs}>
               <p>
                 {offer.teamName === null ? "" : `${offer.teamName} · `}
                 {offer.seasonName} · {offer.clubName}
