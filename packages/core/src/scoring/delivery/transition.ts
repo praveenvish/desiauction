@@ -39,7 +39,9 @@ function recordBall(
   bowler.legalBalls += legal ? 1 : 0;
   bowler.wides += wides;
   bowler.noBalls += noBalls;
-  bowler.dots += legal && total === 0 ? 1 : 0;
+  // A dot is a legal ball the bowler conceded nothing from: byes and leg-byes
+  // are not charged to the bowler, so they do not spoil it.
+  bowler.dots += legal && payload.runsBat + wides + noBalls === 0 ? 1 : 0;
   innings.runs += total;
   innings.extras.wides += wides;
   innings.extras.noBalls += noBalls;
@@ -328,11 +330,43 @@ export function applyTransition(state: MatchState, input: MatchEvent): ApplyResu
       if (payload.nonStrikerId === null && !isLoneBatter(state, innings))
         return { ok: false, reason: "not_batting" };
       if (superOver) next.pendingSuperOver = state.pendingSuperOver.slice(1);
+      const revision = state.pendingRevision;
+      if (!superOver && revision && revision.inningsNo === innings.no) {
+        innings.maxBalls = revision.maxBalls;
+        if (revision.targetRuns !== undefined) {
+          innings.target = revision.targetRuns;
+          innings.targetMethod = revision.method;
+        }
+        next.pendingRevision = null;
+      }
       next.innings = [...state.innings, innings];
       break;
     }
     case "revise":
     case "innings_closed": {
+      // A revision for the innings about to start can be entered during the
+      // innings break (a DLS target is usually set before the chase begins).
+      if (
+        event.type === "revise" &&
+        state.phase === "innings_break" &&
+        state.pendingSuperOver.length === 0 &&
+        event.payload.inningsNo === state.innings.length + 1
+      ) {
+        if (
+          !state.format ||
+          actualBallLimit(event.payload.maxBalls, state.format.ballsPerOver, {}) === undefined
+        )
+          return REFUSED;
+        next.pendingRevision = {
+          inningsNo: event.payload.inningsNo,
+          maxBalls: event.payload.maxBalls,
+          method: event.payload.method,
+          ...(event.payload.targetRuns !== undefined
+            ? { targetRuns: event.payload.targetRuns }
+            : {}),
+        };
+        break;
+      }
       if (state.phase !== "live" && state.phase !== "interrupted")
         return { ok: false, reason: "not_live" };
       const previous = currentInnings(state);

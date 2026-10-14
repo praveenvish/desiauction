@@ -1,4 +1,5 @@
 import { canParticipateInOver } from "./overs";
+import { previousOverBowlers } from "./bowlers";
 import type { NextAction } from "../types";
 import { deriveResult } from "./result";
 import { currentInnings } from "./state";
@@ -60,10 +61,11 @@ export function nextActions(state: MatchState): NextAction[] {
     const fielders = state.lineups[innings.bowlingTeamId];
     const allowed: string[] = [];
     const blocked: Extract<NextAction, { kind: "pick_bowler" }>["blocked"] = [];
+    const previousOver = previousOverBowlers(innings);
     for (const id of [...(fielders?.battingOrder ?? []), ...(fielders?.out ?? [])]) {
       const reason = fielders?.out.includes(id)
         ? "subbed_out"
-        : state.format.noConsecutiveOvers && innings.lastBowlerOfPreviousOver === id
+        : state.format.noConsecutiveOvers && previousOver.has(id)
           ? "consecutive"
           : !canParticipateInOver(innings, id, state.format.maxOversPerBowler)
             ? "quota"

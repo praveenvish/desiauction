@@ -2598,3 +2598,70 @@ describe("N-2 net run rate inputs follow the ICC playing conditions", () => {
     expect(score.home).toMatchObject({ nrr_runs: 8, nrr_balls: 6 });
   });
 });
+
+describe("F12 law gaps", () => {
+  it("(a) a run out on a wide may record the runs completed before it", () => {
+    const state = fresh();
+    const next = apply(state, {
+      ...payload(state, 0, { wides: 2 }),
+      wicket: {
+        kind: "run_out",
+        playerOutId: innings(state).nonStrikerId ?? "h2",
+        fielderIds: [],
+        runsCompleted: 1,
+      },
+    });
+    expect(innings(next)).toMatchObject({ runs: 2, wickets: 1 });
+  });
+  it("(b) nobody who bowled any ball of the previous over may bowl the next (Law 17.8)", () => {
+    let state = fresh();
+    state = apply(state, payload(state));
+    state = transition(state, "bowler_set", { bowlerId: "a2", midOver: true, reason: "injury" });
+    for (let n = 0; n < 5; n++) state = apply(state, payload(state));
+    expect(innings(state).bowlerId).toBeNull();
+    for (const bowlerId of ["a1", "a2"])
+      expect(
+        applyEvent(state, event("bowler_set", { bowlerId, midOver: false }, state.lastSeq + 1)),
+      ).toMatchObject({ ok: false, reason: "bowler_consecutive" });
+    state = transition(state, "bowler_set", { bowlerId: "a3", midOver: false });
+    state = apply(state, payload(state));
+    expect(
+      applyEvent(
+        state,
+        event("bowler_set", { bowlerId: "a2", midOver: true, reason: "injury" }, state.lastSeq + 1),
+      ),
+    ).toMatchObject({ ok: false, reason: "bowler_consecutive" });
+  });
+  it("(c) a free hit allows hit the ball twice", () => {
+    let state = fresh();
+    state = apply(state, payload(state, 0, { noBall: true }));
+    expect(innings(state).freeHitNext).toBe(true);
+    const next = apply(state, {
+      ...payload(state),
+      wicket: { kind: "hit_twice", playerOutId: innings(state).strikerId ?? "h1", fielderIds: [] },
+    });
+    expect(innings(next).wickets).toBe(1);
+  });
+  it("(d) a legal bye or leg bye is a dot for the bowler", () => {
+    let state = fresh();
+    state = apply(state, payload(state, 0, { byes: 2 }));
+    state = apply(state, payload(state, 0, { legByes: 1 }));
+    const bowler = innings(state).bowlers[innings(state).bowlerId ?? "a1"];
+    expect(bowler).toMatchObject({ dots: 2, runs: 0 });
+  });
+  it("(e) a revised target can be set during the innings break and applies when the chase starts", () => {
+    let state = fullMatch();
+    state = apply(state, payload(state, 6, {}, 6));
+    state = dotsToEnd(state);
+    expect(state.phase).toBe("innings_break");
+    state = transition(state, "revise", {
+      inningsNo: 2,
+      maxBalls: 4,
+      targetRuns: 5,
+      method: "dls",
+    });
+    state = startNext(state);
+    expect(innings(state)).toMatchObject({ maxBalls: 4, target: 5, targetMethod: "dls" });
+    expect(state.pendingRevision).toBeNull();
+  });
+});

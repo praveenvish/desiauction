@@ -112,7 +112,8 @@ describe("scoring sheets", () => {
     expect(legalWickets(state, ball, "home-2")).toEqual(["run_out", "obstructing", "timed_out"]);
     const m = model();
     m.apply("ball", { ...ball, extras: { noBall: true } });
-    expect(legalWickets(m.view().state, ball)).toEqual(["run_out", "obstructing"]);
+    // Free hit after the no-ball: run out, hit the ball twice and obstructing (ICC).
+    expect(legalWickets(m.view().state, ball)).toEqual(["run_out", "hit_twice", "obstructing"]);
   });
   it("derives replacement after the wicket and omits it at all out", () => {
     const m = model();

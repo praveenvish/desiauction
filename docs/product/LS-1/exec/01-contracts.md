@@ -648,12 +648,12 @@ Each rule has a unit test named `R-xx …` in `packages/core/src/scoring/deliver
 - R-07: At the end of a legal over (`legalBalls % ballsPerOver === 0`), strike swaps and `bowlerId` becomes null. A new bowler is required (`bowler_set`) before the next ball.
 
 **Bowlers**
-- R-08: `noConsecutiveOvers` rejects a `bowler_set` naming the bowler of the previous over (`bowler_consecutive`), except in the first over of an innings.
+- R-08: `noConsecutiveOvers` rejects a `bowler_set` (start of over **or mid-over replacement**) naming anyone who bowled any ball of the previous over (`bowler_consecutive`, Law 17.8). *(Amended 2026-10-14: previously only the bowler of the last ball was blocked, and mid-over replacements were not checked.)*
 - R-09: `maxOversPerBowler` rejects a bowler whose completed legal overs = max (`bowler_quota`).
 
 **Wickets**
 - R-10: Bowler-credited kinds are `bowled`, `caught`, `caught_and_bowled`, `lbw`, `stumped`, `hit_wicket`. All other kinds are not credited to the bowler.
-- R-11: On a wide only `stumped`, `run_out`, `hit_wicket` and `obstructing` are allowed. On a no-ball only `run_out`, `obstructing` and `hit_twice` are allowed. On a free hit only `run_out` and `obstructing` are allowed. Otherwise reject `illegal_wicket_on_extra` / `free_hit_dismissal`.
+- R-11: On a wide only `stumped`, `run_out`, `hit_wicket` and `obstructing` are allowed. On a no-ball only `run_out`, `obstructing` and `hit_twice` are allowed. On a free hit only `run_out`, `hit_twice` and `obstructing` are allowed (ICC; amended 2026-10-14). A run out on a wide may record `runsCompleted` up to `wides − wideRuns`. Otherwise reject `illegal_wicket_on_extra` / `free_hit_dismissal`.
 - R-12: `lbw` is rejected when `format.lbw` is false (`illegal_wicket_on_extra` with detail `lbw_off`).
 - R-13: After a wicket the dismissed end is empty. The next ball is rejected (`not_batting`) until `new_batter`, unless the innings is closed (R-15).
 - R-14: `retire hurt` empties the end without a wicket; the player may later `resume_batting` into an empty end. `retire out` counts as a wicket with no bowler credit.
@@ -666,7 +666,7 @@ Each rule has a unit test named `R-xx …` in `packages/core/src/scoring/deliver
   - the batting order has no available batter (`no_more_batters`);
   - `innings_closed` is applied.
 - R-16: The target for innings 2 = innings 1 runs (incl. penalty) + 1, unless revised by `revise.targetRuns`.
-- R-17: `revise` sets `maxBalls` = `maxBalls` from the payload, and `target` when given. A revise is allowed at any time while live.
+- R-17: `revise` sets `maxBalls` = `maxBalls` from the payload, and `target` when given. A revise is allowed at any time while live, **and during the innings break for the innings about to start** (held as `pendingRevision` and applied at `innings_started`; amended 2026-10-14).
 
 **Super over**
 - R-18: A tie (runs equal, both innings closed) with `format.superOver` true gives phase `result_reached` with `nextActions` offering `start_super_over`.
@@ -808,7 +808,7 @@ Super-over balls are excluded from `PlayerLine` (R-21).
   Two further rules:
   - **Milestones do not stack.** Only the highest reached milestone scores; 58 runs gets +8 for 50, not +4 and +8.
   - **Thresholds.** Pace and economy apply only above the minimum balls (T20: 10 balls batting, 12 balls bowling; T10: 6/6; Box: 5/6), and are capped (±10 / ±8 / ±6).
-- **A-2** `AwardLine` is `{ code: string; label: string; qty: number; points: number }`. Codes:
+- **A-2** `AwardLine` is `{ code: string; label: string; qty: number; points: number }`. A **dot** is a legal ball from which the bowler concedes nothing (byes and leg-byes do not spoil it; amended 2026-10-14). Codes:
   `runs, fours, sixes, milestone_30, milestone_50, milestone_100, milestone_25, milestone_20, pace_vs_match, wickets, bowled_lbw_bonus, top_order_bonus, haul, dots, maidens, economy_vs_match, catches, stumpings, run_out_direct, run_out_assist, duck`.
   Labels are fixed English strings, e.g. `"Faster than the match"` and `"Cheaper than the match"`.
 - **A-3** Award kinds:

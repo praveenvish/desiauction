@@ -27,7 +27,7 @@ export function validateDismissal(
     return { ok: false, reason: "illegal_wicket_on_extra", detail: "wide" };
   if (ball.extras.noBall && !["run_out", "obstructing", "hit_twice"].includes(wicket.kind))
     return { ok: false, reason: "illegal_wicket_on_extra", detail: "no_ball" };
-  if (innings.freeHitNext && !["run_out", "obstructing"].includes(wicket.kind))
+  if (innings.freeHitNext && !["run_out", "obstructing", "hit_twice"].includes(wicket.kind))
     return { ok: false, reason: "free_hit_dismissal" };
   if (wicket.playerOutId !== innings.strikerId && wicket.playerOutId !== innings.nonStrikerId)
     return { ok: false, reason: "not_batting" };
@@ -56,6 +56,7 @@ export function validateDismissal(
     wicket.runsCompleted !== undefined &&
     wicket.runsCompleted !==
       ball.runsBat +
+        (ball.extras.wides ? ball.extras.wides - (state.format?.wideRuns ?? 1) : 0) +
         (ball.extras.byes ?? 0) +
         (ball.extras.legByes ?? 0) +
         (ball.extras.noBall

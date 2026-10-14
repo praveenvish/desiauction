@@ -75,6 +75,13 @@ export interface MatchState {
   originalTieSetting: SeasonScoringRules["superOverTie"] | null;
   superOverTie: SeasonScoringRules["superOverTie"];
   pendingSuperOver: { inningsNo: number; battingTeamId: string }[];
+  /** A revision entered at the innings break for the innings about to start (DLS before the chase). */
+  pendingRevision: {
+    inningsNo: number;
+    maxBalls: number;
+    targetRuns?: number;
+    method: "manual" | "dls";
+  } | null;
   phase: Phase;
   attempt: number;
   competition: { name: string; season: string } | null;
@@ -111,6 +118,7 @@ export function initialState(attempt = 1): MatchState {
     originalTieSetting: null,
     superOverTie: "another",
     pendingSuperOver: [],
+    pendingRevision: null,
     phase: "not_started",
     attempt,
     competition: null,
