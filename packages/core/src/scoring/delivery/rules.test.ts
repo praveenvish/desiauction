@@ -2544,3 +2544,57 @@ it("ends between-over STAT when an illegal delivery starts the next over", () =>
   expect(innings(state).ballsInOver).toBe(0);
   expect(overlayProjection(state).betweenOvers).toBe(false);
 });
+
+describe("N-2 net run rate inputs follow the ICC playing conditions", () => {
+  it("charges the full quota to a side left with no batter able to come in", () => {
+    let state = fresh();
+    state = transition(state, "retire", { registrationId: "h1", kind: "out" });
+    state = transition(state, "new_batter", { registrationId: "h3", end: "striker" });
+    state = transition(state, "retire", { registrationId: "h3", kind: "out" });
+    expect(innings(state).closed).toBe("no_more_batters");
+    const quota = innings(state).maxBalls;
+    expect(scoreForResult(state, NEW_SEASON_SCORING_RULES).home.nrr_balls).toBe(quota);
+    expect(
+      scoreForResult(state, { ...NEW_SEASON_SCORING_RULES, allOutUsesQuota: false }).home.nrr_balls,
+    ).toBe(0);
+  });
+  it("credits the first side with target − 1 off the chasing side's allotted balls", () => {
+    let state = fullMatch();
+    state = apply(state, payload(state, 6, {}, 6));
+    state = startNext(dotsToEnd(state));
+    state = transition(state, "revise", {
+      inningsNo: 2,
+      maxBalls: 3,
+      targetRuns: 5,
+      method: "dls",
+    });
+    state = apply(state, payload(state, 6, {}, 6));
+    expect(innings(state).closed).toBe("target");
+    const score = scoreForResult(state, NEW_SEASON_SCORING_RULES);
+    expect(score.home).toMatchObject({ runs: 6, nrr_runs: 4, nrr_balls: 3 });
+    expect(score.away).toMatchObject({ runs: 6, nrr_runs: 6, nrr_balls: 1 });
+  });
+  it("charges a revised chase that is bowled out its revised quota", () => {
+    let state = startNext(dotsToEnd(fullMatch()));
+    state = transition(state, "revise", {
+      inningsNo: 2,
+      maxBalls: 6,
+      targetRuns: 9,
+      method: "dls",
+    });
+    for (let n = 0; n < 10 && !innings(state).closed; n++) {
+      state = apply(state, {
+        ...payload(state),
+        wicket: { kind: "bowled", playerOutId: innings(state).strikerId ?? "a1", fielderIds: [] },
+      });
+      if (!innings(state).closed && innings(state).strikerId === null)
+        state = transition(state, "new_batter", {
+          registrationId: `a${String(n + 3)}`,
+          end: "striker",
+        });
+    }
+    const score = scoreForResult(state, NEW_SEASON_SCORING_RULES);
+    expect(score.away.nrr_balls).toBe(6);
+    expect(score.home).toMatchObject({ nrr_runs: 8, nrr_balls: 6 });
+  });
+});

@@ -317,7 +317,10 @@ export const CRICKET: SportPack = {
     points: DEFAULT_POINTS,
     /* Runs per BALL times six — never runs per decimal over. See `netRate`. */
     tiebreakers: [
-      netRateWithFallback("runs", "nrr_balls", "balls", 6, "NRR", { key: "net_run_rate" }),
+      netRateWithFallback("runs", "nrr_balls", "balls", 6, "NRR", {
+        key: "net_run_rate",
+        preferredNumerator: "nrr_runs",
+      }),
     ],
     summariseSide: summariseFields("{runs}/{balls:overs}"),
   },

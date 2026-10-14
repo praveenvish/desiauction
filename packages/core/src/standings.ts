@@ -195,17 +195,26 @@ function addFixtureScore(
   source: ScoreRecord | undefined,
   fields: readonly string[],
 ): void {
-  const previousBalls = target.balls ?? 0;
-  const previousNrr = target.nrr_balls;
-  const supplied = source?.nrr_balls;
+  // Net run rate inputs (`nrr_runs`, `nrr_balls`) fall back to the plain
+  // runs/balls of every fixture that did not record them, so older typed
+  // results and newer scored ones add up on the same basis.
+  const pairs = [
+    ["nrr_runs", "runs"],
+    ["nrr_balls", "balls"],
+  ] as const;
+  const previous = pairs.map(([nrr, plain]) => [target[nrr], target[plain] ?? 0] as const);
   addInto(
     target,
     source,
-    fields.filter((field) => field !== "nrr_balls"),
+    fields.filter((field) => field !== "nrr_balls" && field !== "nrr_runs"),
   );
-  if (previousNrr !== undefined || (supplied !== undefined && supplied !== null)) {
-    target.nrr_balls = (previousNrr ?? previousBalls) + (supplied ?? source?.balls ?? 0);
-  }
+  pairs.forEach(([nrr, plain], index) => {
+    const [previousNrr, previousPlain] = previous[index] ?? [undefined, 0];
+    const supplied = source?.[nrr];
+    if (previousNrr !== undefined || (supplied !== undefined && supplied !== null)) {
+      target[nrr] = (previousNrr ?? previousPlain) + (supplied ?? source?.[plain] ?? 0);
+    }
+  });
 }
 
 /**

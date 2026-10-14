@@ -94,7 +94,10 @@ export const BOX_CRICKET: SportPack = {
      * prevent is proportionally worse in a box than on a ground.
      */
     tiebreakers: [
-      netRateWithFallback("runs", "nrr_balls", "balls", 6, "NRR", { key: "net_run_rate" }),
+      netRateWithFallback("runs", "nrr_balls", "balls", 6, "NRR", {
+        key: "net_run_rate",
+        preferredNumerator: "nrr_runs",
+      }),
     ],
     summariseSide: summariseFields("{runs}/{wickets} ({balls:overs})"),
   },

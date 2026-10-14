@@ -780,17 +780,17 @@ Super-over balls are excluded from `PlayerLine` (R-21).
 - **N-1 `deriveResult`** returns null or one of:
   - `{ outcome: 'home_win'|'away_win'|'tie'|'no_result'|'abandoned'; winnerTeamId: string|null; marginText: string; method: 'super_over'|'dls'|'manual_target'|'walkover'|null }`.
   - `marginText` reads e.g. "by 6 wickets", "by 22 runs", "on super over", "by walkover".
-- **N-2** `fixture_results.score` written at finalize: `{ home: { runs, wickets, balls, nrr_balls }, away: { … } }`.
-  - `balls` = actual legal balls faced.
+- **N-2** `fixture_results.score` written at finalize: `{ home: { runs, wickets, balls, nrr_runs, nrr_balls }, away: { … } }`. *(Amended 2026-10-14 to follow the ICC playing conditions; the original text charged every revised chase its full quota, which was wrong.)*
+  - `runs` / `balls` = actual runs and legal balls (display).
   - `nrr_balls`:
-    - if all out and `allOutUsesQuota`, the full quota (`maxBalls` of that innings);
-    - if a revised target applied, the revised `maxBalls`;
-    - else the legal balls.
+    - all out **or no batter left to come in** (`no_more_batters`), with `allOutUsesQuota`: the innings quota (`maxBalls`, the revised one if revised);
+    - otherwise the legal balls faced. A winning chase, revised or not, is charged only the balls it faced.
+  - `nrr_runs`: the runs counted for NRR. Equal to `runs`, except in a match with a revised target (manual or DLS): the side that batted first is credited with **target − 1 runs off the chasing side's allotted balls** (`nrr_runs = target − 1`, `nrr_balls = chase maxBalls`).
   - Super overs are excluded.
 - **N-3** `packages/core/src/standings.ts` changes:
   - `StandingsRules` gains `allOutUsesQuota?: boolean` and `excludeNoResultFromNrr?: boolean`.
   - When `excludeNoResultFromNrr` is set, `no_result` outcomes do not add scores (points are still awarded).
-  - The cricket tiebreaker uses `netRate("runs", "nrr_balls" if present else "balls", 6, …)`. Implement as a new helper `netRateWithFallback(numerator, preferred, fallback, per, label, options)` in `tiebreakers.ts`, and use it in the cricket and box_cricket packs. This is still a value call, so `pack-contract` stays green.
+  - The cricket tiebreaker uses `netRate("nrr_runs" if present else "runs", "nrr_balls" if present else "balls", 6, …)` (the `preferredNumerator` option). Implement as a new helper `netRateWithFallback(numerator, preferred, fallback, per, label, options)` in `tiebreakers.ts`, and use it in the cricket and box_cricket packs. This is still a value call, so `pack-contract` stays green.
   - The display `summariseSide` keeps using `balls`.
 - **N-4** `server/competition/results.ts` `recordFixtureResult` refuses with the new reason `scored_match` when a `matches` row exists for the fixture with `last_seq > 0`. The UI shows "This match is scored ball by ball. Correct it from the scorecard."
 

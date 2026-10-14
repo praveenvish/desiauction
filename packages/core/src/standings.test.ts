@@ -862,3 +862,26 @@ it("uses all-out quota only when result production enables it, then aggregates t
     ).toBe(enabled ? -22 : -12);
   }
 });
+
+describe("N-2 revised-target credit in the table", () => {
+  it("uses the credited runs and balls of a revised match, and plain runs elsewhere", () => {
+    const revised: FixtureResultInput = {
+      homeTeamId: A,
+      awayTeamId: B,
+      outcome: "away_win",
+      homeScore: { runs: 6, wickets: 0, balls: 6, nrr_runs: 4, nrr_balls: 3 },
+      awayScore: { runs: 6, wickets: 0, balls: 1, nrr_runs: 6, nrr_balls: 1 },
+    };
+    const legacy: FixtureResultInput = {
+      homeTeamId: A,
+      awayTeamId: B,
+      outcome: "home_win",
+      homeScore: { runs: 100, balls: 60 },
+      awayScore: { runs: 90, balls: 60 },
+    };
+    const row = rowFor(buildStandings(TEAMS, [revised, legacy], CRICKET_RULES), A);
+    expect(row.scored).toMatchObject({ runs: 106, nrr_runs: 104, nrr_balls: 63 });
+    expect(row.conceded).toMatchObject({ runs: 96, nrr_runs: 96, nrr_balls: 61 });
+    expect(row.tiebreakers.net_run_rate).toBeCloseTo((104 / 63) * 6 - (96 / 61) * 6);
+  });
+});
