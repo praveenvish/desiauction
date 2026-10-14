@@ -1571,3 +1571,25 @@ Managed runner34250exit0/stagecomplete and ports3050–3051free before completio
 - [x] Per-entry acceptance and amendments recorded above instead of a PR body.
 - [x] As built documentation and reproducible final gate evidence.
 - [ ] Human-owned PR/push/remote CI/merge, explicitly deferred by instruction; no claim these occurred.
+
+## 2026-10-14 · Architect review fixes and F-GATE
+
+The architect executed the fix list in `05-review-fixes.md` (F01–F13) on this branch; its status table maps each fix to its commit. F-GATE ran on a fresh database (`ls1gate`, migrations 0112–0127, five roles, `pnpm seed:demo`):
+
+| Gate | Result |
+|---|---|
+| G-db | journal 127 entries OK; web + engine migrations applied |
+| G-roles | `grants:verify` 985 expectations, 94 tables, 5 roles; `rls:verify` PASS; `posture:verify` 16 files / 82 tests |
+| G-static | `check:motion`, `check:posture` (86 by-design, 0 debt/defect), `depcruise`, `format:check`; `turbo run lint typecheck --force` 27/27 |
+| Unit | `turbo run test --force` 11/11 (core 1221, ui 193, messaging 264, …) |
+| Integration | `turbo run test:integration --force --concurrency=1`: web 319 files / 3317, engine 75, live 9 (incl. 420-case P-1 parity as `desiauction_live`), finops-runner 5 |
+| Browser (precompiled, chromium) | final full run 258 passed, 29 declared skips, 1 failed + 2 serial dependents not run: `public-experience.spec.ts` "a mistyped address…" — the 404 heading is server-rendered every time (30/30 HTML probes); the test also fails intermittently on unmodified `origin/main` (1 in 8 whole-file runs, same DB), so it is a pre-existing flake, not an LS-1 regression. Every LS-1 spec passed |
+| 500 viewers (live-states) | 14,985 attempts, p95 68.7 ms (< 300), 304 ratio 96.7 % (> 80 %), passed |
+| Socket load (apps/live as `desiauction_live`) | 5 rooms × 300 sockets, 1500/1500 framed, 0 failures, p50 2.6 ms, p95 4.5 ms |
+| X-20 sixty-second start | `/score` → setup 0.2 s → pad ready 2.4 s → first ball accepted 2.5 s (< 60 s), Playwright trace attached |
+
+Harness notes for the next run: build with `PUBLIC_BASE_URL=http://localhost:3050` and export `NEXT_DIST_DIR=.next-e2e` for the test process too; seed the demo data on a fresh database; untracked `apps/web/e2e/.ui-e1*` folders from the UI-refinement programme must be moved aside or Playwright collects them.
+
+Defects the browser suite caught and fixed in this round: the guest-claim offer confirmation vanished on re-render (`/me/claims` now redirects with the answer); three spec races (rally finish read before send, axe mid theme transition, guest-claim flow updated for F09).
+
+Known gap, unchanged by these fixes: after the edit window passes and before the sweep marks a match `final`, nobody (not even an organiser) can correct it.

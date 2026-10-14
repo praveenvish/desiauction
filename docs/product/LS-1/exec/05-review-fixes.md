@@ -4,7 +4,7 @@
 
 **Reviewer:** Claude (architect). Method: `04-validation.md` §3, plus four independent read-only reviews and gate re-runs.
 
-**Verdict: DO NOT MERGE YET.**
+**Verdict: DO NOT MERGE YET.** *(Superseded 2026-10-14: every fix landed and F-GATE passed — see Status.)*
 
 **Status (2026-10-14):**
 - The founder accepted every recommendation in §3 (R1–R7).
@@ -28,7 +28,7 @@
 
   | F13 contracts | this commit | `01-contracts.md` now describes the code, including C29–C41 and every fix above |
 
-  F-GATE follows.
+  F-GATE passed on a fresh database (2026-10-14); results in EXEC-LOG. The one browser failure is a pre-existing `main` flake.
 - ⚠️ A local-only merge commit `7a190185` ("Merge verified UI checkpoint 680d3c64 into main") exists on the **local** `main` (worktree `main-ui-merge`). **Never push it.** It carries the UI-refinement programme (storage-gated auction bids, 27 MB `BASELINE.json`) and is based on a stale `main`. When LS-1 merges, reset local `main` to `origin/main`.
 
 The live-scoring work (`55c97aef`) is high quality and close to mergeable. The branch also carries a separate unreleased programme (UI-REFINEMENT) that changes live-auction bidding, and the review found five launch-blocking security/integrity issues plus three cricket-law bugs. Fix them in the order below, on the same branch (rules from `00-README.md` still apply), then the architect re-validates.
