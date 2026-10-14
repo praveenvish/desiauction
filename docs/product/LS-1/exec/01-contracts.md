@@ -10,21 +10,28 @@ All migrations are hand-authored in `packages/db/migrations/`. Each one starts w
 
 Each migration is mirrored by hand in `packages/db/src/schema.ts`, using the helpers `id()` and `ts()` (lines 26-27). Every new table is also added to `apps/web/src/server/test-support/purge-org.ts`, in the import list and in the delete order with children before parents.
 
-Planned numbers. Renumber per trap T1 if `main` moved.
+As built (journal `packages/db/migrations/meta/_journal.json`). Renumber per trap T1 if `main` moved.
 
-| File | idx | when | Commit |
-|---|---|---|---|
-| `0112_ls1_match_core.sql` | 111 | 1793376000000 | C13 |
-| `0113_ls1_people_on_match.sql` | 112 | 1793462400000 | C14 |
-| `0114_ls1_scorer_grant_and_result_source.sql` | 113 | 1793548800000 | C14 |
-| `0115_ls1_move_tournament_tables.sql` | 114 | 1793635200000 | C15 |
-| `0116_ls1_lines_and_awards.sql` | 115 | 1793721600000 | C35 |
-| `0117_ls1_previous_career.sql` | 116 | 1793808000000 | C37 |
-| `0118_ls1_trust.sql` | 117 | 1793894400000 | C38 |
-| `0119_ls1_personal_org.sql` | 118 | 1793980800000 | C40 |
-| `0120_ls1_team_formation.sql` | 119 | 1794067200000 | C41 |
-| `0121_ls1_ball_facts.sql` | 120 | 1794153600000 | C42 |
-| `0122_ls1_move_tournament_tables_2.sql` | 121 | 1794240000000 | C42 |
+| File | idx | when | Commit | Section |
+|---|---|---|---|---|
+| `0112_ls1_match_core.sql` | 111 | 1793376000000 | C13 | D-1, D-2, D-3 |
+| `0113_ls1_people_on_match.sql` | 112 | 1793462400000 | C14 | D-4, D-5 |
+| `0114_ls1_scorer_grant_and_result_source.sql` | 113 | 1793548800000 | C14 | D-6, D-7 |
+| `0115_ls1_move_tournament_tables.sql` | 114 | 1793635200000 | C15 | D-8 |
+| `0116_ls1_lines_and_awards.sql` | 115 | 1793721600000 | C35 | D-9, D-8 |
+| `0117_ls1_previous_career.sql` | 116 | 1793808000000 | C37 | D-10 |
+| `0118_ls1_trust.sql` | 117 | 1793894400000 | C38 | D-11 |
+| `0119_ls1_personal_org.sql` | 118 | 1793980800000 | C40 | D-12 |
+| `0120_ls1_team_formation.sql` | 119 | 1794067200000 | C41 | D-13 |
+| `0121_ls1_ball_facts.sql` | 120 | 1794153600000 | C42 | D-14 |
+| `0122_ls1_move_tournament_tables_2.sql` | 121 | 1794240000000 | C42 | D-8 |
+| `0123_ls1_scorer_award_identity.sql` | 122 | 1794326400000 | C42 | D-9 |
+| `0124_ls1_lobby_result_source.sql` | 123 | 1794412800000 | C54 | D-15 |
+| `0125_ls1_manager_policy_split.sql` | 124 | 1794499200000 | F09 | D-4, D-5 |
+| `0126_ls1_live_history_column.sql` | 125 | 1794585600000 | F05 | D-3 |
+| `0127_ls1_live_role_functions.sql` | 126 | 1794672000000 | F07 | D-16 |
+
+**Person arms are SELECT-only.** Every LS-1 table that lets a person read rows outside the current tenant does it with a separate `FOR SELECT` policy next to an org-equality `FOR ALL` tenant policy. No person arm can insert, update or delete. A default (`FOR ALL`) person arm is never used, because `DELETE` is governed by `USING` alone (found in C35). Applies to D-4, D-9, D-13 and D-14.
 
 ### D-1 `matches` (0112)
 
@@ -98,7 +105,7 @@ CREATE TABLE "match_events" (
 - **Append-only (INV-04):** a guarded `REVOKE UPDATE, DELETE ON match_events FROM desiauction_app, desiauction_engine, desiauction_runner, desiauction_system` in the migration, using the `DO $$ … FOREACH role_name …` pattern from 0085, which revokes only for roles that exist. Add `match_events` to `ops/db/create-app-role.sql` line 236 and to `APPEND_ONLY` in `apps/web/scripts/verify-grants.ts`.
 - Also add `REVOKE ALL ON matches, match_events, match_live_state FROM desiauction_engine, desiauction_runner` (guarded) and the same line in `create-app-role.sql` next to line 270.
 
-### D-3 `match_live_state` (0112)
+### D-3 `match_live_state` (0112, 0126)
 
 One row per match, written in the append transaction. Public reads go by primary key.
 
@@ -108,12 +115,15 @@ CREATE TABLE "match_live_state" (
   "org_id" char(26) NOT NULL,
   "competition_id" char(26) NOT NULL,
   "seq" bigint NOT NULL,
-  "state" jsonb NOT NULL,                  -- PublicLiveState (S-5)
+  "state" jsonb NOT NULL,                  -- latest stored entry: PublicLiveState (S-5) + optional sidecars
+  "history" jsonb NOT NULL DEFAULT '[]'::jsonb,  -- 0126: the delay ring, ≤ 30 entries, oldest first
   "updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 ```
 
-FK `fixture_id → fixtures CASCADE`. RLS: tenant policy.
+- FK `fixture_id → fixtures CASCADE`. RLS: tenant policy.
+- `state` holds the latest lean `PublicLiveState` plus optional sibling sidecars, each built from the same fold and names in the same transaction: `scorecard` (C30), `charts` (C31), `resultDetails` (C36), `overlay` (C43) and the family `panel` (C47). Sidecars never enlarge the lean DTO (the 6 KB S-5 budget is unchanged).
+- `history` is the betting-delay ring: the last 30 stored entries (`{ updatedAt, state, …sidecars }`). Until F05 it lived inside `state.history`; 0126 moved it out and strips `state.history` from existing rows, so a hot read fetches one released entry instead of all thirty. (amended F05)
 
 ### D-4 `team_managers` (0113)
 
@@ -141,11 +151,13 @@ CREATE TABLE "team_managers" (
   - `team_id → teams CASCADE`;
   - `person_id → people RESTRICT`;
   - `created_by → people RESTRICT`.
-- **Policy `team_managers_tenant`:**
-  - `USING (org_id = current_setting('app.org_id', true) OR person_id = current_setting('app.person_id', true))`;
-  - `WITH CHECK (org_id = current_setting('app.org_id', true))`.
+- **Policies (as of 0125, amended F09):**
+  - `team_managers_tenant` (`FOR ALL`): `USING` and `WITH CHECK` `(org_id = current_setting('app.org_id', true))`;
+  - `team_managers_person_read` (`FOR SELECT`): `USING (person_id = current_setting('app.person_id', true))`.
 
-  This is the same shape as `registrations_tenant`.
+  0113 shipped a single `FOR ALL` policy with an `OR person_id = …` arm in `USING` (the `registrations_tenant` shape). 0125 split it so a manager can read their own rows from any tenant context but can write only inside the club's tenant.
+- 0125 also revokes `team_managers` and `fixture_officials` from `desiauction_engine` and `desiauction_runner` (guarded `DO $$` block, plus the recipe and `verify-grants.ts`).
+- Automatic auction-owner provisioning is one-time per (org, competition, team, person): any earlier row for that tuple, revoked or not, suppresses it. It takes the advisory lock `ls1-manager:<org>:<competition>:<team>:<person>` (C16). Team-entry approval also creates a `captain` manager (C41).
 
 ### D-5 `fixture_officials` (0113)
 
@@ -171,6 +183,8 @@ CREATE TABLE "fixture_officials" (
   - `created_by → people RESTRICT`.
 - Index `(fixture_id)`.
 - RLS: tenant policy.
+- Revoked from engine and runner (0125, F09).
+- A handover redemption may appoint a guest as `scorer` here (`created_by` = issuer, C19). Removed officials are never revived.
 
 ### D-6 Grants and result source (0114)
 
@@ -201,13 +215,14 @@ UPDATE competitions SET scoring_rules = '{"allOutUsesQuota":false,"excludeNoResu
 
 New seasons are created with the F-3 defaults (all true), set by application code at creation.
 
-### D-8 `move_tournament` (0115 and 0122)
+### D-8 `move_tournament` (0115, 0116 and 0122)
 
 `CREATE OR REPLACE FUNCTION platform_move_tournament(char, char, char, text, char, char, char, text)`.
-- Copy the **entire** current body from `0109_move_single_season.sql`.
+- Copy the **entire** current body from the previous definition (first `0109_move_single_season.sql`; then each LS-1 version copies the one before it, keeping every update, check, grant, audit and return field).
 - Add the line `UPDATE <table> SET org_id = p_target_org WHERE competition_id = ANY (v_comps);` for each of:
   - `matches`, `match_events`, `match_live_state`, `team_managers`, `fixture_officials` (in 0115);
-  - `match_player_lines`, `match_awards`, `ball_facts`, `match_confirmations` (in 0122).
+  - `match_player_lines`, `match_awards` (in 0116, C35);
+  - `ball_facts`, `match_confirmations`, `team_entries` (in 0122; `team_entries` added by the C42 amendment).
 - `match_events` is append-only for the app role. The function is `SECURITY DEFINER` (owner), so the UPDATE is allowed there; keep it that way.
 - Extend `apps/web/src/posture/move-tournament.posture.test.ts` so it asserts that each table's rows moved.
 
@@ -237,14 +252,18 @@ CREATE TABLE "match_player_lines" (
   - fixture → CASCADE;
   - registration → CASCADE;
   - team → RESTRICT.
-- RLS: tenant policy with a person arm via registrations:
+- RLS (amended C35): two policies.
   ```sql
-  USING (org_id = current_setting('app.org_id', true)
-         OR registration_id IN (SELECT id FROM registrations
-                                WHERE person_id = current_setting('app.person_id', true)))
-  WITH CHECK (org_id = current_setting('app.org_id', true))
+  CREATE POLICY "match_player_lines_tenant" ON "match_player_lines" FOR ALL
+    USING (org_id = current_setting('app.org_id', true))
+    WITH CHECK (org_id = current_setting('app.org_id', true));
+  CREATE POLICY "match_player_lines_person_read" ON "match_player_lines" FOR SELECT
+    USING (registration_id IN (SELECT id FROM registrations
+                               WHERE person_id = current_setting('app.person_id', true)));
   ```
-- If `rls:verify` flags this as non-org-equality, add `match_player_lines` to `PARTICIPANT_SCOPED` in `apps/web/scripts/verify-rls.ts` **with a proof query** mirroring how `auction_team_targets` is proven.
+  A person sees their own lines from any tenant; only the owning tenant writes.
+- `rls:verify` lists `match_player_lines` as participant-scoped with a proof query (the `auction_team_targets` pattern).
+- Lines are rebuilt at every finalization (FIN-1) from the canonical fold, with the frozen format and award version. Rally and hockey matches write no lines (C49, C53); kabaddi and football/basketball write their own family lines.
 
 ```sql
 CREATE TABLE "match_awards" (
@@ -266,8 +285,12 @@ CREATE TABLE "match_awards" (
 );
 ```
 
-- Append-only (INV-04 treatment: migration revoke, recipe and APPEND_ONLY). The current award for a `(scope, fixture_id|competition_id, kind)` is the latest row.
-- RLS: tenant policy.
+- Address check `match_awards_address_check`: `scope='match'` needs `fixture_id`; `scope='season'` needs `fixture_id IS NULL` (C35).
+- Indexes `match_awards_fixture_current_idx (scope, fixture_id, kind, created_at DESC, id DESC)` and `match_awards_competition_current_idx (scope, competition_id, kind, created_at DESC, id DESC)`.
+- Append-only (INV-04 treatment: migration revoke, recipe and APPEND_ONLY). The current award for a `(scope, fixture_id|competition_id, kind)` is the latest row by `created_at DESC, id DESC`. An insert is serialised so its `created_at` is strictly later than the previous row's, even on a tied or backward clock; the audit keeps the real action time.
+- RLS: tenant policy only (no person arm).
+- **0123 (C42):** adds `computed_person_id char(26)` and `winner_person_id char(26)`, with check `match_awards_identity_check`: for `scope='season' AND kind='scorer_of_season'` both registration columns are null (the scorer is a person, not a registration); for every other kind both person columns are null.
+- Automatic rows: changed picks append (explicit null winner allowed); an identical pick appends nothing. An organiser override appends a row with `source='organizer'`, a trimmed non-empty `reason`, the latest computed pick kept as context and the chosen player's points as `score`. Re-finalization never writes an `auto` row for a kind that has an organiser override (C35).
 
 ### D-10 `player_previous_careers` (0117)
 
@@ -286,6 +309,8 @@ CREATE TABLE "player_previous_careers" (
 
 - This table is person-scoped, the same pattern as `player_profiles`: **no RLS**, and the module self-scopes by person.
 - Add it to `APP_WRITES_PERSON` in `verify-grants.ts` and to `REVOKE ALL … FROM engine, runner`.
+- Every read, upsert and delete is scoped to the session person; the form never supplies a person id. Shown on the person's own career only, labelled self-reported, and excluded from every scored total, board and award (C37).
+- Account erasure deletes the person's rows in the existing erasure transaction and removes an owned screenshot after commit. Tournament moves and org purges do not touch this person-global table (C37).
 
 ### D-11 Trust (0118)
 
@@ -306,7 +331,8 @@ CREATE UNIQUE INDEX "match_confirmations_one_uq" ON "match_confirmations" ("fixt
 ALTER TABLE "matches" ADD COLUMN "trust_reasons" jsonb NOT NULL DEFAULT '[]'::jsonb;  -- TrustReason[] (T-2)
 ```
 
-RLS: tenant policy.
+- RLS: tenant policy `match_confirmations_tenant` (`FOR ALL`, org equality). Revoked from engine and runner.
+- No extra columns (C38). A row is the latest projection of one team's decision; each decision is also an immutable audit event that records the row id, verdict, actor, team and match revision `(attempt, lastSeq)`. A row with no linked audit evidence is not trust proof. See T-4.
 
 ### D-12 Personal organisations (0119)
 
@@ -315,6 +341,14 @@ ALTER TABLE "organizations" ADD COLUMN "kind" text NOT NULL DEFAULT 'club';
 ALTER TABLE "organizations" ADD CONSTRAINT "organizations_kind_check" CHECK ("kind" IN ('club','personal'));
 CREATE UNIQUE INDEX "organizations_personal_owner_uq" ON "organizations" ("created_by") WHERE "kind" = 'personal';
 ```
+
+Quick matches (`/score/new`, C40; amended by the C40 Astra resolution):
+- One personal org per owner, created under the advisory lock `('personal-org', personId)`. Personal orgs are left out of club navigation, organiser detection, public directories and the sitemap; admin club counts show them separately as Personal.
+- Each year and sport gets one private competition named `Friendlies <year>` (`visibility='private'`, `team_formation='organizer'`), created under the lock `('quick-match', orgId)`.
+- **Franchise reuse.** A team name is a durable identity in the existing `franchises` table (personal org, sport, trimmed case-sensitive name). Sport is resolved through the linked competitions because `franchises` has no sport column. The same year reuses the same annual `teams` row; a new year creates a new team row linked to the same franchise. Old teams, fixtures and lineups are never moved or rewritten. Ambiguous matches are refused, never approximated.
+- Registrations are reused only inside the same annual competition. Picking a previous player creates a new annual registration for the same person; a typed guest name creates a new club-only person. Names never merge identities. A registration already on another team of that year is refused, not transferred.
+- The chosen format is immutable fixture-creation audit metadata, read by setup. It never overwrites the season's rules.
+- Trust reads the persisted `organizations.kind`: a personal match is never `verified` (organiser verification gives `confirmed`).
 
 ### D-13 Team formation (0120)
 
@@ -333,7 +367,15 @@ CREATE TABLE "team_entries" (
 );
 ```
 
-`team_entries` gets the tenant policy plus a person arm on `captain_person_id`.
+RLS (amended C41): `team_entries_tenant` (`FOR ALL`, org equality in `USING` and `WITH CHECK`) plus `team_entries_captain_read` (`FOR SELECT`, `captain_person_id = app.person_id`). The captain can read their own entries but never update or delete them. Revoked from engine and runner.
+
+Team entry flow (C41):
+- The code lives at `/join/[entryCode]` (URL-17), which shares the physical route `app/join/[token]/page.tsx` with club invitations. See URL-17 for the dispatch rule.
+- Sign-in comes first. Then a narrow read-only resolver (`server/competition/team-entry-resolver.ts`, an allowlisted by-design posture entry) looks up a current code on a `team_formation='team_entry'` season and returns only the org/competition identity and the season name, sport and whether intake is open. Unknown, rotated, disabled or closed codes all get the same generic refusal.
+- Submission runs in the resolved tenant under a competition lock, rechecks code, formation and open intake, and takes captain, org and competition from the server. Status is always `submitted`; caller-supplied review or identity fields are refused.
+- The code permits submission only. It grants no club membership, scoring or review rights.
+- Review needs `team.manage` and `registration.review`. Approval atomically creates the team, approved registrations (club-only people for guests) and a `captain` team manager, and sets the status. Repeat or concurrent approval creates no duplicates. A rejection reason is audited only (no column).
+- A non-auction season closes intake to the stage "season on" instead of "auction done".
 
 ### D-14 `ball_facts` (0121)
 
@@ -359,7 +401,28 @@ CREATE TABLE "ball_facts" (
 ```
 
 - Indexes: `(batter_id)`, `(bowler_id)`, `(competition_id)`.
-- RLS: tenant policy plus a person arm via registrations for `batter_id`/`bowler_id`, the same shape as D-9.
+- RLS: `ball_facts_tenant` (`FOR ALL`, org equality) plus `ball_facts_person_read` (`FOR SELECT`, `batter_id` or `bowler_id` is one of the person's registrations). Same shape as D-9. Revoked from engine and runner.
+- Primary-extra mapping (C42): `extra_kind`/`extras` take, in order, wide (all wide runs); no-ball (no-ball runs only, `total − runsBat − byes − legByes`); bye; leg-bye; else null and 0. The table is an analytics projection, not a team-score ledger: summing `runs_bat + extras` does not rebuild team totals. No rows for penalties. `fielder_id` is null when more than one fielder took part; `caught_and_bowled` credits the bowler. Styles are snapshots at delivery time.
+
+### D-15 `fixture_participants.source` (0124, C54)
+
+```sql
+ALTER TABLE fixture_participants ADD COLUMN source text;
+ALTER TABLE fixture_participants ADD CONSTRAINT fixture_participants_source_check CHECK (source IS NULL OR source IN ('typed','scored'));
+UPDATE fixture_participants SET source = 'typed' WHERE placement IS NOT NULL;
+```
+
+Lobby (placement) results: the typed single-round writer sets `typed`; scored finalization writes the aggregate placement, kills and `scored` atomically. Typed entry is refused once a scored history exists.
+
+### D-16 Live service role and functions (0127, F07)
+
+`apps/live` is internet-facing and reads no table. It connects as `desiauction_live` via `LIVE_DATABASE_URL` (the env refine requires that username).
+- Role (created by `ops/db/create-app-role.sql`, password variable `live_password`): `LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE`, `USAGE` on schema `public`, no table or sequence privileges, `EXECUTE` on the two functions below only.
+- `live_snapshot(p_fixture_id char(26), p_slug text, p_token text) RETURNS TABLE (state jsonb, stamps jsonb, trust text, rules jsonb, sport text)`: the latest stored entry, the ring's `updatedAt` stamps in order, the match trust, the season rules and the sport.
+- `live_history_entry(p_fixture_id, p_slug, p_token, p_index int) RETURNS jsonb`: one ring entry by position.
+- Both are `LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp`, owned by `desiauction_system` (the recipe hands them over), `EXECUTE` revoked from `PUBLIC`. Each applies P-1 itself, with the same conditions as `scoringPublicAccess` in `packages/db/src/scoring-public.ts`, and returns nothing for a match the caller may not see. A parity test covers all 420 combinations of visibility, status, phase, org and proof.
+- The delay rule stays in core: the reader calls `live_snapshot`, picks the index with `delayedHistoryIndex`, then calls `live_history_entry`, both in one read-only `REPEATABLE READ` transaction.
+- Note: the fix list (F07) named one function, `live_release`. Two were built so the delay rule is not duplicated in SQL.
 
 ---
 
@@ -392,10 +455,10 @@ Every type has a hand-written validator `validate<Type>(payload): ValidationResu
 
 | `type` | Payload (all fields required unless marked `?`) |
 |---|---|
-| `match_started` | `{ format: FormatSpec; conditions: Conditions; homeTeamId: string; awayTeamId: string; superOverTie?: SeasonScoringRules['superOverTie'] }` |
+| `match_started` | `{ format: FormatSpec; conditions: Conditions; homeTeamId: string; awayTeamId: string; superOverTie?: SeasonScoringRules['superOverTie']; competition?: { name: string; season: string } /* C09 importer */ }` |
 | `lineup_confirmed` | `{ teamId; battingOrder: string[] /* ≥2, ≤ format.playersPerSide + 4 */; captainId: string; keeperId: string; substitutes: string[] }` |
 | `toss` | `{ winnerTeamId: string; decision: 'bat' \| 'bowl' }` |
-| `innings_started` | `{ inningsNo: number /* positive safe integer, exact next scheduled */; battingTeamId; strikerId; nonStrikerId: string \| null /* lone batter only */; bowlerId; superOver?: boolean }` |
+| `innings_started` | `{ inningsNo: number /* positive safe integer, exact next scheduled */; battingTeamId; strikerId; nonStrikerId: string \| null /* lone batter only */; bowlerId; superOver?: boolean; miscountedOvers?: Record<string, number> /* C09 */; absentBatterIds?: string[] /* C09 */ }` |
 | `ball` | See E-3 |
 | `new_batter` | `{ registrationId; end: 'striker' \| 'non_striker' }` |
 | `bowler_set` | `{ bowlerId; midOver: boolean; reason?: 'injury'\|'suspended'\|'other' }` |
@@ -415,9 +478,18 @@ Every type has a hand-written validator `validate<Type>(payload): ValidationResu
 | `abandon` | `{ kind: 'no_result'\|'abandoned'; reason: string }` (`abandoned` = never started, per the existing schema meaning) |
 | `walkover` | `{ winnerTeamId; reason: string }` |
 | `restart` | `{ reason: string }` (attempt + 1, rule R-40) |
+| `match_voided` | `{ reason: string /* trimmed, non-empty, ≤ 300 chars */ }`, `targetEventId` null. Voids the whole match (R-43, C26) |
 | `void` | `{}` with `targetEventId` |
 | `amend` | `{ payload: <same payload type as the target> }` with `targetEventId` |
 | `finish` | `{}` (the scorer confirms that a derived result is final) |
+
+Importer-only fields (C09; see the C09 amendments at the end). They exist so Cricsheet matches replay exactly; the pad never sends them:
+- `match_started.competition`: competition name and season, immutable across restarts and corrections like the tie setting.
+- `innings_started.miscountedOvers`: umpire-adjudicated over lengths, keyed by zero-based over index; values differ from `ballsPerOver`.
+- `innings_started.absentBatterIds`: registered batting-side players absent hurt (not openers); no wickets or statistics.
+- E-3 `extras.noBallRuns`, `wicket.substituteFielderIds`, `wicket.unknownFielderCount`.
+
+Other families (rally, raid, timed, placement) have their own payload maps in `packages/core/src/scoring/{rally,raid,timed,placement}/`; see `03-sports-families.md` and the C48–C54 amendments. `EventType` is the union of all five maps.
 
 ### E-3 The `ball` payload
 
@@ -428,6 +500,7 @@ export interface BallPayload {
   extras: {
     wides?: number;                      // total wide runs incl. the 1 penalty (≥1 when present)
     noBall?: true;                       // the no-ball's own run(s) come from format.noBallRuns
+    noBallRuns?: number;                 // C09: only with noBall; total no-ball extras, ≥ format.noBallRuns
     byes?: number;                       // ≥1 when present
     legByes?: number;                    // ≥1 when present
   };
@@ -435,9 +508,11 @@ export interface BallPayload {
   shot?: { zone: ZoneKey; angle: number };   // angle 0..359 clockwise from 'straight' (bowler's end up), batter's frame already mirrored for LHB
   wicket?: {
     kind: WicketKind; playerOutId: string;
-    fielderIds: string[];                // 0..2
+    fielderIds: string[];                // run out: distinct fielders up to fielding-side size; other kinds ≤ 1
+    substituteFielderIds?: string[];     // C09: distinct subset of fielderIds who are registered fielding substitutes
+    unknownFielderCount?: number;        // C09: positive; anonymous fielders, no individual stats
     where?: { x: number; y: number };    // -1..1 normalised field coords, (0,0)=batter, y+ = towards bowler
-    runsCompleted?: number;              // run out only: runs completed before the run out (already counted in runsBat/byes)
+    runsCompleted?: number;              // run out only: runs completed before the run out (already counted in runsBat/byes); on a wide ≤ wides − wideRuns (F12)
   };
 }
 export type ZoneKey = 'long_off'|'cover'|'point'|'third_man'|'fine_leg'|'square_leg'|'mid_wicket'|'long_on';
@@ -607,6 +682,8 @@ export function publicLiveState(state: MatchState, names: NameBook): PublicLiveS
 interface MatchState {
   superOverTie: SeasonScoringRules['superOverTie']; // immutable match_started snapshot; omission means 'another'
   pendingSuperOver: { inningsNo: number; battingTeamId: string }[]; // scheduled pair, consumed by innings_started
+  pendingRevision: { inningsNo; maxBalls; targetRuns?; method: 'manual'|'dls' } | null; // F12: revise entered at the innings break
+  competition: { name: string; season: string } | null;  // C09 importer snapshot
   phase: Phase; attempt: number; format: FormatSpec | null; conditions: Conditions;
   teams: { home: string; away: string } | null;
   lineups: Record<teamId, { battingOrder: string[]; captainId; keeperId; substitutes: string[]; out: string[] /* subbed out */ }>;
@@ -614,7 +691,7 @@ interface MatchState {
   innings: InningsState[];          // in order, super overs flagged
   currentInnings: number | null;    // index into innings
   interrupted: { reason } | null;
-  outcome: 'no_result' | 'abandoned' | 'walkover' | null; walkoverWinner: string | null;
+  outcome: 'no_result' | 'abandoned' | 'walkover' | 'void' | null; walkoverWinner: string | null;  // 'void' from match_voided (R-43)
   finished: boolean;                // 'finish' applied
   styles: Record<registrationId, { battingHand?: 'right'|'left'; bowlingStyle?: string }>;
   penaltyRuns: { teamId: string; runs: number; inningsNo: number | null }[];
@@ -622,6 +699,10 @@ interface MatchState {
 interface InningsState {
   no: number; superOver: boolean; battingTeamId; bowlingTeamId;
   runs: number; wickets: number; legalBalls: number; maxBalls: number | null; target: number | null;
+  targetMethod: 'manual' | 'dls' | null;          // set by revise; null = target follows the previous innings (R-16)
+  completedOvers: number; ballsInOver: number; miscountedOvers: Record<string, number>;  // C09 official over boundaries
+  absentBatterIds: string[];                      // C09
+  scoreTrace: InningsScorePoint[];                // C31: {seq, kind: opening|delivery|penalty|retirement, runs, wickets, legalBalls, completedOvers, ballsInOver, subsequent}
   extras: { wides; noBalls; byes; legByes; penalty };
   strikerId: string | null; nonStrikerId: string | null; bowlerId: string | null;
   batters: Record<id, BatterLine>; bowlers: Record<id, BowlerLine>;
@@ -665,7 +746,7 @@ Each rule has a unit test named `R-xx …` in `packages/core/src/scoring/deliver
   - the 2nd innings runs exceed the target − 1 (`target`);
   - the batting order has no available batter (`no_more_batters`);
   - `innings_closed` is applied.
-- R-16: The target for innings 2 = innings 1 runs (incl. penalty) + 1, unless revised by `revise.targetRuns`.
+- R-16: The target for innings 2 = innings 1 runs (incl. penalty) + 1, unless revised by `revise.targetRuns`. Penalty runs awarded to the side that batted first after its innings has closed raise the chase target to `runs + 1` while the chase's `targetMethod` is null (Law 41); a chase closed `target` that now falls short reopens. The same applies inside a super-over pair. *(Amended F10, 2026-10-14.)*
 - R-17: `revise` sets `maxBalls` = `maxBalls` from the payload, and `target` when given. A revise is allowed at any time while live, **and during the innings break for the innings about to start** (held as `pendingRevision` and applied at `innings_started`; amended 2026-10-14).
 
 **Super over**
@@ -701,6 +782,7 @@ Each rule has a unit test named `R-xx …` in `packages/core/src/scoring/deliver
 - R-40: `restart` increments `attempt`. Events of older attempts are ignored by `replayMatch`; `match_started` must be re-applied in the new attempt.
 - R-41: `void` of a ball re-folds as if the ball never happened. Every later event must still apply; otherwise reject `amend_breaks_later_events`.
 - R-42: `amend` replaces the payload. Same type only (`amend_type_mismatch`). Later events must still apply.
+- R-43: `match_voided` (C26) voids the whole match. Innings and history stay; the state becomes terminal (`finished`, phase and outcome `void`), with no derived result and no next actions. It is accepted even after `finish`/`final`. Replay refuses every later event (corrections and restart included) and refuses any correction that targets `match_voided`. The ordinary event-level `void` is unchanged.
 - R-50: The server stores an event only if `replayMatch(existing ∪ new)` succeeds.
 
 ### S-4 `NextAction`
@@ -811,9 +893,13 @@ Super-over balls are excluded from `PlayerLine` (R-21).
 - **A-2** `AwardLine` is `{ code: string; label: string; qty: number; points: number }`. A **dot** is a legal ball from which the bowler concedes nothing (byes and leg-byes do not spoil it; amended 2026-10-14). Codes:
   `runs, fours, sixes, milestone_30, milestone_50, milestone_100, milestone_25, milestone_20, pace_vs_match, wickets, bowled_lbw_bonus, top_order_bonus, haul, dots, maidens, economy_vs_match, catches, stumpings, run_out_direct, run_out_assist, duck`.
   Labels are fixed English strings, e.g. `"Faster than the match"` and `"Cheaper than the match"`.
-- **A-3** Award kinds:
-  - match: `player_of_match`, `fighter_of_match`;
-  - season: `season_mvp`, `best_batter`, `best_bowler`, `best_fielder`, `best_keeper`, `emerging`, `scorer_of_season`.
+- **A-3** Award kinds (as built in `server/scoring/awards.ts`):
+  - match: `player_of_match`, `fighter_of_match` (cricket, kabaddi, football, basketball); `top_fragger` (lobby/placement only, C54);
+  - season: `season_mvp`, `best_batter`, `best_bowler`, `best_fielder`, `best_keeper`, `emerging`, `scorer_of_season` (cricket); `season_mvp`, `best_raider`, `best_defender` (kabaddi, C51).
+  - Award versions frozen per match: `cricket-v1/<formatKey>`, `kabaddi-v1/<formatKey>`, `football-v1/<formatKey>`, `basketball-lite-v1/<formatKey>`. Rally (`unscored/rally/<formatKey>`) and hockey (`unscored/timed/<formatKey>`) have no points or automatic awards. Timed sports have no season awards (C49, C53).
+  - `top_fragger`: most kills across the rounds, then better overall team placement, then lower registration id; needs at least one kill, else null. No PoM/Fighter/season awards for lobbies.
+  - `best_raider` / `best_defender`: highest positive season raid / tackle points over verified/confirmed completed non-void fixtures, then registration id.
+  - Organiser overrides are refused for kinds the match's sport does not support.
 - **A-4** `pickMatchAwards(lines, result)`:
   - PoM = the highest points. If that player's team lost and a winning-team player is in the top 3, the highest winning-team player gets it instead.
   - Fighter = the highest player on the losing team, excluding PoM. Null on a tie or no result.
@@ -844,39 +930,70 @@ All are `export const dynamic = "force-dynamic"` and `runtime = "nodejs"`. Auth 
   8. On `finish`, run FIN-1.
   - Response: `{ acks: { eventId, seq | null, status: 'stored'|'duplicate'|'rejected', reason?, message? }[], lastSeq, phase }`.
   - Events after a rejected one in the same batch are **not** applied (`status:'rejected', reason:'bad_payload', message:'Skipped after an earlier refusal.'`).
-  - Events with `type ∈ {void, amend}` after `matches.phase='finished'` are accepted only within `editWindowHours` of `finished_at`, and only from the scorer or the organiser. After `final`, only the organiser can send them, and they reopen FIN-1.
+  - Events with `type ∈ {void, amend}` after `matches.phase='finished'` are accepted only within `editWindowHours` of `finished_at`, and only from **the scorer who finished the match** (the actor of the last event received at or before `finished_at`) or an organiser (authority (a)). Whoever holds the claim since then may not correct. After `final`, only the organiser can send them, and they reopen FIN-1. *(Amended F09.)*
+  - `match_voided` needs authority (a) and the current device claim (the organiser may force-claim first). It has no edit-window limit. Under the match lock it appends, stores phase `void` (overriding final-phase preservation), refreshes the snapshot and audits `match.voided` (actor, reason, event id, attempt, seq). It does not run FIN-1, delete the stored result or invent a no-result. Result reads, standings, careers, lines, awards, boards and scorer home exclude voided matches; the public gate (P-1) hides them. (C26, C36)
+  - **Eligibility for every family (F08).** After each candidate: the match's teams must be the fixture's teams, and every player the match can name (cricket: every batting order and substitute list; other families: squads/rosters) must be an approved registration of that team in this season. A cricket `match_started` in a later attempt must carry the stored `matches.format` exactly. Otherwise `bad_payload`.
+  - Dedupe order (C18): after the lock and the authority/claim/attempt/rate checks, an existing `(fixture_id, event_id)` is acknowledged as `duplicate` without using a seq. A new id is replayed first; a refusal inserts nothing and skips the rest of the batch. Accepted earlier entries of the batch still commit.
+  - Each accepted event also writes an authority audit row (arm, actor, attempt, event ids, seqs, represented teams for arm (d), inherited handover provenance) used by trust (C38).
+  - An accepted `toss` dispatches pending toss reminders after commit (C30). An accepted `style_set` propagates to the registration (API-7).
+  - The rate limit is ≤ 300 events per minute per fixture (`scoringCapacity`).
 - **API-2 `POST /api/score/[fixtureId]/start`.** Body: `{ deviceId; formatKey; conditions; lineups: {teamId; battingOrder; captainId; keeperId; substitutes}[2] }`.
   - Creates the `matches` row, validating every registration id is an approved registration of that team.
   - Writes `fixture_lineups` (replace) via the existing `saveLineup`.
   - Takes the claim.
   - Moves the fixture `published → in_progress` (`fixtureTransition(...,'start')`). Draft or scheduled fixtures are refused with "Publish the match first".
   - Appends `match_started` + two `lineup_confirmed` as seq 1..3.
-  - Idempotent on deviceId when the claim already belongs to the caller.
+  - **Seeded styles (C42).** In the same transaction it reads the recognised profile styles of every selected registration (substitutes included) and appends one `style_set` per registration that has a known field, sorted by registration id, as seq 4… The start audit `meta.seededStyles` records `{registrationId, eventId, source: 'registration_profile'}`. Unknown fields stay absent; no profile-change audit is written for copying. A restart copies styles from the replayed prior attempt, never from the current profile.
+  - Lock order (C26): read the fixture identity without a lock, provision team managers (advisory locks), then lock the fixture `FOR UPDATE` and recheck identity, authority, sides and lifecycle. The existing-match lookup does not lock.
+  - Idempotent on deviceId when the claim already belongs to the caller; a retry returns stored state without reading profiles or reseeding.
+  - A restart does not go through API-2: after the `restart` ack the client sends `match_started` and both `lineup_confirmed` (and seeded styles) through API-1 in the new attempt.
 - **API-3 `GET /api/score/[fixtureId]/events?since=<seq>`.** Authorised scorers and organisers only. Returns `{ attempt, lastSeq, events: MatchEvent[] }` (max 2000) so a device can resume.
+  - `&prepare=1` (only with `since=0`, C27) returns the offline bootstrap: actor, privacy-filtered names and setup, language, share path, attempt and lastSeq. For a published fixture with no match, or a match still awaiting setup input, it returns `preparation: "unstarted"` (events `[]`, attempt null when there is no match row) and creates nothing. Responses are private/no-store and never cached by the service worker.
 - **API-4 `POST /api/score/[fixtureId]/claim`.** Body `{ deviceId, mode: 'clean'|'force' }`.
   - `clean` succeeds when the claim is empty or held by the same person.
   - `force` requires organiser (`fixture.manage`) OR (an authorised scorer AND `now − max(received_at of holder's last event, scorer_claimed_at)` ≥ 120 s). **Force is always a human action; nothing expires automatically.**
+  - A non-organiser `force` is refused once the match is finished, final or void ("This match is finished. Corrections go through the organiser.") *(F09)*.
   - Returns `{ ok, holder: { name } | null, lastSeq }`. Audits `match.claim.taken|forced`.
+  - **Force-takeover flow on the pad (C46).** `claim-force` ("Take over scoring") is disabled while offline, while deliveries wait to send, or once the match is finished or void. It opens a confirmation dialog ("Take over scoring?"). On confirm the device stops its sender, waits for local writes, posts `mode:'force'`, then re-reads the canonical history (API-3) and resumes from it before scoring is enabled again. Saved deliveries stay on their original phone; nothing is replayed, discarded or reassigned automatically. No new API.
 - **API-5 `POST /api/score/[fixtureId]/handover-token`.** The holder gets a signed single-use token (HMAC with env `SCORING_HANDOVER_SECRET`, 10 min TTL) for the QR code.
   - `POST /api/score/handover/redeem` with `{ token, deviceId }` takes the claim **cleanly** for the redeemer.
   - The redeemer must be signed in. A guest scorer signs in with phone OTP; there is no anonymous scoring (simplifies trust).
+  - Redemption may appoint the redeemer as a `fixture_officials` scorer and transfers the claim. An appointment delegated from arm (d) stays arm (d) through later handovers (`match.claim.handover_redeemed` meta `inheritedAuthority`). Issuance audits `match.claim.handover_issued` with the token hash only, never the token (C19).
 - **API-6 `POST /api/score/[fixtureId]/players`.** Body `{ teamId, name, phone? }`.
-  - Creates a club-only person (`people.club_org_id = org`, no contact) plus an approved registration on the team.
-  - If `phone` is given, it is stored only via the existing claim path later; v1 does not store it here.
-  - Returns the `registrationId`. Then the client appends `player_added`.
+  - Creates a club-only person (`people.club_org_id = org`, no contact) plus an approved registration on the team (source `scorer_guest`).
+  - Locks the fixture, not the match: works before API-2 on published/in_progress fixtures and creates no match, claim or events (C23).
+  - Authority (d) may add guests only to a team it represents ("You can add guests only to your own team.") *(F09)*.
+  - Returns the `registrationId`. Then the client appends `player_added` (or includes the guest in the API-2 lineup before start).
+- **API-6b `PATCH /api/score/[fixtureId]/players`** (guest claim, C39 + F09). Body `{ registrationId, phone }`. Same authority and team checks as API-6.
+  - Phone not yet on any account: attaches the phone to the club-only person through the existing `attachPhoneToClubOnly` path (source `scorer_guest_claim`), audits `registration.guest_claimed` and queues `player.claim_invite`. The registration id, events and lines do not change; the career follows the person.
+  - Phone already belongs to an account: nothing moves. The server audits `registration.guest_claim_offered` and sends `player.claim_offer` to that account. The holder accepts or declines at `/me/claims` (`registration.guest_claim_offer_accepted|declined`); only acceptance attaches. The scorer gets the same reply either way. *(F09; before F09 this attached silently.)*
+  - Refused for another tenant, another team, unauthorised callers, or a person already in the season.
 - **API-7** Style propagation. On storing `style_set`, update `registrations.batting_style`/`bowling_style` for that registration **only when the column is null**, mapping `right → 'right_hand'`, `left → 'left_hand'`, and bowling style keys 1:1. Audit `registration.style_set_by_scorer`.
 - **API-8** Jobs. Extend `app/api/jobs/messages/route.ts` `handle()` with `sweepScoring()` from `server/scoring/sweep.ts`, which:
   1. marks `finished` matches older than `editWindowHours` as `final`, running FIN-1 again if any correction landed;
   2. marks `live`/`interrupted` matches with no event for 6 h as `stalled`, and audits;
   3. queues `match.quiet` organiser notices for matches with no ball for 15 min while live (dedupe per match per 30 min).
 
-  Each step is wrapped in `.catch(() => "failed")`.
-- **API-9 `GET /api/live/[fixtureId]?t=<share_token>|s=<slug>`.** Public.
-  - Reads `match_live_state` via `systemDb` after the gate (P-1).
-  - Returns `PublicLiveState`. If `trust_level ∉ {verified}` and `publicDelaySeconds > 0`, it returns the state as of `now − delay` (store the last N=30 states in a ring inside `match_live_state.state.history` keyed by `updatedAt`; pick the newest ≤ cutoff).
-  - Headers: `ETag: "<seq>"`, `Cache-Control: public, max-age=0, s-maxage=1, stale-while-revalidate=5`. Honour `If-None-Match` (304).
-  - Rate limit: none in app (CDN/Caddy absorbs). Add a posture allowlist entry `by-design` with reason "public live read model after visibility/share-token gate".
-- **API-10 `POST /api/live/[fixtureId]/view`.** Body `{ t?|s? }`. Increments a per-minute viewer bucket in memory per process and flushes `viewer_peak = greatest(...)` every 60 s. Used for trust (T-2). Returns 204.
+  Each step is wrapped in `.catch(() => "failed")`. The sweep also refreshes trust of finalized matches (T-4), recovers missed result/award/confirmation/claim notices and toss reminders, and releases nothing early. System-pool discovery selects only `fixtureId`/`orgId`; every detail read and write runs in `withTenantDb` (C22).
+- **API-9 `GET /api/live/[fixtureId]?t=<share_token>|s=<slug>[&view=…]`.** Public.
+  - Gate first (P-1, `scoringPublicAccess`), rechecked inside each projection statement.
+  - **Delay (P-3).** In one read-only `REPEATABLE READ` transaction: read the latest entry and the ring's `updatedAt` stamps (D-3 `history`), pick with core `delayedHistoryIndex` (same rule as `selectDelayedEntry`: `current` when trust is `verified` or the delay is 0, else the newest entry with `updatedAt ≤ now − delay`), then fetch only that entry. Never a newer fallback. *(F05)*
+  - **Delay-404 (C29).** When no ring entry is old enough yet (new match, fast scoring), or the gate fails, or the match is void, the answer is `404 { error: 'not_found' }` with `Cache-Control: no-store` and no ETag.
+  - `view`: absent → lean `PublicLiveState` with current trust; `scorecard` → `{live, scorecard}` (C30); `charts` → `{live, charts}` (C31); `result` → `{live, resultDetails}` (C36); `overlay` → `{live, overlay, stat}` (C43). Every representation comes from the same selected entry; a missing sidecar on that entry is a 404, never rebuilt from current events.
+  - Headers: representation ETag from `liveRepresentationEtag(state, view, revision)` (sequence, view, current trust, result revision; overlay has its own digest), `Cache-Control: public, max-age=0, s-maxage=1, stale-while-revalidate=5`. Honour `If-None-Match` (304) only after the gate. Raid/timed clocks add `X-LS1-Server-Time` and `X-LS1-Clock-Delay`.
+  - In-process cache: one projection per `(fixtureId, s, t, view)` for `LIVE_API_CACHE_MS` (default 1000, max 5000), coalescing concurrent reads on one promise; failures are never cached. *(F05)*
+  - Rate limit: none in app (CDN/Caddy absorbs). Posture allowlist entry `by-design`: "public live read model after visibility/share-token gate".
+- **API-10 `POST /api/live/[fixtureId]/view`.** Body `{ t?|s? }`. Returns 204, or the API-9 404 when the gate fails. *(Amended F04.)*
+  - Counts **distinct viewers per minute**, not requests: each client is a salted key `sha256("view.1:<SCORING_HANDOVER_SECRET>:<fixtureId>:<client address>")` (address from `clientIp` with `TRUSTED_PROXY_COUNT`); the address itself is never kept. One key counts once a minute however often it pings.
+  - Anyone who may score the match (any AUTH-1 arm, via `authorityKind`) or holds its claim (`isMatchInsider`) gets 204 but is never counted.
+  - Buckets are per process and bounded (2048 fixture-minutes, 100,000 keys each); one unref'd 60 s timer, no overlapping flush, bounded retry. Writes run as the `SCORING_SYSTEM_ACTOR` service context (`00000000000000000000000000`) through `withTenantDb`, rechecking access and setting `viewer_peak = greatest(viewer_peak, count)` (C29).
+  - The public page pings once a minute while visible, never while hidden (C32).
+  - Note: the fix list (F04) proposed a signed per-page view token and a 2-pings-per-minute limit, and using apps/live socket counts. The code uses the salted client key instead; apps/live does not feed `viewer_peak`.
+- **API-11 apps/live (WebSocket).** Same gate and delay as API-9, read through D-16 as `desiauction_live`. *(Amended F05, F07, F09.)*
+  - Two physical connections per instance (C44): one `LISTEN` connection, one reader (`max 1`, 30 s statement timeout).
+  - Per tick, one read per (fixture, proof) and the frame fans out to every socket holding that proof.
+  - Caps: `LIVE_MAX_SOCKETS` global (default 5000), 2000 rooms, 20 sockets per client address. A client with no trustworthy address (per `client-address.ts`) skips the per-client cap rather than sharing one `""` key.
+  - Origins must be in `LIVE_ALLOWED_ORIGINS` (required in production).
 
 ### AUTH-1 Who may score (`server/scoring/authority.ts` `mayScore(db, personId, fixture)`)
 
@@ -886,7 +1003,14 @@ True when any of:
 - (c) an active `fixture_officials` row with role `scorer` and `person_id` = caller;
 - (d) an active `team_managers` row for either side's team.
 
-A match scored under (d) only can never be above `confirmed` (T-1).
+A match scored under (d) only can never be above `confirmed` (T-1). Any (d) contribution, or missing authority history, prevents authority-only verification; an organiser tapping Finish does not launder it (C38).
+
+Further limits (amended F09, C19, C26):
+- A scorer appointed through a handover from arm (d) keeps arm (d), however many handovers follow.
+- Arm (d) adds guests only to a team it represents (API-6).
+- After finish, corrections come only from the scorer who finished or arm (a); a non-(a) force-claim is refused (API-1, API-4).
+- `match_voided` needs arm (a).
+- Arm (d) for lobbies: an active manager of a scheduled team; more than one qualifying team needs an explicit choice (C54).
 
 ### FIN-1 Finalize (`server/scoring/finalize.ts`)
 
@@ -894,11 +1018,15 @@ Runs in one `withTenantDb` transaction:
 1. `deriveResult`.
 2. Upsert `fixture_results` with `source='scored'`, `score` (N-2), outcome, winner and method. Bypass N-4's refusal by calling an internal function `writeScoredResult` (not `recordFixtureResult`).
 3. Fixture `in_progress → completed` if not already.
-4. (C35+) Replace `match_player_lines` for the fixture.
-5. (C35+) Append `match_awards` rows (auto) unless an organiser override exists for that kind.
-6. (C42+) Replace `ball_facts`.
-7. Audit `match.finalized`.
-8. Then, outside the transaction: `revalidatePath` on `/seasons/[slug]/fixtures`, `/standings` and `/c/[slug]`, and queue notifications (M-1).
+4. (C38) Compute and write trust (T-1) for the current revision, before lines.
+5. (C35+) Replace `match_player_lines` for the fixture.
+6. (C35+) Append `match_awards` rows (auto) unless an organiser override exists for that kind.
+7. (C42+) Replace `ball_facts`.
+8. (C36) Refresh the stored live entry with the closed `resultDetails` sidecar at the same seq.
+9. Audit `match.finalized`.
+10. Then, outside the transaction: `revalidatePath` on `/seasons/[slug]/fixtures`, `/standings` and `/c/[slug]`, and dispatch notifications (M). A dispatch failure never undoes scoring; the sweep recovers from the committed audit. Duplicates and retries do not repeat the audit or the notices.
+
+Newly accepted `finish` runs FIN-1 inside the append transaction; accepted corrections to a finished/final match re-run it from the corrected replay (C21). Unsupported or inconsistent award versions fail the transaction. `match_voided` does not run FIN-1 (API-1).
 
 ---
 
@@ -910,7 +1038,7 @@ Runs in one `withTenantDb` transaction:
 | URL-2 | `/score/[fixtureId]/setup` | Steps: conditions → XIs (order, C, WK, subs) → toss and openers. Mockups 2-4 |
 | URL-3 | `/score/[fixtureId]` | The pad. Mockups 7-13 |
 | URL-4 | `/score/shell` | Static, data-free pad shell for SW precache (offline cold start) |
-| URL-5 | `/score/new` | Quick match (C40) |
+| URL-5 | `/score/new` | Quick match (C40). Personal org, `Friendlies <year>`, franchise reuse: see D-12 |
 | URL-6 | `/score/handover/[token]` | Handover redeem |
 | URL-7 | `/c/[slug]/m/[fixtureNumber]` | Public live/result page, tabs Live · Scorecard · Charts · Squads. Mockups 14-18, states 21 |
 | URL-8 | `/m/[shareToken]` | The same page for quick/private matches (noindex) |
@@ -922,8 +1050,19 @@ Runs in one `withTenantDb` transaction:
 | URL-14 | `/c/[slug]/p/[number]/insights` and `/me/insights` | Batter and bowler insights. Mockups 21-22 |
 | URL-15 | `/seasons/[slug]/brief/[fixtureId]` | Captain brief (PRO). Mockup 23 |
 | URL-16 | `/seasons/[slug]/awards` | Season awards and leaderboards. Mockup "Season awards" |
-| URL-17 | `/join/[entryCode]` | Team entry for team-formation `team_entry` seasons (C41) |
+| URL-17 | `/join/[entryCode]` | Team entry for team-formation `team_entry` seasons (C41). **Dispatch:** the physical route stays `app/join/[token]/page.tsx`. Only values matching `/^[A-HJ-NP-Z2-9]{6}$/` (`TEAM_ENTRY_CODE`) go to team entry; every other value keeps the club-invitation flow unchanged (no alias, no uppercasing). See D-13 |
 | URL-18 | `/.well-known/assetlinks.json` | TWA (C45) |
+| URL-19 | `/me/claims` | Guest-claim offers for the signed-in person: accept or decline (F09) |
+| URL-20 | `/me/[sport]` | Own career, cross-club, session-only (C37). Public career stays on the existing gated player page |
+| URL-21 | `/c/[slug]/m/[fixtureNumber]/board` | Full-screen match board, same facts and gate as the overlay, `noindex` |
+| URL-22 | `/inbox?reminder=<requestId>`, `/inbox?matchNotice=<noticeId>` | Recipient-only notice links (C30, C36). Sign-in required; the server proves ownership before revealing the match. No bearer token in any durable body |
+| URL-23 | `/admin/moderation` | Platform moderation of flagged matches (C38, T-4) |
+
+- `/score` moved the C23 Quick match tile from `/score/quick` to `/score/new`, with no alias (C40).
+- `/c/[slug]/m/[fixtureNumber]` renders for a published fixture before any match row exists: countdown or "Waiting for the scorer", public team identities, kickoff, venue and announced lineups only (C30). Token pages still need a match row and the exact token.
+- `/m/[shareToken]` is excluded from search: `robots` disallows the exact prefix `/m/` (not `/m`, which would also block `/manifest.webmanifest`), plus `noindex, nofollow` header and metadata (C30).
+- Both match routes use their own compact public shell (C30).
+- The existing `/seasons/[slug]/fixtures/match-day` route keeps its redirect to `/seasons/[slug]/fixtures` (C33).
 
 Layout rule: `/score/**` uses its own minimal layout `app/score/layout.tsx` (no console shell). It imports only the theme bootstrap and fonts, and has a JS budget of ≤ 60 KB route JS over the framework baseline (check with `pnpm check:bundle`; extend its config with the `/score/[fixtureId]` route).
 
@@ -935,24 +1074,36 @@ Layout rule: `/score/**` uses its own minimal layout `app/score/layout.tsx` (no 
   - the competition visibility is `public` and the fixture status is `published|in_progress|completed`; or
   - the request carries the match's exact `share_token`.
 
-  Otherwise 404 (indistinguishable from absent).
+  In both cases the match must not be `void`, and the match, fixture and competition orgs must agree (and the slug must match when given). Otherwise 404 (indistinguishable from absent). The one definition is `scoringPublicAccess` (`packages/db/src/scoring-public.ts`); the SQL functions of D-16 repeat it and a parity test keeps them equal.
 - **P-2** Public JSON and pages never include phone, email, DOB, `club_org_id` or registration status.
 - **P-3** Betting delay applies per F-3 `publicDelaySeconds` to matches whose trust is not `verified`. The organiser can set 0 only for seasons where every match has an appointed scorer (UI hint).
+  - Live reads (API-9, API-11, SSR, OG/preview, overlay, board, career current projections) serve only a released ring entry; before one exists they answer 404 (C29). A trust downgrade changes the ETag, so no stale `verified` 304 survives (C38).
+  - **Results (F03).** Public season readers (`resultsOf`, `standingsOf` and `seasonPlayIn` with audience `"public"`, used by the season page and its table) leave out a scored result until `matches.finished_at + publicDelaySeconds` (default 60) has passed, unless the match is `verified`. This is the query filter `releasedToPublic` in `server/competition/results.ts`, not a stored `public_at` column; there is no migration. The console audience sees every result at once. Typed results have no match row and pass.
+  - Note: the fix list (F03) also named the sitemap `lastmod`, season OG cards, posters and `revalidateScoredMatch`. The F03 commit (`c4b95343`) changed only the season page readers listed above.
 - **P-4** Public scorecards are indexable (`index, follow`) only when competition visibility is `public`. Share-token pages are `noindex`.
 - **P-5** Terms: add the paragraph "Live scores are for following matches. Using them for betting or resale is not allowed." to the existing terms page section that covers acceptable use (find it under `apps/web/src/content` or `app/legal`, and log the path).
 - **P-6** Minors: a person is a minor when `registrations.date_of_birth` exists and age < 18 on the match date. Public outputs show `initials` instead of the full name, and no photo. Insights pages for minors are not public. Players with no DOB are treated as adults (consistent with current behaviour).
+  - Known minors never show a full name or photo, even with guardian consent (C18; founder decision R2). Photos of others need consent and adult confirmation dated on or before the match date.
+  - The match date is the calendar part of `fixtures.kickoff_at`, else `matches.started_at` in Asia/Kolkata (C18).
+  - One helper, `publicName(person, registration, matchDate)`, covers live, results, posters, OG, careers and the public showcase. A public career withholds a player's historical minor performances; the player's own career keeps them (C39).
 
 ---
 
 ## T · Trust
 
-- **T-1** `trust_level` rules, computed by `computeTrust(facts)` in `packages/core/src/scoring/trust.ts`:
-  - `flagged` if any hard signal (T-2) is present and no organiser verification.
-  - `verified` if the scorer authority was (a), (b) or (c) (AUTH-1) and the competition is not personal (`organizations.kind='club'`), or an organiser verified it.
-  - `confirmed` if the opposing team's manager confirmed, or (`viewer_peak` ≥ 15 and the match was live-scored) and no dispute 48 h after finish.
-  - else `self_scored`.
-- **T-2** Signals (`TrustReason` codes):
+- **T-1** `trust_level` rules, computed by `computeTrust(facts)` in `packages/core/src/scoring/trust.ts`, in this order (amended C12, C38; founder decision R1):
+  1. `flagged` if any hard signal (T-2, `disputed` included) is present and there is no effective organiser verification for the current revision.
+  2. Organiser verification: `verified` for a club, `confirmed` for a personal org.
+  3. Not live-scored, or `backfilled`: `confirmed` only with an explicit opposing-manager confirmation and no unresolved dispute; else `self_scored`.
+  4. Live-scored with club authority (a), (b) or (c) and no (d) contribution: `verified`.
+  5. Opposing-manager confirmation without unresolved dispute: `confirmed`.
+  6. Automatic: `confirmed` only when **all** hold: live-scored, `viewer_peak` ≥ 15, finished ≥ 48 h ago (for the current revision; a correction restarts the clock), no dispute.
+  7. Else `self_scored`.
+
+  `viewer_peak` counts distinct salted client keys per minute, never requests, and never anyone who may score the match (API-10, F04). The ≥ 15 rule relies on this.
+- **T-2** Signals (`TrustReason` codes, in `TRUST_REASON_ORDER`):
   - **Hard:**
+    - `disputed`: an opposing manager disputed the current revision (C38). Only a later organiser verification of that revision resolves it.
     - `pace_impossible`: ≥ 30 legal balls whose client timestamps span < 4 s per ball on average, **and** the batch was received live. A batch synced after the fact is judged as `backfilled`, not hard.
     - `same_person_both_sides`.
     - `overlapping_matches`: the same registration's person in two matches whose live windows overlap.
@@ -960,7 +1111,15 @@ Layout rule: `/score/**` uses its own minimal layout `app/score/layout.tsx` (no 
     - `backfilled`;
     - `scorer_is_top_scorer` (the scorer's own registration scored ≥ 50% of team runs);
     - `opponent_all_guests` (the opposing XI has 0 people with phone or email).
+  - Live proof is per family: cricket uses the 30-ball / 4 s pace rule; rally, raid, timed and lobby use full receipt coverage and the 120 s window only, with no physical-pace or `scorer_is_top_scorer` signal (C49–C54).
+  - `overlapping_matches` uses a narrow read-only system reader (`server/scoring/trust-facts.ts`, by-design posture entry) that sees the same person's participation in other clubs and returns overlap evidence only (C38).
 - **T-3** Leaderboards, records and season awards count only `verified` and `confirmed` matches. Careers show all matches with a trust label (mockup Career).
+- **T-4** Confirmations and moderation (C38):
+  - The match revision is `(attempt, lastSeq)`. Any newly accepted scoring event invalidates earlier confirmations and verifications; duplicates, trust refreshes and award-only overrides do not.
+  - Confirm token: purpose-separated, versioned HMAC over fixture, attempt, lastSeq, opposing team and expiry; valid 7 days; only the hash is audited. `/match/confirm/[token]` requires the current active manager of exactly that team and refuses the scorer's own work.
+  - `match.confirm_request` goes only when the authority was (d) and the represented side is known; it goes to the other side. Mixed or unknown history sends nothing.
+  - Organiser review (`fixture.manage` + reason): Verify or Keep flagged. Platform moderation at `/admin/moderation` (`platform.moderate`, recent step-up, reason, writes via `inOrg`): Verify, Keep flagged or Exclude. Exclude is sticky across corrections and restarts until a platform Verify; an organiser cannot lift it.
+  - Trust is refreshed at finalization, on confirmation/moderation and by the sweep, without re-finalizing or re-sending result notices. The stored live entry is refreshed at the same seq so public reads carry current trust.
 
 ---
 
@@ -970,12 +1129,19 @@ New catalogue entries. Each needs a template and a label per INV-13.
 
 | Key | Audience | Channels | Inbox key | Trigger |
 |---|---|---|---|---|
-| `match.result` | players of both XIs | in_app, email | `match.result_published` | FIN-1 |
-| `match.award` | award winner | in_app, email, whatsapp (if opted in) | `match.award_won` | FIN-1 when PoM/Fighter is set |
-| `match.confirm_request` | opposing team managers | in_app, email | `match.confirm_requested` | FIN-1 when the authority was only (d) |
+| `match.result` | players of both XIs (canonical finalized lines, incl. replacements; deduped by person) | in_app, email | `match.result_published` | FIN-1 |
+| `match.award` | award winner | in_app, email, whatsapp (if opted in); **never SMS** | `match.award_won` | FIN-1 or an override, when PoM, Fighter or `top_fragger` is set |
+| `match.confirm_request` | opposing team managers | in_app, email | `match.confirm_requested` | FIN-1 when the authority was only (d) (T-4) |
 | `match.quiet` | organiser | in_app | `match.quiet` | API-8 |
+| `match.toss_reminder` | a signed-in viewer who asked | in_app (with push), or email | `match.toss_reminder` | accepted toss (C30) |
+| `player.claim_invite` | the guest whose new phone was attached | in_app, email | `player.claim_invited` | API-6b, phone not on an account (C39) |
+| `player.claim_offer` | the account that already holds the phone | in_app, email | `player.claim_offered` | API-6b, phone on an account (F09) |
 
-WhatsApp for `match.award` uses a **new** utility template key `da_match_award`. Register it in the DLT/WhatsApp template list exactly like `da_lineup_announced`, with the en + hi variants. If the founder has not approved it in Meta, the channel stays off via the existing switches (do not block).
+- **WhatsApp-only award text (C36).** `match.award` is the only LS-1 notice with a phone channel. It uses the explicit WhatsApp path (`enqueueWhatsApp`, WhatsApp key `match.award`, Meta template `da_match_award`, en + hi, utility). It never falls back to SMS, whether WhatsApp is off, opted out, unmapped or failing. Until Meta approves `da_match_award` the channel stays off via the existing switches (founder decision R4). No other LS-1 notice uses SMS or WhatsApp.
+- Dedupe keys: `match.result:<fixtureId>:<personId>`; `match.award:<fixtureId>:<kind>:<personId>` (a replacement winner is notified; a score-only change is not; a null winner sends nothing). Before enqueue and before deferred delivery the current winner and non-void state are rechecked; obsolete pending notices are suppressed.
+- Links in durable bodies go through recipient-only resolvers (URL-22); no bearer URL is stored.
+- **Claim channels (C39, F09).** Claim notices are in-app and email only. A phone-only person sees the notice in their own inbox after signing in with that phone; no SMS or WhatsApp is promised.
+- **Toss reminder (C30).** The only "follow" there is: the `live-follow` control offers a one-shot "Remind me at the toss" before the toss and is omitted after it. Requires sign-in, the P-1 gate and either an existing push subscription or explicit consent plus a verified email. Request and cancel are fixture-locked audit events (`match.toss_reminder.requested|cancelled`, with channel, consent wording/version and access provenance; never a bearer token). After an accepted toss (the effective canonical toss; a voided toss does not count) the dispatcher sends once per request id; the sweep recovers missed dispatches. The message says only that the toss happened, with a gated link; no decision or score. Cancellation, access and consent are rechecked before every send. A request after the toss is answered "already happened".
 
 ---
 
@@ -1215,6 +1381,78 @@ Astra authorizes C28 fullT10 journey to assert existing accepted live-state proj
 
 Astra authorizes Pad start_innings integration and small sheet/model in existing lazy options entry to make the fixed T10 journey possible. Current replay/queued state supplies action number/team and canonical lineups; distinct openers (core-permitted lone-batter exception), eligible opposing bowler, only matching pending superOver flag. No prior-innings dismissal/quota carryover/new fields/core/API. Recompute/refuse stale action, prevent double confirmation, canonical useMatch.apply persistence/offline/normal refusal/reachable action. Required UI chase after60legalballs and refresh/offline/stale/double/invalid/superover coverage. All gates/budgets remain unchanged.
 
+### C29 · Delay-404 and the viewer metric (2026-10-09)
+
+Folded into API-9 and API-10. When the 30-entry ring has no entry old enough, API-9 answers a gated `no-store` 404 with no ETag; it never falls back to a newer entry. The selected entry's seq drives the ETag and 304, after the gate. API-10 writes as `SCORING_SYSTEM_ACTOR` (`00000000000000000000000000`): no person row, no events, no fabricated audit. The public system reader gates each ping; the flush runs as the app role in `withTenantDb`, rechecks access and keeps `greatest(viewer_peak, count)`. Bearer tokens are kept in memory only, never logged or stored.
+
+### C30 · Waiting page, scorecard sidecar and toss reminder (2026-10-09)
+
+Folded into URL (waiting page, `/m/` robots, compact shell), API-9 (`view=scorecard`), D-3 (sidecars) and M (toss reminder, `/inbox?reminder=`).
+- Waiting page: shows only public facts and announced lineups, never the approved squad as a confirmed XI. "Waiting for the scorer" before a match exists; "Live updates will appear shortly" while API-9 is still 404. Scores come only from the delayed selector.
+- Scorecard: a pure `publicScorecard(state, names)` DTO stored beside each ring entry; S-5 and its 6 KB limit are unchanged. Old entries without it say "Detailed scorecard unavailable"; nothing is fabricated. Dismissal attribution comes from the final matching `BallSummary`: bowler only for bowler-credited kinds, recorded and substitute fielders, unknown count.
+- Season pages link supported scored matches to `/c/<slug>/m/<fixtureNumber>`; the dynamic segment is decoded once at the route boundary.
+- Polling: 2 s while the page is visible and the match is `live` (or `result_reached`, C34); 15 s otherwise; stops when terminal.
+
+### C31 · Delayed charts and the innings score trace (2026-10-09)
+
+Folded into D-3, S-2 (`scoreTrace`) and API-9 (`view=charts`, ETag `charts-<seq>-<trust>`). `publicCharts(state, names)` is a separate DTO stored beside each ring entry. Worm uses canonical runs and legal-ball positions; Manhattan uses the actual over containers (partial and miscounted overs, extras included) with penalties and non-delivery wickets as separate labelled adjustments, so bars plus adjustments equal the total. The wagon wheel shows only recorded shots at their canonical angles (no invented directions), with "Other" for unusual run values; a four and a six at the same angle are drawn at lengths 78 and 90. Regulation and super-over innings are separate.
+
+### C32 · Link previews and "Follow" (2026-10-09)
+
+OG/Twitter images for `/c/[slug]/m/[fixtureNumber]` use the same gate and the same delayed entry as API-9, revalidate 15 s, show an initials tile only (no photo lookup) and only when an on-strike batter exists. A denied or malformed address gets a neutral PNG with no identifying facts. "Follow" grants no subscription: it is the visible-page view ping (once a minute) plus the one-shot toss reminder (M).
+
+### C33 · Organiser match-day board (2026-10-09)
+
+`/seasons/[slug]/fixtures/today` (URL-10), `fixture.manage` inside the tenant, current canonical state with no public delay. Days follow Asia/Kolkata. Main table: today's published, in_progress and completed supported fixtures. "Needs you" cards: quiet (no accepted delivery for ≥ 15 min while live; not interrupted, break or terminal), stalled, missing lineup (within 60 min of kickoff, judged on saved lineups before setup and on the effective canonical lineup after), no scoring assignment (no active scorer appointment and no current claim holder who passes AUTH-1), and unconfirmed results (> 24 h, not void, not confirmed/verified; flagged shows "Review result"). One card per fixture, in that priority; one working action per card and row. Older unresolved problems appear as cards only. Viewer figure: "Match viewer peaks", the sum of each match's peak, explained as not unique or current viewers. Progress is shown only for a finite canonical quota. Poster and sponsor tiles are hidden.
+
+### C34 · Viewer timing and load (2026-10-09)
+
+A visible `result_reached` keeps the 2 s poll until finish. Load acceptance: 500 independent viewers, 60 s, each polling 2 s after its own response with its own ETag; p95 < 300 ms and 304 share > 80%. Socket mode added by F05: 5 rooms × 300 sockets.
+
+### C35 · Player lines, awards and the person-read policy (2026-10-10)
+
+Folded into D-9 and the "person arms are SELECT-only" rule in D. 0116 also replaces the move function with the two projection updates (D-8). Overrides: one address, a kind valid for that scope, `fixture.manage` on the resolved competition, a trimmed reason; match scope needs a finalized non-void match and a canonical line for the chosen player (replacements included); match scope locks the match, season scope locks the competition.
+
+### C36 · Result page, poster and award notices (2026-10-10)
+
+Folded into FIN-1 (step 8), API-9 (`view=result`, ETag `result-<seq>-<revision>-<trust>`) and M (dedupe keys, WhatsApp-only award). The result details are a closed sanitized sidecar on the same delayed entry; an override refreshes it at the same seq and changes the revision. A historical entry without it means "unavailable", never current data. The result poster (`/seasons/[slug]/posters/result/[fixtureId]`) is organiser-only through the existing audited poster gate, for a finalized non-void scored match; a private season's export carries no QR or share token. Whole-match void withdraws every fresh public representation (generic 404, no-store).
+
+### C37 · Careers (2026-10-10)
+
+Own career (`/me/[sport]`): the session person across clubs, no public delay. Public career: the existing same-club gated player page, approved registrations, public published seasons, completed scored non-void finalized matches, and only matches whose current delayed entry is released (a correction can withhold a match until its cutoff). Totals use the frozen line format and conditions; super overs excluded. Trusted qualification and all-trust figures are shown separately. Previous career: D-10.
+
+### C38 · Trust, confirmations and moderation (2026-10-10)
+
+Folded into D-11, T-1, T-2 (`disputed`), T-4 and AUTH-1. No new D-11 columns.
+
+### C39 · Guest claims and public names (2026-10-10)
+
+Folded into API-6b, M (claim channels) and P-6 (`publicName`). The claim keeps the registration id, the accepted events and the player lines; only the person behind the registration gains the stats. Receipt `registration.guest_claimed` is written in the claim transaction; delivery runs after commit inside the recipient's tenant boundary, deduped per registration and person, with sweep recovery. The setup form's optional mobile uses a separate PATCH after the unchanged POST, so a failed link keeps the created guest for a retry.
+
+### C40 · Quick matches on personal clubs (2026-10-10)
+
+Folded into D-12 (personal org, `Friendlies <year>`, franchise reuse) and URL-5.
+
+### C41 · Seasons without an auction and team entry (2026-10-10)
+
+Folded into D-13 (policies and flow) and URL-17 (`/join` dispatch).
+
+### Review fixes F03–F12 (architect, 2026-10-14)
+
+From `05-review-fixes.md`. Each is folded into the section named.
+
+| Fix | Contract change | Sections |
+|---|---|---|
+| F03 | Public season results and tables wait for the betting delay (`releasedToPublic` filter, no migration) | P-3 |
+| F04 | `viewer_peak` counts distinct salted client keys per minute; scorer and managers never count | API-10, T-1 |
+| F05 | 0126 `history` column; two-step `REPEATABLE READ` read; one read per (room, proof); `LIVE_MAX_SOCKETS`; `LIVE_API_CACHE_MS` | D-3, API-9, API-11 |
+| F07 | 0127 `live_snapshot` / `live_history_entry`; role `desiauction_live` | D-16, API-11 |
+| F08 | Eligibility for every family; cricket restart keeps the frozen format | API-1 |
+| F09 | 0125 manager policy split and revokes; guest claim offers; post-finish corrections; (d) guests own team only | D-4, D-5, API-1, API-4, API-6, API-6b, AUTH-1, M |
+| F10 | Penalty runs to the batting-first side raise the chase target | R-16 |
+| F11 | `nrr_runs` / `nrr_balls`; `no_more_batters` charged like all out; revised-target credit | N-2, N-3 |
+| F12 | Previous-over bowlers (Law 17.8); free-hit `hit_twice`; wide run-out `runsCompleted`; bye/leg-bye dot; `pendingRevision` | R-08, R-11, R-17, A-2, E-3, S-2 |
+
 ### C42 tournament-move continuity amendment (Astra, 2026-10-10)
 
 D8/0122 copies the complete current 0116 `platform_move_tournament` definition, retaining every prior update, security setting, authorization check, grant, audit and return field. Add planned `ball_facts`/`match_confirmations` updates and `UPDATE team_entries SET org_id = p_target_org WHERE competition_id = ANY (v_comps)`. All entry statuses move; identifiers, captain identity, players, review evidence and competition linkage remain unchanged. Real move posture tests prove submitted/approved/rejected movement, target reads, refusal for unrelated source-tenant personnel, retained captain-only reads, isolation of other competitions, existing refusals and atomic rollback. Do not edit historical migrations 0116 or 0120. No extra schema or privilege widening.
@@ -1247,6 +1485,8 @@ STAT uses selected snapshot on-strike registration, C42 knownstyle>=60facedsampl
 Brief requires signed-in fixture.manage organizer or active participating team_manager rechecked within existing tenant boundary, then tier pro|association; membership/sharetoken alone genericrefusal, authorizedfree lockedpreview with zero stats. Entitled uses same-tenant privateT3 aggregates with existing privacyhandling/no contacts/crossorg/public privilege. No newDBfields/dependencies/rawevents endpoint. Required delayedboundary/wicket, firstload/amendment/void/restart/duplicates,4s/reducedmotion,miscounts,59/60,unknown/minor/private,trust/privacyETag andbriefisolation proofs.
 
 ### C44 focused Astra connection amendment (2026-10-10)
+
+*Superseded in part by F07 (2026-10-14): the two connections are now `desiauction_live`, not `desiauction_system`, and read only through the D-16 functions. See API-11.*
 
 Supersede C44's literal one-connection wording with at most two physical desiauction_system connections per live-service instance: one dedicated LISTEN connection and one max1 reader. Supported postgres APIs only. Listener-owning handle performs listen/lifecycle only, no ordinary queries; statement_timeout0 only listener config, existing30s reader timeout retained with bounded queue/work. No per-room pools/new dependency/schema/write grant/engine edits. Unsubscribe and close both owning handles on shutdown, replace connections without accumulating listeners/pools on reconnect. Prove committed versus rolledback pg_notify, actual backend cap, reader timeout, reconnect/no duplicatefanout and complete shutdown. All P1/P3/socket/origin/heartbeat/fallback/deployment/gates unchanged.
 
