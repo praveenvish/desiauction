@@ -7,7 +7,7 @@ import {
   scoringUpdate,
 } from "../../../score/storage";
 import { onAuctionRecoveryChange, publishAuctionRecovery } from "./recovery-events";
-import { AuctionCommands } from "./command-runtime";
+import { AuctionCommands, STORAGE_TIMEOUT_MS } from "./command-runtime";
 import { recoveryKey, type RecoveryMarker } from "./command-state";
 
 export function useAuctionCommands(
@@ -50,21 +50,33 @@ export function useAuctionCommands(
     const unsubscribe = onScoringStop(() => {
       commands.stop();
     });
+    // Bidding never waits on browser storage: if the device store cannot be
+    // opened (blocked, private or quota-limited browsers) or does not answer,
+    // recovery is kept in this tab and every control still works.
+    let settled = false;
+    const tabOnly = () => {
+      if (settled || !mounted || commands.stopped) return;
+      settled = true;
+      commands.useMemory();
+      commands.begin();
+      void commands.load();
+    };
+    const fallback = setTimeout(tabOnly, STORAGE_TIMEOUT_MS);
     void bindScoringActor(actorId)
       .then(async (receipt) => {
-        if (mounted && receipt.valid()) {
-          commands.begin();
-          await commands.load();
-        }
+        if (settled || !mounted || !receipt.valid()) return;
+        settled = true;
+        clearTimeout(fallback);
+        commands.begin();
+        await commands.load();
       })
       .catch(() => {
-        if (mounted && !commands.stopped) {
-          commands.error = "Recovery storage could not be opened. No command will be sent.";
-          changed();
-        }
+        clearTimeout(fallback);
+        tabOnly();
       });
     return () => {
       mounted = false;
+      clearTimeout(fallback);
       unsubscribe();
       unsubscribeRecovery();
       commands.stop();

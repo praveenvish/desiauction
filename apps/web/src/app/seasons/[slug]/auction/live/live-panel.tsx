@@ -667,6 +667,7 @@ export function LivePanel({
                 frozen={notTakingBids}
                 readOnly={readOnly}
                 busy={bidBusy}
+                sending={commands.pending("bid")}
                 onBid={(amount) => {
                   void bid(amount);
                 }}
@@ -722,6 +723,7 @@ export function LivePanel({
                 frozen={notTakingBids}
                 readOnly={readOnly}
                 busy={bidBusy}
+                sending={commands.pending("bid")}
                 onBid={(amount) => {
                   void bid(amount);
                 }}

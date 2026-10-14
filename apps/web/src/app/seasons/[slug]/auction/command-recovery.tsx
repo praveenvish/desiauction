@@ -109,10 +109,23 @@ export function CommandRecovery({
       </span>
     </div>
   );
-  if (!exceptional) return compact;
+  // No device storage — every control works, recovery lives in this tab.
+  const tabOnly = commands.degraded ? (
+    <p className="auction-command-status-note" role="status">
+      Recovery isn’t saved on this device. Keep this tab open while the auction runs.
+    </p>
+  ) : null;
+  if (!exceptional)
+    return (
+      <>
+        {compact}
+        {tabOnly}
+      </>
+    );
   return (
     <>
       {compact}
+      {tabOnly}
       <section
         className="auction-recovery-card"
         aria-label="Auction command recovery"

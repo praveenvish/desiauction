@@ -80,6 +80,10 @@ export function useFinancialWork(slug: string, inputScope: Scope | null) {
           }
           boundary.current = { signature, work };
           setState({ signature, ready: true, records, error: "" });
+          if (work.degraded)
+            setNotice(
+              "Unsent payments aren’t saved on this device. Finish each one before closing this tab.",
+            );
         })
         .catch((error: unknown) => {
           if (isActive() && current.current === signature)

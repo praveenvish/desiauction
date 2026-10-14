@@ -45,6 +45,7 @@ export function PaddleControl({
   squadSigned,
   readOnly,
   busy,
+  sending = busy,
   onBid,
   plan = null,
 }: {
@@ -57,8 +58,10 @@ export function PaddleControl({
   squadSigned: number;
   /** The feed is stale: nothing may be sent, and a chosen amount lapses. */
   readOnly: boolean;
-  /** A bid from this room is in flight. */
+  /** Bidding is held: a bid is in flight, or the room's command guard says wait. */
   busy: boolean;
+  /** A bid from this tab is actually in flight (defaults to `busy`). */
+  sending?: boolean;
   onBid: (amount: number) => void;
   /** WR-1: the owner's plan folded against this frame; null when they have none. */
   plan?: PlanState | null;
@@ -352,7 +355,9 @@ export function PaddleControl({
         data-amount={amount === undefined ? undefined : String(amount)}
       >
         {bidsDisabled ? null : <IconHand size={22} weight="fill" />}
-        <span>{busy && !locked && !readOnly ? "Sending your bid…" : label}</span>
+        <span>
+          {busy && !locked && !readOnly ? (sending ? "Sending your bid…" : "One moment…") : label}
+        </span>
       </button>
 
       <VisuallyHidden role="status" data-testid="bid-gesture-status">

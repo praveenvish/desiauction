@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { AuctionCommands, type CommandStorage } from "./command-runtime";
+import { describe, expect, it, vi } from "vitest";
+import {
+  AuctionCommands,
+  memoryCommandStorage,
+  STORAGE_TIMEOUT_MS,
+  type CommandStorage,
+} from "./command-runtime";
 import { commandOutcome, recoveryContext } from "./command-state";
 
 function storage(initial?: unknown) {
@@ -148,7 +153,7 @@ describe("auction command safety", () => {
       a.blocked("CompleteAuction", { overrideSquadMinimum: true, reason: "Approved exception" }),
     ).toBe(false);
   });
-  it("storage failure means no dispatch; corruption is not an empty recovery list", async () => {
+  it("storage failure keeps bidding in this tab; corruption is not an empty recovery list", async () => {
     const saved = storage();
     let calls = 0;
     const a = new AuctionCommands(
@@ -161,15 +166,14 @@ describe("auction command safety", () => {
       () => {},
     );
     await a.load();
-    expect(
-      (
-        await a.dispatch("bid", "PlaceBid", {}, () => {
-          calls++;
-          return Promise.resolve(undefined);
-        })
-      ).kind,
-    ).toBe("not-started");
-    expect(calls).toBe(0);
+    // No device storage: the bid still goes out once, guarded in memory.
+    await a.dispatch("bid", "PlaceBid", {}, () => {
+      calls++;
+      return Promise.resolve(undefined);
+    });
+    expect(calls).toBe(1);
+    expect(a.degraded).toBe(true);
+    expect(a.error).toBeNull();
     const b = new AuctionCommands(
       "person",
       "auction",
@@ -180,7 +184,7 @@ describe("auction command safety", () => {
     expect(b.ready).toBe(false);
     expect(b.error).toBeTruthy();
   });
-  it("failed settlement retains the prepared interlock rather than reporting uncomplicated Ready", async () => {
+  it("a settlement write that fails moves recovery to this tab and still settles", async () => {
     const saved = storage();
     let writes = 0;
     const a = new AuctionCommands(
@@ -199,9 +203,10 @@ describe("auction command safety", () => {
     expect(
       (await a.dispatch("bid", "PlaceBid", {}, (id) => Promise.resolve(accepted(id)))).kind,
     ).toBe("accepted");
-    expect(a.error).toBe("settlement failed");
-    expect(a.markers[0]?.state).toBe("prepared");
-    expect(a.blocked("PlaceBid", {})).toBe(true);
+    expect(a.error).toBeNull();
+    expect(a.degraded).toBe(true);
+    // The prepared marker was carried into memory and settled there.
+    expect(a.markers[0]?.state).toBe("accepted");
   });
   it("late answers after an account/room stop cannot repopulate rendered recovery state", async () => {
     const saved = storage();
@@ -213,8 +218,7 @@ describe("auction command safety", () => {
       id = commandId;
       return answer.promise;
     });
-    await Promise.resolve();
-    await Promise.resolve();
+    await expect.poll(() => id).not.toBe("");
     a.stop();
     answer.resolve(accepted(id));
     expect((await sent).kind).toBe("unknown");
@@ -416,7 +420,7 @@ describe("practice lifecycle recovery", () => {
     expect(outcome).toMatchObject({ kind: "refused", ended: true, stage: "create" });
     expect(card.markers).toEqual([]);
   });
-  it("never creates if storage cannot reserve and rejects mismatched direct receipt", async () => {
+  it("reserves in memory when storage cannot, and rejects mismatched direct receipt", async () => {
     let calls = 0;
     const broken = new AuctionCommands(
       "person",
@@ -432,8 +436,9 @@ describe("practice lifecycle recovery", () => {
           return Promise.resolve(null);
         })
       ).kind,
-    ).toBe("not-started");
-    expect(calls).toBe(0);
+    ).toBe("unknown");
+    expect(calls).toBe(1);
+    expect(broken.degraded).toBe(true);
     const saved = storage();
     const card = new AuctionCommands("person", "real", saved.adapter, () => {});
     await card.load();
@@ -682,7 +687,7 @@ describe("exact-practice shared termination reservations", () => {
   });
 });
 
-it("keeps failed lease release exceptional and clears local identity on account stop", async () => {
+it("finishes a lease release in memory when storage fails, and clears identity on stop", async () => {
   const saved = storage();
   const client = new AuctionCommands("person", "auction", saved.adapter, () => {});
   await client.load();
@@ -698,10 +703,53 @@ it("keeps failed lease release exceptional and clears local identity on account 
   );
   saved.adapter.update = () => Promise.reject(new Error("Release storage failed"));
   await client.releaseChain(lease);
-  expect(client.error).toBe("Release storage failed");
+  expect(client.error).toBeNull();
+  expect(client.degraded).toBe(true);
   expect(client.isChainActive(lease.commandId)).toBe(false);
-  expect(client.markers.some((item) => item.commandId === lease.commandId)).toBe(true);
+  expect(client.markers.some((item) => item.commandId === lease.commandId)).toBe(false);
   client.stop();
   expect(client.stopped).toBe(true);
   expect(client.isChainActive(lease.commandId)).toBe(false);
+});
+
+describe("bidding without device storage", () => {
+  it("falls back to this tab when the store hangs instead of failing", async () => {
+    vi.useFakeTimers();
+    try {
+      const client = new AuctionCommands(
+        "person",
+        "auction",
+        { read: () => new Promise(() => {}), update: () => new Promise(() => {}) },
+        () => {},
+      );
+      const loading = client.load();
+      await vi.advanceTimersByTimeAsync(STORAGE_TIMEOUT_MS);
+      await loading;
+      expect(client.ready).toBe(true);
+      expect(client.degraded).toBe(true);
+      let calls = 0;
+      const sent = client.dispatch("bid", "PlaceBid", {}, (id) => {
+        calls++;
+        return Promise.resolve(accepted(id));
+      });
+      expect((await sent).kind).toBe("accepted");
+      expect(calls).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("a bid whose answer was lost unblocks bidding once the room moves on", async () => {
+    const client = new AuctionCommands("person", "auction", memoryCommandStorage(), () => {});
+    await client.load();
+    await client.observe(7);
+    const lost = await client.dispatch("bid", "PlaceBid", {}, () =>
+      Promise.reject(new Error("socket closed")),
+    );
+    expect(lost.kind).toBe("unknown");
+    expect(client.blocked("PlaceBid", {})).toBe(true);
+    await client.observe(7);
+    expect(client.blocked("PlaceBid", {})).toBe(true);
+    await client.observe(8);
+    expect(client.blocked("PlaceBid", {})).toBe(false);
+  });
 });

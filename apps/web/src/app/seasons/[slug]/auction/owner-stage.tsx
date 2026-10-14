@@ -94,6 +94,7 @@ export function OwnerStage({
   frozen,
   readOnly,
   busy,
+  sending,
   onBid,
   plan,
   planNames,
@@ -120,6 +121,8 @@ export function OwnerStage({
   frozen: boolean;
   readOnly: boolean;
   busy: boolean;
+  /** A bid from this tab is actually in flight. */
+  sending?: boolean;
   onBid: (amount: number) => void;
   plan: PlanState | null;
   planNames: (registrationId: string) => string;
@@ -197,6 +200,7 @@ export function OwnerStage({
           squadSigned={squadSigned}
           readOnly={readOnly}
           busy={busy}
+          sending={sending ?? busy}
           onBid={onBid}
           plan={plan}
         />
