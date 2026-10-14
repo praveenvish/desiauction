@@ -108,6 +108,17 @@ async function capture(
       await page.setViewportSize(size);
       await page.evaluate(async () => {
         await document.fonts.ready;
+        // A theme flip runs colour transitions; axe sampling mid-transition
+        // measures a blend of the two themes' golds, not either one.
+        // Finite ones only (a looping pulse never finishes), and never long.
+        const settling = document
+          .getAnimations()
+          .filter((animation) => animation.effect?.getTiming().iterations !== Infinity)
+          .map((animation) => animation.finished.catch(() => undefined));
+        await Promise.race([
+          Promise.all(settling),
+          new Promise((resolve) => setTimeout(resolve, 2000)),
+        ]);
       });
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,

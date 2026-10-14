@@ -107,6 +107,8 @@ for (const theme of ["daylight", "floodlight"] as const) {
         await expect(page.getByTestId("rally-finish")).toBeEnabled();
         await page.getByTestId("rally-finish").click();
         await expect(page.getByText("Match finished", { exact: true })).toBeVisible();
+        // The finish is queued like any entry; read the database once it is sent.
+        await expect(page.getByRole("status")).toHaveText("Saved");
         await expect(viewer.getByTestId("live-result")).toContainText(
           tie ? "3–0 rubbers" : "1–0 rubbers",
         );

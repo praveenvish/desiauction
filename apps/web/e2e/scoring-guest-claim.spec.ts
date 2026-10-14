@@ -4,7 +4,7 @@ import { createDb, people, registrations, auditLog, fixtures } from "@desiauctio
 import { and, eq, sql } from "drizzle-orm";
 import { seedScoringFixture, scoringSession } from "./scoring-fixtures";
 
-test("a guest mobile-link retry keeps one registration and sends only the recipient an inbox notice", async ({
+test("a guest mobile-link retry keeps one registration and the account holder accepts the offer", async ({
   page,
   browser,
 }) => {
@@ -70,20 +70,35 @@ test("a guest mobile-link retry keeps one registration and sends only the recipi
     const after = await guests();
     expect(after).toHaveLength(1);
     expect(after[0]?.id).toBe(before[0]?.id);
-    expect(after[0]?.personId).toBe(fixture.nextActorId);
+    // F09: an account already holds this number, so nothing moves on the
+    // scorer's word — the holder is offered the guest entry and decides.
+    expect(after[0]?.personId).not.toBe(fixture.nextActorId);
     const notices = await handle.db
       .select()
       .from(auditLog)
       .where(
-        and(eq(auditLog.scopeId, fixture.nextActorId), eq(auditLog.action, "player.claim_invited")),
+        and(eq(auditLog.scopeId, fixture.nextActorId), eq(auditLog.action, "player.claim_offered")),
       );
     expect(notices).toHaveLength(1);
+    const offerLine = "A scorer thinks you played as their guest — is it you?";
     await page.goto("/inbox");
-    await expect(page.getByText("Sign in to see your match stats", { exact: true })).toHaveCount(0);
+    await expect(page.getByText(offerLine, { exact: true })).toHaveCount(0);
     await scoringSession(recipient, fixture.nextActorToken);
     const other = await recipient.newPage();
     await other.goto("/inbox");
-    await expect(other.getByText("Sign in to see your match stats", { exact: true })).toBeVisible();
+    await expect(other.getByText(offerLine, { exact: true })).toBeVisible();
+    await other.goto("/me/claims");
+    const offer = other.getByRole("region", { name: "Claim retry guest" });
+    await expect(offer).toBeVisible();
+    expect((await new AxeBuilder({ page: other }).analyze()).violations).toEqual([]);
+    await offer.getByRole("button", { name: "Yes, that was me", exact: true }).click();
+    await expect(
+      other.getByText("Done — the match stats are now part of your career.", { exact: true }),
+    ).toBeVisible();
+    const accepted = await guests();
+    expect(accepted).toHaveLength(1);
+    expect(accepted[0]?.id).toBe(before[0]?.id);
+    expect(accepted[0]?.personId).toBe(fixture.nextActorId);
   } finally {
     await recipient.close();
     await handle.sql.end({ timeout: 5 });
