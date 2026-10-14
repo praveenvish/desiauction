@@ -24,6 +24,14 @@ import {
 } from "./whatsapp";
 import { deliverMail, transactionalMailer, type TransactionalMailer } from "./transactional-mail";
 import { unsubscribeHeaders } from "./unsubscribe";
+import { eligibleTossReminder, tossRequestId } from "../scoring/toss-reminder-state";
+import { eligibleMatchNotice, matchNoticeAddress } from "../scoring/result-notice-state";
+import {
+  confirmationNoticeAddress,
+  eligibleConfirmationNotice,
+} from "../scoring/confirmation-notice-state";
+import { auditLog } from "@desiauction/db";
+import { and } from "drizzle-orm";
 
 /**
  * THE PERSONAL-MESSAGE QUEUE (0079).
@@ -120,6 +128,41 @@ export async function enqueueSms(texts: readonly QueuedSms[], db: Db = appDb): P
   if (rows.length === 0) {
     return [];
   }
+  const inserted = await db
+    .insert(messageOutbox)
+    .values(rows)
+    .onConflictDoNothing({ target: messageOutbox.dedupeKey })
+    .returning({ dedupeKey: messageOutbox.dedupeKey });
+  return inserted.map((row) => row.dedupeKey);
+}
+/** C36's award channel has no registered SMS shape and must never fall back to SMS. */
+export async function enqueueWhatsApp(
+  texts: readonly {
+    personId: string;
+    orgId: string;
+    kind: "match.award";
+    dedupeKey: string;
+    slots: Readonly<{ competition: string }>;
+  }[],
+  db: Db = appDb,
+): Promise<string[]> {
+  const rows = texts.map((text) => {
+    if (!text.slots.competition.trim()) throw new Error("Award competition is required");
+    return {
+      id: newId(),
+      personId: text.personId,
+      orgId: text.orgId,
+      kind: text.kind,
+      channel: "whatsapp" as const,
+      dedupeKey: `whatsapp:${text.dedupeKey}`,
+      subject: "",
+      bodyText: "",
+      bodyHtml: "",
+      templateKey: "match.award",
+      slots: text.slots,
+    };
+  });
+  if (!rows.length) return [];
   const inserted = await db
     .insert(messageOutbox)
     .values(rows)
@@ -245,7 +288,8 @@ type ClaimedRow = {
   person_id: string;
   org_id: string | null;
   kind: string;
-  channel: "email" | "sms";
+  dedupe_key: string;
+  channel: "email" | "sms" | "whatsapp";
   subject: string;
   body_text: string;
   body_html: string;
@@ -414,7 +458,7 @@ export async function drainOutbox(
       limit ${limit}
       for update skip locked
     )
-    returning id, person_id, org_id, kind, channel, subject, body_text, body_html,
+    returning id, person_id, org_id, kind, dedupe_key, channel, subject, body_text, body_html,
               template_key, slots, media_url, attempts, ${LEASE_TOKEN} as lease
   `);
 
@@ -428,7 +472,9 @@ export async function drainOutbox(
   let sms: PlayerSmsSender | null | undefined = options.sms;
   // Which approved template each kind goes out under — the admin's mapping,
   // else the env var — read once per drain, and only when a text is due.
-  const resolver: TemplateResolver | null = claimed.some((row) => row.channel === "sms")
+  const resolver: TemplateResolver | null = claimed.some(
+    (row) => row.channel === "sms" || row.channel === "whatsapp",
+  )
     ? await templateResolver(db)
     : null;
   const injected = options.whatsappTemplate;
@@ -443,7 +489,85 @@ export async function drainOutbox(
       skipped += 1;
       continue;
     }
-    if (row.channel === "sms") {
+    if (row.kind === "match.confirm_request") {
+      try {
+        const address = confirmationNoticeAddress(row.dedupe_key);
+        const orgId = row.org_id;
+        const now = options.now ?? new Date();
+        const eligible =
+          address &&
+          address.personId === row.person_id &&
+          orgId &&
+          (await db.transaction(async (tx) => {
+            await tx.execute(
+              sql`select set_config('app.person_id', ${row.person_id}, true), set_config('app.org_id', ${orgId}, true)`,
+            );
+            const [receipt] = await tx
+              .select({ at: auditLog.at })
+              .from(auditLog)
+              .where(
+                and(
+                  eq(auditLog.scopeType, "person"),
+                  eq(auditLog.scopeId, row.person_id),
+                  eq(auditLog.subject, row.dedupe_key.replace(/^email:/, "")),
+                ),
+              );
+            return (
+              receipt &&
+              now.getTime() < receipt.at.getTime() + 7 * 24 * 3600000 &&
+              (await eligibleConfirmationNotice(tx, address, now))
+            );
+          }));
+        if (!eligible) {
+          await settle(db, row.id, "suppressed", "confirmation unavailable");
+          suppressed++;
+          continue;
+        }
+      } catch {
+        await db
+          .update(messageOutbox)
+          .set({
+            lastError: "confirmation eligibility lookup failed",
+            nextAttemptAt: new Date(Date.now() + backoffMs(row.attempts)),
+          })
+          .where(eq(messageOutbox.id, row.id));
+        retrying++;
+        continue;
+      }
+    }
+    if (row.kind === "match.result" || row.kind === "match.award") {
+      try {
+        const address = matchNoticeAddress(row.dedupe_key);
+        const orgId = row.org_id;
+        const eligible =
+          address &&
+          orgId &&
+          address.kind === row.kind &&
+          address.personId === row.person_id &&
+          (await db.transaction(async (tx) => {
+            await tx.execute(
+              sql`select set_config('app.person_id', ${row.person_id}, true), set_config('app.org_id', ${orgId}, true)`,
+            );
+            return eligibleMatchNotice(tx, orgId, address);
+          }));
+        if (!eligible) {
+          await settle(db, row.id, "suppressed", "match notice unavailable");
+          suppressed++;
+          continue;
+        }
+      } catch {
+        await db
+          .update(messageOutbox)
+          .set({
+            lastError: "match notice eligibility lookup failed",
+            nextAttemptAt: new Date(Date.now() + backoffMs(row.attempts)),
+          })
+          .where(eq(messageOutbox.id, row.id));
+        retrying++;
+        continue;
+      }
+    }
+    if (row.channel === "sms" || row.channel === "whatsapp") {
       if (sms === undefined) sms = createPlayerSmsSender(db, resolver?.smsId);
       const result = await sendText(db, row, { sms, whatsapp }, options.now ?? new Date());
       if (result === "sent") sent += 1;
@@ -451,6 +575,38 @@ export async function drainOutbox(
       else if (result === "failed") failed += 1;
       else if (result === "retrying") retrying += 1;
       continue;
+    }
+    if (row.kind === "match.toss_reminder") {
+      try {
+        const requestId = tossRequestId(row.dedupe_key);
+        const orgId = row.org_id;
+        const eligible =
+          requestId !== null &&
+          orgId !== null &&
+          (await db.transaction(async (tx) => {
+            await tx.execute(
+              sql`select set_config('app.person_id', ${row.person_id}, true), set_config('app.org_id', ${orgId}, true)`,
+            );
+            return (
+              (await eligibleTossReminder(tx, requestId, row.person_id, orgId, "email")) !== null
+            );
+          }));
+        if (!eligible) {
+          await settle(db, row.id, "suppressed", "reminder unavailable");
+          suppressed += 1;
+          continue;
+        }
+      } catch {
+        await db
+          .update(messageOutbox)
+          .set({
+            lastError: "reminder eligibility lookup failed",
+            nextAttemptAt: new Date(Date.now() + backoffMs(row.attempts)),
+          })
+          .where(eq(messageOutbox.id, row.id));
+        retrying += 1;
+        continue;
+      }
     }
     const email = await verifiedEmailOf(db, row.person_id);
     if (email === null) {
@@ -584,7 +740,12 @@ async function sendText(
     row.template_key !== null && row.template_key in SMS_TEMPLATES
       ? SMS_TEMPLATES[row.template_key as TemplateKey]
       : null;
-  if (template === null || row.slots === null) {
+  const whatsappOnly = row.channel === "whatsapp";
+  const templateKey =
+    whatsappOnly && row.kind === "match.award" && row.template_key === "match.award"
+      ? ("match.award" as const)
+      : template?.key;
+  if (!templateKey || row.slots === null || (whatsappOnly && templateKey !== "match.award")) {
     await settle(db, row.id, "failed", `unknown template ${row.template_key ?? "(none)"}`);
     return "failed";
   }
@@ -612,7 +773,7 @@ async function sendText(
   const whatsappVerdict = await platformVerdict(db, row.kind, "whatsapp");
   const decision = await mayDeliver(db, row, {
     contact: person.phone,
-    channel: whatsappVerdict.enabled ? "whatsapp" : "sms",
+    channel: whatsappOnly || whatsappVerdict.enabled ? "whatsapp" : "sms",
   });
   if (!decision.send) {
     await settle(db, row.id, "suppressed", decision.reason);
@@ -637,8 +798,8 @@ async function sendText(
    * at most once, so the row stops here, failed with the reason spelled out;
    * the in-app inbox line the caller wrote still carries the moment.
    */
-  const waTemplate = WHATSAPP_TEMPLATES[template.key];
-  const waName = channels.whatsapp.templateName(template.key);
+  const waTemplate = WHATSAPP_TEMPLATES[templateKey];
+  const waName = channels.whatsapp.templateName(templateKey);
   let block: WhatsAppBlock;
   if (!whatsappVerdict.enabled) {
     block = { kind: "platform_off", reason: whatsappVerdict.reason };
@@ -668,7 +829,7 @@ async function sendText(
         // approved in it — then the version it IS approved in, at once.
         const first = languageFor(
           consent.language,
-          channels.whatsapp.templateLanguages(template.key),
+          channels.whatsapp.templateLanguages(templateKey),
         );
         let receipt;
         try {
@@ -725,7 +886,7 @@ async function sendText(
     }
   }
   const route = textFallback(block, {
-    smsAvailable: channels.sms !== null,
+    smsAvailable: !whatsappOnly && channels.sms !== null,
     attempts: row.attempts,
     maxAttempts: MAX_ATTEMPTS,
   });
@@ -750,7 +911,7 @@ async function sendText(
   // "sms" is only ever answered when a gateway exists; the check is for the
   // compiler, and settles honestly if that ever stops being true.
   const gateway = channels.sms;
-  if (gateway === null) {
+  if (gateway === null || template === null || whatsappOnly) {
     await settle(db, row.id, "suppressed", "no_text_channel: no SMS gateway");
     return "suppressed";
   }

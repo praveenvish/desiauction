@@ -1,0 +1,139 @@
+.chart-panel {
+  margin-top: 16px;
+}
+.chart-field {
+  display: block;
+  width: min(100%, 440px);
+  margin: 16px auto;
+}
+.chart-plot {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+}
+.chart-plot text {
+  fill: var(--text-secondary);
+  font: 10px var(--font-text);
+}
+.chart-grid {
+  stroke: var(--border-subtle);
+  stroke-width: 1;
+}
+.chart-series-1 {
+  --chart-color: var(--chart-s1);
+}
+.chart-series-2 {
+  --chart-color: var(--chart-s2);
+}
+.chart-line {
+  stroke: var(--chart-color);
+  stroke-width: 2;
+}
+.chart-point,
+.chart-bar {
+  fill: var(--chart-color);
+}
+.chart-point:focus,
+.chart-bar:focus {
+  outline: none;
+  stroke: var(--focus-ring);
+  stroke-width: 3;
+}
+.chart-wicket-cap {
+  stroke: var(--text-heading);
+  stroke-width: 2;
+}
+.chart-shot {
+  stroke-width: 1.5;
+}
+.chart-shot:focus {
+  outline: none;
+  stroke-width: 4;
+}
+.chart-shot-runs,
+.chart-shot-other {
+  stroke: var(--text-on-dark);
+}
+.chart-shot-four {
+  stroke: var(--chart-s1);
+}
+.chart-shot-six {
+  stroke: var(--chart-s2);
+}
+.chart-shot-other {
+  stroke-dasharray: 3 2;
+}
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  list-style: none;
+  padding: 0;
+  font-size: 13px;
+}
+.chart-legend li::before {
+  content: "";
+  display: inline-block;
+  width: 12px;
+  height: 3px;
+  margin-right: 6px;
+  vertical-align: middle;
+  background: var(--chart-color, var(--text-secondary));
+}
+.chart-shot-key-four {
+  --chart-color: var(--chart-s1);
+}
+.chart-shot-key-six {
+  --chart-color: var(--chart-s2);
+}
+.chart-readout {
+  min-height: 44px;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.chart-note {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.chart-batter-pills,
+.chart-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chart-batter-pills button {
+  border: 1px solid var(--border-subtle);
+  border-radius: 24px;
+  background: var(--surface-raised);
+  color: var(--text-primary);
+}
+.chart-batter-pills button[aria-pressed="true"],
+.chart-groups button[aria-pressed="true"] {
+  border-color: var(--accent-line);
+  background: var(--surface-overlay);
+  font-weight: 600;
+}
+.chart-innings-choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+  font-size: 13px;
+}
+.chart-innings-choice select {
+  min-height: 44px;
+  max-width: 100%;
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 8px;
+}
+.chart-panel details {
+  margin-top: 16px;
+}
+.chart-panel summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding: 12px 0;
+}

@@ -56,6 +56,11 @@ export function shellKind(pathname: string): ShellKind {
   // The overlay and public board are bare, chrome-free surfaces — checked
   // before `liveMatch` so the auction segment never frames them in the Live shell.
   if (
+    /^\/c\/[^/]+\/m\/[^/]+(?:\/(?:overlay|board))?\/?$/.test(pathname) ||
+    /^\/m\/[^/]+\/?$/.test(pathname) ||
+    pathname.startsWith("/match/confirm/") ||
+    pathname === "/score" ||
+    pathname.startsWith("/score/") ||
     pathname.startsWith("/gallery") ||
     pathname.startsWith("/dev") ||
     // Onboarding is a focused, chrome-free moment (2026-07-24 collapse). The
@@ -612,10 +617,14 @@ const SECTION_LABELS: [RegExp, string][] = [
    */
   [/\/registrations$/, "Players"],
   [/\/fixtures\/calendar$/, "Calendar"],
+  [/\/fixtures\/today$/, "Match day"],
   [/\/fixtures\/match-day$/, "Match day"],
   [/\/fixtures$/, "Schedule"],
   [/\/lineups$/, "Lineups"],
   [/\/reviews$/, "Reviews"],
+  [/\/awards$/, "Season awards"],
+  [/\/brief\/[^/]+$/, "Captain’s brief"],
+  [/\/insights$/, "Player insights"],
   [/\/standings$/, "Table"],
   [/\/auction\/ledger$/, "Ledger"],
   [/\/auction\/engine$/, "Engine"],
@@ -1021,6 +1030,8 @@ export interface NavScope {
 export interface NavRoles {
   /** Holds `org:owner` or `org:staff` anywhere. */
   organizes: boolean;
+  /** A current scoring season appointment, from roles.scores. */
+  scores?: number;
   /**
    * How many clubs this person runs. The Clubs item is offered only past one:
    * with a single club it is a list of one, and that club is already reached
@@ -1263,6 +1274,9 @@ export function navigationFor(input: { roles: NavRoles | null; pathname: string 
   const candidates: (NavItem | null)[] = [
     { key: "home", label: "Home", shortLabel: "Home", href: "/home", icon: "home" },
     liveDoor(roles),
+    (roles.scores ?? 0) > 0
+      ? { key: "score", label: "Score", shortLabel: "Score", href: "/score", icon: "sports" }
+      : null,
     scopeItem("team", roles.teams, "My teams", "My team", "team", ownTeamHref),
     scopeItem(
       "nights",
@@ -1481,6 +1495,7 @@ export function seasonTabs(
   role: SeasonRole,
   options: {
     canSettle?: boolean;
+    teamFormation?: "auction" | "organizer" | "team_entry";
     /** The owner's own team here — "My team" opens its squad, not the grid. */
     ownTeamId?: string;
   } = {},
@@ -1532,9 +1547,11 @@ export function seasonTabs(
           // recorded per match and the table is derived from the fixtures
           // beside it, so all three are one question (round 2 moved Lineups
           // here from Players).
-          claims: ["/standings", "/lineups"],
+          claims: ["/standings", "/lineups", "/fixtures/today"],
         },
-        auction,
+        ...(options.teamFormation === undefined || options.teamFormation === "auction"
+          ? [auction]
+          : []),
         // Absent without `settlement.view`, never disabled — the surface itself
         // 404s rather than admit the books exist, and the tab must agree.
         ...(options.canSettle === true
@@ -1545,7 +1562,13 @@ export function seasonTabs(
     case "auctioneer":
       // Conduct is narrow on purpose (core/capabilities): run the night, see
       // who is bidding. No registrations, no money, no reviews.
-      return [overview, teams, auction];
+      return [
+        overview,
+        teams,
+        ...(options.teamFormation === undefined || options.teamFormation === "auction"
+          ? [auction]
+          : []),
+      ];
     case "owner":
       // Overview leads (round 5): an owner standing on the season's own page
       // saw four tabs and none of them lit.
@@ -1563,8 +1586,12 @@ export function seasonTabs(
           }),
           testId: "open-teams",
         },
-        { key: "my-plan", label: "My plan", href: `${base}/auction/plan` },
-        { key: "room", label: "Auction room", href: `${base}/auction/live` },
+        ...(options.teamFormation === undefined || options.teamFormation === "auction"
+          ? [
+              { key: "my-plan", label: "My plan", href: `${base}/auction/plan` },
+              { key: "room", label: "Auction room", href: `${base}/auction/live` },
+            ]
+          : []),
         table,
       ];
     case "player":
@@ -1572,11 +1599,19 @@ export function seasonTabs(
         overview,
         { key: "my-entry", label: "My entry", href: `${base}/register` },
         table,
-        auction,
+        ...(options.teamFormation === undefined || options.teamFormation === "auction"
+          ? [auction]
+          : []),
       ];
     case "member":
     case "public":
-      return [overview, table, auction];
+      return [
+        overview,
+        table,
+        ...(options.teamFormation === undefined || options.teamFormation === "auction"
+          ? [auction]
+          : []),
+      ];
   }
 }
 

@@ -159,6 +159,10 @@ const RAW_SENDERS: readonly { token: string; allowed: Readonly<Record<string, st
     token: "enqueueMail(",
     allowed: {
       "server/messaging/outbox.ts": "defines it; the drain asks the gate for every row",
+      "server/scoring/toss-reminder-delivery.ts":
+        "recipient/org boundary, eligibility/channel gates, atomic notice/enqueue, request-ID dedupe; gated drain rechecks reminder before send",
+      "server/scoring/result-notice-delivery.ts":
+        "recipient tenant boundary, serialized current-winner/nonvoid check and channel gates; atomic receipt/enqueue, gated drain rechecks eligibility",
       "server/auction/auction-notify.ts": "queues only — delivery is the gated drain",
       "server/competition/registration-notify.ts": "queues only — delivery is the gated drain",
       "server/competition/appointments.ts": "queues only — delivery is the gated drain",
@@ -173,6 +177,15 @@ const RAW_SENDERS: readonly { token: string; allowed: Readonly<Record<string, st
         "queues only, held ten minutes — delivery is the gated drain",
       "server/competition/match-day.ts": "queues only — delivery is the gated drain",
       "server/competition/season-finale.ts": "queues only — delivery is the gated drain",
+    },
+  },
+  {
+    token: "enqueueWhatsApp(",
+    allowed: {
+      "server/messaging/outbox.ts":
+        "defines WhatsApp-only enqueue; gated drain preserves consent/switches and never falls back to SMS",
+      "server/scoring/result-notice-delivery.ts":
+        "queues gated current award recipient only, with fixture/kind/person dedupe",
     },
   },
   {

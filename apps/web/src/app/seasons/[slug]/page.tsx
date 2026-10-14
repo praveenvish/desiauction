@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
@@ -85,6 +86,9 @@ export default async function CompetitionHomePage({
           the URL, on the server, so the HTML never carries a second h1. */}
       <main className="ov-page">
         <div className="ov-stack">
+          {["cricket", "box_cricket"].includes(view.competition.sport) && (
+            <Link href={`/seasons/${slug}/awards`}>Season awards and leaderboards</Link>
+          )}
           <OverviewPanel
             view={view}
             slug={slug}

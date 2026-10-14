@@ -21,7 +21,7 @@ import {
   teams,
   type DbHandle,
 } from "@desiauction/db";
-import { inArray } from "drizzle-orm";
+import { inArray, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { env } from "../../env";
@@ -40,7 +40,7 @@ const db = handle.db;
 const MARK = "LIVEBOARD-REGRESSION";
 const MIN = 60_000;
 const HOUR = 60 * MIN;
-const NOW = Date.now();
+let NOW = Date.now();
 
 let orgId = "";
 /** The season of the auction created last — the busy room's, while it is seeded. */
@@ -159,6 +159,18 @@ async function bid(
 }
 
 beforeAll(async () => {
+  // A populated validation database legitimately has newer closed auctions.
+  // Keep our logical board clock and all relative assertions independent of
+  // those records, without altering the process clock or production limit.
+  const [clock] = await db
+    .select({ maxAtMs: sql<string | null>`max(${auctionEvents.atMs})` })
+    .from(auctionEvents);
+  const maxExistingAtMs =
+    clock?.maxAtMs === null || clock?.maxAtMs === undefined ? null : Number(clock.maxAtMs);
+  if (maxExistingAtMs !== null && !Number.isSafeInteger(maxExistingAtMs))
+    throw new Error("Invalid persisted auction clock");
+  NOW = Math.max(Date.now(), maxExistingAtMs === null ? 0 : maxExistingAtMs + HOUR + MIN);
+  if (!Number.isSafeInteger(NOW)) throw new Error("Invalid test auction clock");
   creator = await person("Organizer");
   orgId = newId();
   await db.insert(organizations).values({
@@ -263,6 +275,25 @@ describe("liveAuctionBoard", () => {
     const board = await liveAuctionBoard(db, NOW);
     const ended = board.ended.find((row) => row.auctionId === closedRecently);
     expect(ended?.endedAtMs).toBe(NOW - HOUR);
+  });
+
+  it("returns exactly the ten newest qualifying ended auctions", async () => {
+    const endedIds: string[] = [];
+    for (let index = 0; index < 11; index += 1) {
+      const id = await auction("completed", `Bounded ended ${String(index)}`);
+      await event(id, 1, "AuctionOpened", NOW - 2 * HOUR);
+      await event(id, 2, "AuctionClosed", NOW - (index + 1) * MIN);
+      endedIds.push(id);
+    }
+    const board = await liveAuctionBoard(db, NOW);
+    expect(board.ended).toHaveLength(10);
+    expect(board.ended.map((row) => row.auctionId)).toEqual(endedIds.slice(0, 10));
+    expect(board.ended.map((row) => row.endedAtMs)).toEqual(
+      Array.from({ length: 10 }, (_, index) => NOW - (index + 1) * MIN),
+    );
+    expect(board.ended.map((row) => row.auctionId)).not.toContain(endedIds[10]);
+    expect(board.ended.map((row) => row.auctionId)).not.toContain(closedLongAgo);
+    // afterAll purges only this spec's own organization and people.
   });
 });
 

@@ -13,6 +13,8 @@ import { OwnSquad } from "./own-squad";
 import { PublishByHand } from "./hand-entry";
 import { ResultsSheet } from "./results-sheet";
 import { SquadSheetsPanel } from "./squad-sheets-panel";
+import { teamEntriesView } from "../../../../server/competition/team-entry-actions";
+import { TeamEntriesPanel } from "./team-entries-panel";
 import { TeamsPanel } from "./teams-panel";
 import "../../seasons.css";
 import "./teams.css";
@@ -30,11 +32,12 @@ export default async function TeamsPage({
   searchParams: Promise<{ team?: string; view?: string }>;
 }) {
   const [{ slug }, sp] = await Promise.all([params, searchParams]);
-  const [view, appointments, squadSheets, session] = await Promise.all([
+  const [view, appointments, squadSheets, session, entries] = await Promise.all([
     teamsWorkspaceView(slug),
     appointmentsPanelView(slug),
     squadSheetsPanelView(slug),
     currentSession(),
+    teamEntriesView(slug),
   ]);
   if (view === null) {
     notFound();
@@ -137,6 +140,9 @@ export default async function TeamsPage({
     <ToastProvider>
       <main className="registrations-dash tm-page">
         <div className="dash-stack tm-stack">
+          {entries !== null ? (
+            <TeamEntriesPanel slug={slug} code={entries.code} entries={entries.entries} />
+          ) : null}
           {ownCard !== undefined && (selectedTeam === null || selectedTeam.id === ownCard.id) ? (
             <OwnSquad
               slug={slug}

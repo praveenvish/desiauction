@@ -4,6 +4,13 @@
  * without importing each other (email programme PR18).
  */
 export type SecurityAction =
+  | "match.toss_reminder"
+  | "match.result_published"
+  | "match.award_won"
+  | "match.confirm_requested"
+  | "player.claim_invited"
+  | "player.claim_offered"
+  | "match.quiet"
   | "auth.login.otp"
   /** A correct code or passkey for a SUSPENDED account (0103): no session issued. */
   | "auth.login.refused_suspended"

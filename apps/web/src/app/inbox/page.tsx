@@ -17,12 +17,16 @@ import { redirect } from "next/navigation";
 import { detailOf } from "../../lib/inbox-events";
 import { currentSession } from "../../server/auth/actions";
 import { systemDb } from "../../server/db";
+import { reminderId, resolveReminderLink } from "../../server/scoring/reminder-link";
+import { resolveMatchNoticeLink } from "../../server/scoring/result-notice-link";
+import { resolveConfirmationNoticeLink } from "../../server/scoring/confirmation-notice-link";
 import { inboxState, listInboxEvents } from "../../server/auth/security-events";
 import { rolesOf } from "../../server/roles/roles";
 import { InboxList } from "./inbox-list";
 import "./inbox.css";
 
 export const metadata = { title: "Notifications" };
+export const dynamic = "force-dynamic";
 
 /** How many notices load. The old hard 10 could not show last week's decision. */
 const WINDOW = 50;
@@ -85,12 +89,65 @@ export default async function InboxPage({
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
+  const params = await searchParams;
+  const requestedReminder = reminderId(params["reminder"]);
+  const requestedMatchNotice = reminderId(params["matchNotice"]);
+  const requestedConfirmation = reminderId(params["confirmation"]);
   const session = await currentSession();
   if (session === null) {
-    redirect("/login?next=/inbox");
+    const next = requestedConfirmation
+      ? `/inbox?confirmation=${requestedConfirmation}`
+      : requestedMatchNotice
+        ? `/inbox?matchNotice=${requestedMatchNotice}`
+        : requestedReminder === null
+          ? "/inbox"
+          : `/inbox?reminder=${requestedReminder}`;
+    redirect(`/login?next=${encodeURIComponent(next)}`);
+  }
+  if (params["confirmation"] !== undefined) {
+    const destination = await resolveConfirmationNoticeLink(
+      session.personId,
+      requestedConfirmation,
+    );
+    if (destination) redirect(destination);
+    return (
+      <main className="inbox">
+        <EmptyState
+          headingLevel={2}
+          title="Confirmation unavailable"
+          description="This confirmation is no longer available."
+        />
+      </main>
+    );
+  }
+  if (params["matchNotice"] !== undefined) {
+    const destination = await resolveMatchNoticeLink(session.personId, requestedMatchNotice);
+    if (destination) redirect(destination);
+    return (
+      <main className="inbox">
+        <EmptyState
+          headingLevel={2}
+          title="Match notice unavailable"
+          description="This match notice is no longer available."
+        />
+      </main>
+    );
+  }
+  if (params["reminder"] !== undefined) {
+    const destination = await resolveReminderLink(session.personId, requestedReminder);
+    if (destination !== null) redirect(destination);
+    return (
+      <main className="inbox">
+        <EmptyState
+          headingLevel={2}
+          title="Reminder unavailable"
+          description="This reminder link is no longer available."
+        />
+      </main>
+    );
   }
   // "Show older": the page before this timestamp. Anything unparseable is page 1.
-  const beforeRaw = (await searchParams)["before"];
+  const beforeRaw = params["before"];
   const beforeAt = beforeRaw === undefined ? null : new Date(beforeRaw);
   const before = beforeAt !== null && !Number.isNaN(beforeAt.getTime()) ? beforeAt : undefined;
   const [events, roles, state] = await Promise.all([
@@ -154,18 +211,53 @@ export default async function InboxPage({
                 const competitionId = competitionIdOf(event.meta);
                 const competition = competitionId === null ? undefined : named.get(competitionId);
                 const detail = detailOf(event.meta);
+                const requestId =
+                  event.action === "match.toss_reminder" &&
+                  typeof event.meta === "object" &&
+                  event.meta !== null &&
+                  "requestId" in event.meta
+                    ? reminderId(event.meta.requestId)
+                    : null;
+                const matchNoticeId =
+                  ["match.result_published", "match.award_won", "match.confirm_requested"].includes(
+                    event.action,
+                  ) &&
+                  typeof event.meta === "object" &&
+                  event.meta !== null &&
+                  "noticeId" in event.meta
+                    ? reminderId(event.meta.noticeId)
+                    : null;
                 return {
                   action: event.action,
                   at: event.at.toISOString(),
                   ...(detail === null ? {} : { detail }),
-                  ...(competition !== undefined
+                  ...(matchNoticeId !== null
                     ? {
                         subject: {
-                          name: competition.name,
-                          ...(competition.publicPage ? { href: `/c/${competition.slug}` } : {}),
+                          name:
+                            event.action === "match.confirm_requested"
+                              ? "Confirm the result"
+                              : "Match result",
+                          href:
+                            event.action === "match.confirm_requested"
+                              ? `/inbox?confirmation=${matchNoticeId}`
+                              : `/inbox?matchNotice=${matchNoticeId}`,
                         },
                       }
-                    : {}),
+                    : event.action === "player.claim_offered"
+                      ? { subject: { name: "Answer", href: "/me/claims" } }
+                      : requestId !== null
+                        ? { subject: { name: "Live match", href: `/inbox?reminder=${requestId}` } }
+                        : competition !== undefined
+                          ? {
+                              subject: {
+                                name: competition.name,
+                                ...(competition.publicPage
+                                  ? { href: `/c/${competition.slug}` }
+                                  : {}),
+                              },
+                            }
+                          : {}),
                 };
               })}
             />

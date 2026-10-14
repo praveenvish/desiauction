@@ -1,3 +1,6 @@
+import type { TimedFormat } from "../scoring/timed/formats";
+import type { RaidFormat } from "../scoring/raid/formats";
+import type { RallyFormat } from "../scoring/rally/formats";
 /**
  * WHAT A SPORT IS ALLOWED TO VARY.
  *
@@ -26,6 +29,7 @@
  */
 
 import type { LobbyPoints, PointsPolicy, TiebreakerSpec } from "../standings";
+import type { FormatSpec } from "../scoring/formats";
 
 /**
  * How a value is written by a person, versus how we store it.
@@ -158,6 +162,20 @@ export interface Terminology {
  * set of aliases and a seed fixture — not a project.
  */
 export interface SportPack {
+  readonly scoring?: {
+    depth: 0 | 1 | 2;
+    defaultFormat: string;
+    awardTable: string;
+  } & (
+    | { family: "delivery"; formats: readonly FormatSpec[] }
+    | { family: "rally"; formats: readonly RallyFormat[] }
+    | { family: "raid"; formats: readonly RaidFormat[] }
+    | { family: "timed"; formats: readonly TimedFormat[] }
+    | {
+        family: "placement";
+        formats: readonly import("../scoring/placement/format-types").PlacementFormat[];
+      }
+  );
   /** Stored token; becomes `competitions.sport` in Phase 1. */
   readonly key: string;
   readonly label: string;

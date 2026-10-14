@@ -193,6 +193,7 @@ function TeamGrid({
       {/* Not for a season run offline (0110): "Create the auction" refuses it,
           and its next step is typing the results in — the band below. */}
       {view.viewer.canManageTeams &&
+      (view.teamFormation === undefined || view.teamFormation === "auction") &&
       view.rulesSource === null &&
       view.auctionSource !== "imported" &&
       view.teams.length > 0 ? (
@@ -263,7 +264,9 @@ function TeamGrid({
           title="No teams yet"
           description={
             view.viewer.canManageTeams
-              ? "The auction needs at least two teams. Add the first one with “Add team” above."
+              ? view.teamFormation !== undefined && view.teamFormation !== "auction"
+                ? "Add your teams or approve captain sign-ups before building the schedule."
+                : "The auction needs at least two teams. Add the first one with “Add team” above."
               : "The organizer hasn't added any teams yet."
           }
           data-testid="teams-empty"
@@ -393,7 +396,10 @@ function TeamGridCard({
   // An offline season never gets owner invites — no auction is created in the
   // app — so "Owner — invited once the auction exists" would wait forever.
   const steps = setupSteps(team, captain, icons, auctionExists, view.viewer.canManageTeams).filter(
-    (step) => view.auctionSource !== "imported" || step.key !== "owner",
+    (step) =>
+      (view.auctionSource !== "imported" &&
+        (view.teamFormation === undefined || view.teamFormation === "auction")) ||
+      step.key !== "owner",
   );
   // What can be done now: the coach and icons are optional, and the owner
   // waits for the auction.

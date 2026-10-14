@@ -74,6 +74,7 @@ export const MOTION_BANDS: Record<PosterKind, readonly MotionLayer[]> = {
   reveal: ["base", "hero", "items"],
   top: ["base", "hero", "items"],
   season: ["base", "hero", "items"],
+  result: ["base", "hero", "items", "stamp"],
 };
 
 export interface PosterRenderOptions {

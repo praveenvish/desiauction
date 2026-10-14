@@ -1,3 +1,4 @@
+import { ScoringSignOutForm } from "../../../components/scoring-sign-out-form";
 import Link from "next/link";
 import { ButtonLink, Card } from "@desiauction/ui";
 import { redirect } from "next/navigation";
@@ -7,6 +8,9 @@ import { roleHelp, roleLabel } from "../../../lib/invite-roles";
 import { currentSession, logoutToAction } from "../../../server/auth/actions";
 import { acceptInviteAction, inviteLandingView } from "../../../server/orgs/actions";
 import type { InvitePreview } from "../../../server/orgs/invites";
+import { TEAM_ENTRY_CODE } from "../../../server/competition/team-entry-code";
+import { entryCompetitionByCode } from "../../../server/competition/team-entry-resolver";
+import { TeamEntryForm } from "./team-entry-form";
 import { AcceptInviteButton } from "./accept-button";
 import "../../orgs/orgs.css";
 import "../join.css";
@@ -29,6 +33,25 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
   if (session === null) {
     // Anonymous stays a real redirect — the login flow carries `next` back here.
     redirect(`/login?next=/join/${token}`);
+  }
+  if (TEAM_ENTRY_CODE.test(token)) {
+    const season = await entryCompetitionByCode(token);
+    return (
+      <main className="join">
+        <div className="join-panel">
+          <h1>{season === null ? "Team sign-up unavailable" : `Join ${season.name}`}</h1>
+          <Card>
+            {season === null ? (
+              <p role="alert">
+                This team sign-up link is unavailable. Ask the organizer for a current link.
+              </p>
+            ) : (
+              <TeamEntryForm code={token} />
+            )}
+          </Card>
+        </div>
+      </main>
+    );
   }
   const { landing, viewerLabel } = await inviteLandingView(token);
 
@@ -81,12 +104,12 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
           </>
         )}
 
-        <form action={switchAccount} className="join-identity">
+        <ScoringSignOutForm logout={switchAccount} className="join-identity">
           <span>Signed in as {viewerLabel}. Not you?</span>{" "}
           <button type="submit" className="join-linkbutton" data-testid="join-switch-account">
             Sign out
           </button>
-        </form>
+        </ScoringSignOutForm>
       </div>
     </main>
   );

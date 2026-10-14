@@ -26,9 +26,11 @@ export type Capability =
   | "registration.review"
   // Fixtures & venues (M-IP3-3, same additive path).
   | "venue.manage"
-  | "fixture.manage";
+  | "fixture.manage"
+  | "fixture.score";
 
-export type CapabilitySet = "org:owner" | "org:staff" | "viewer" | "auction:conductor";
+export type CapabilitySet =
+  "org:owner" | "org:staff" | "viewer" | "auction:conductor" | "fixture:scorer";
 
 const SETS: Record<CapabilitySet, readonly Capability[]> = {
   "org:owner": [
@@ -48,6 +50,7 @@ const SETS: Record<CapabilitySet, readonly Capability[]> = {
     "registration.review",
     "venue.manage",
     "fixture.manage",
+    "fixture.score",
   ],
   "org:staff": [
     "tournament.manage",
@@ -56,6 +59,7 @@ const SETS: Record<CapabilitySet, readonly Capability[]> = {
     "registration.review",
     "venue.manage",
     "fixture.manage",
+    "fixture.score",
   ],
   viewer: [],
   /**
@@ -72,6 +76,7 @@ const SETS: Record<CapabilitySet, readonly Capability[]> = {
    * cannot accept an owner link there — conducting shows every rival's purse.
    */
   "auction:conductor": ["auction.conduct"],
+  "fixture:scorer": ["fixture.score"],
 };
 
 export const CAPABILITY_SETS: readonly CapabilitySet[] = [
@@ -79,6 +84,7 @@ export const CAPABILITY_SETS: readonly CapabilitySet[] = [
   "org:staff",
   "viewer",
   "auction:conductor",
+  "fixture:scorer",
 ];
 
 /**

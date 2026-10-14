@@ -62,6 +62,7 @@ const flag = (name) => {
 const webFile = flag("env");
 const engineFile = flag("engine-env");
 const runnerFile = flag("runner-env");
+const liveFile = flag("live-env");
 
 // The file wins over the process environment; the process still supplies what
 // the IMAGE sets rather than the env file (NODE_ENV, APP_VERSION).
@@ -69,6 +70,7 @@ const env = { ...process.env, ...(webFile === undefined ? {} : readEnvFile(webFi
 /** The engine's own environment, or — without split files — the one env. */
 const engineEnv = engineFile === undefined ? env : { ...process.env, ...readEnvFile(engineFile) };
 const runnerEnv = runnerFile === undefined ? env : { ...process.env, ...readEnvFile(runnerFile) };
+const liveEnv = liveFile === undefined ? env : { ...process.env, ...readEnvFile(liveFile) };
 const results = [];
 function check(id, ok, detail, fix) {
   results.push({ id, level: ok ? "pass" : "fail", detail, fix });
@@ -79,6 +81,32 @@ function warn(id, ok, detail, fix) {
 
 const isPostgres = (v) => typeof v === "string" && v.startsWith("postgres");
 const isHttps = (v) => typeof v === "string" && v.startsWith("https://");
+
+check(
+  "LIVE_DATABASE_URL",
+  isPostgres(liveEnv.LIVE_DATABASE_URL) &&
+    (() => {
+      try {
+        return new URL(liveEnv.LIVE_DATABASE_URL).username === "desiauction_live";
+      } catch {
+        return false;
+      }
+    })(),
+  "live uses its own least-privilege role (F07)",
+  "set LIVE_DATABASE_URL in live.env to desiauction_live, then re-run `migrator roles`",
+);
+check(
+  "LIVE_ALLOWED_ORIGINS",
+  (liveEnv.LIVE_ALLOWED_ORIGINS ?? "").split(",").some((value) => isHttps(value.trim())),
+  "live browser origin allowlist",
+  "set LIVE_ALLOWED_ORIGINS in live.env",
+);
+check(
+  "LIVE_TRUSTED_PROXY_COUNT",
+  Number(liveEnv.TRUSTED_PROXY_COUNT ?? "0") >= 1,
+  "live trusted Caddy hop",
+  "set TRUSTED_PROXY_COUNT=1 in live.env",
+);
 
 // --- Identity & database -----------------------------------------------------
 check(
@@ -92,6 +120,12 @@ check(
   isPostgres(env.DATABASE_URL),
   "the app-role connection",
   "set DATABASE_URL to the desiauction_app (NOBYPASSRLS) role",
+);
+warn(
+  "TWA_SHA256_FINGERPRINTS",
+  typeof env.TWA_SHA256_FINGERPRINTS === "string" && env.TWA_SHA256_FINGERPRINTS.trim() !== "",
+  env.TWA_SHA256_FINGERPRINTS ? "Android app link configured" : "Android app link unset",
+  "set TWA_SHA256_FINGERPRINTS to the Play app signing SHA-256 certificates before publishing the Android wrapper",
 );
 // /support and /releases quote this to users. The zod default is "dev"; the
 // pages suppress the sentence for that value, but a launch should ship a real
@@ -160,6 +194,13 @@ for (const [service, scoped] of [
     `unset ALLOW_INSECURE_LOCAL_PRODUCTION in the ${service} env — it disables the production boot checks`,
   );
 }
+
+check(
+  "SCORING_HANDOVER_SECRET-set",
+  (env.SCORING_HANDOVER_SECRET ?? "").length >= 32,
+  "scoring handover signing secret",
+  "set SCORING_HANDOVER_SECRET to at least 32 random characters",
+);
 
 // --- Engine trust ------------------------------------------------------------
 const secret = env.ENGINE_SECRET ?? "";

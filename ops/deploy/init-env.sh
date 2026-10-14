@@ -48,6 +48,7 @@ APP_PW="$(secret)"
 SYSTEM_PW="$(secret)"
 ENGINE_PW="$(secret)"
 RUNNER_PW="$(secret)"
+LIVE_PW="$(secret)"
 ENGINE_SECRET="$(secret 32)"
 S3_USER="da-$(secret 6)"
 S3_PW="$(secret)"
@@ -127,6 +128,7 @@ SYSTEM_DATABASE_URL=postgres://desiauction_system:$SYSTEM_PW@db:5432/$DB
 # Server-side calls stay inside this stack's private network.
 ENGINE_URL=http://engine:4000
 ENGINE_PUBLIC_WS_URL=wss://engine.$DOMAIN/ws
+NEXT_PUBLIC_LIVE_WS_PATH=/live/ws
 ENGINE_SECRET=$ENGINE_SECRET
 LOGIN_DEFAULT_METHOD=email
 $STORAGE
@@ -136,6 +138,8 @@ SETTLEMENT_JOB_SECRET=$(secret)
 DEMO_JOB_SECRET=$(secret)
 DEMO_TOKEN_SECRET=$(secret 32)
 REVIEW_TOKEN_SECRET=$(secret 32)
+# Signs live-scoring handover, confirmation and view tokens; web refuses to serve without it.
+SCORING_HANDOVER_SECRET=$(secret 32)
 $INDEXNOW
 
 # ---- FOUNDER: values only you hold (.env.example explains each) ----
@@ -159,6 +163,17 @@ $INDEXNOW
 # RAZORPAY_KEY_ID=
 # RAZORPAY_KEY_SECRET=
 # RAZORPAY_WEBHOOK_SECRET=
+EOF
+
+write live.env <<EOF
+NODE_ENV=production
+PORT=4100
+# F07: the live service may only call the two P-1 functions (0127).
+LIVE_DATABASE_URL=postgres://desiauction_live:$LIVE_PW@db:5432/$DB
+LIVE_ALLOWED_ORIGINS=$ORIGINS
+TRUSTED_PROXY_COUNT=1
+# Every socket on the live process, across rooms (F05).
+LIVE_MAX_SOCKETS=5000
 EOF
 
 write engine.env <<EOF

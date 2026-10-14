@@ -18,6 +18,19 @@ import {
   competitions,
   createDb,
   grants,
+  fixtures,
+  matches,
+  matchEvents,
+  matchPlayerLines,
+  matchAwards,
+  ballFacts,
+  matchConfirmations,
+  teamEntries,
+  registrations,
+  matchLiveState,
+  teamManagers,
+  fixtureOfficials,
+  fixtureParticipants,
   newId,
   orgMembers,
   sessions,
@@ -47,7 +60,7 @@ const desk = await import("../server/platform-ops/club-actions");
 const { createOrg } = await import("../server/orgs/orgs");
 const { createCompetition } = await import("../server/competition/competitions");
 const { purgeOrg } = await import("../server/test-support/purge-org");
-const { inOrg } = await import("../server/tenant");
+const { inOrg, asPerson } = await import("../server/tenant");
 
 const ownerHandle = createDb(process.env["OWNER_DATABASE_URL"] ?? "");
 const owner = ownerHandle.db;
@@ -64,6 +77,10 @@ let tournamentId = "";
 let seasonId = "";
 let teamId = "";
 let auctionId = "";
+let fixtureId = "";
+let scorerAwardId = "";
+let otherSeasonId = "";
+let originalEntries: (typeof teamEntries.$inferSelect)[] = [];
 let superadmin = "";
 let founder = "";
 let teamOwner = "";
@@ -75,6 +92,24 @@ async function person(name: string, n: number): Promise<string> {
   await ownerHandle.sql`insert into people (id, name, phone) values (${id}, ${name}, ${phoneOf(n)})`;
   ids.push(id);
   return id;
+}
+
+async function assertC42Unmoved() {
+  for (const table of [ballFacts, matchConfirmations]) {
+    expect(
+      await owner
+        .select({ orgId: table.orgId })
+        .from(table)
+        .where(eq(table.competitionId, seasonId)),
+    ).toEqual([{ orgId: fromId }]);
+  }
+  expect(
+    await owner
+      .select()
+      .from(teamEntries)
+      .where(eq(teamEntries.competitionId, seasonId))
+      .orderBy(teamEntries.id),
+  ).toEqual(originalEntries);
 }
 
 beforeAll(async () => {
@@ -133,6 +168,177 @@ beforeAll(async () => {
     createdBy: founder,
   });
 
+  fixtureId = newId();
+  await owner.insert(fixtures).values({
+    id: fixtureId,
+    orgId: fromId,
+    competitionId: seasonId,
+    fixtureNumber: "LS1-MOVE-F001",
+    seq: 1,
+    createdBy: founder,
+  });
+  await owner.insert(matches).values({
+    fixtureId,
+    orgId: fromId,
+    competitionId: seasonId,
+    format: { key: "t20" },
+    awardVersion: "cricket-v1/t20",
+    shareToken: `move-${fixtureId}`,
+  });
+  await owner.insert(matchEvents).values({
+    fixtureId,
+    orgId: fromId,
+    competitionId: seasonId,
+    eventId: newId(),
+    seq: 1,
+    attempt: 1,
+    type: "match_started",
+    payload: {},
+    actorPersonId: founder,
+    clientSeq: 1,
+    clientRecordedAt: new Date(),
+  });
+  await owner
+    .insert(matchLiveState)
+    .values({ fixtureId, orgId: fromId, competitionId: seasonId, seq: 1, state: { v: 1 } });
+  const registrationId = newId();
+  await owner.insert(registrations).values({
+    id: registrationId,
+    orgId: fromId,
+    competitionId: seasonId,
+    teamId,
+    personId: teamOwner,
+    status: "approved",
+    registrationNumber: "LS1-MOVE-R001",
+  });
+  await owner.insert(matchPlayerLines).values({
+    fixtureId,
+    registrationId,
+    orgId: fromId,
+    competitionId: seasonId,
+    teamId,
+    sport: "cricket",
+    formatKey: "t20",
+    conditions: {},
+    stats: { registrationId, teamId, appeared: true },
+    points: "0.00",
+    pointsLines: [],
+    trustLevel: "self_scored",
+  });
+  await owner.insert(fixtureParticipants).values({
+    fixtureId,
+    teamId,
+    orgId: fromId,
+    competitionId: seasonId,
+    placement: 1,
+    score: { kills: 7 },
+    source: "scored",
+  });
+  await owner.insert(matchAwards).values({
+    id: newId(),
+    fixtureId,
+    orgId: fromId,
+    competitionId: seasonId,
+    scope: "match",
+    kind: "player_of_match",
+    computedRegistrationId: registrationId,
+    winnerRegistrationId: registrationId,
+    source: "auto",
+    score: "0.00",
+  });
+  scorerAwardId = newId();
+  await owner.insert(matchAwards).values({
+    id: scorerAwardId,
+    orgId: fromId,
+    competitionId: seasonId,
+    scope: "season",
+    kind: "scorer_of_season",
+    computedPersonId: founder,
+    winnerPersonId: founder,
+    source: "auto",
+    score: "1.00",
+  });
+  await owner.insert(ballFacts).values({
+    fixtureId,
+    seq: 1,
+    orgId: fromId,
+    competitionId: seasonId,
+    inningsNo: 1,
+    overNo: 1,
+    ballInOver: 1,
+    legal: true,
+    phase: "powerplay",
+    batterId: registrationId,
+    bowlerId: registrationId,
+    runsBat: 2,
+    extras: 0,
+    trustLevel: "self_scored",
+    formatKey: "t20",
+  });
+  await owner.insert(matchConfirmations).values({
+    id: newId(),
+    fixtureId,
+    orgId: fromId,
+    competitionId: seasonId,
+    teamId,
+    personId: teamOwner,
+    verdict: "confirmed",
+    note: "Preserve confirmation evidence",
+  });
+  for (const status of ["submitted", "approved", "rejected"] as const) {
+    await owner.insert(teamEntries).values({
+      id: newId(),
+      orgId: fromId,
+      competitionId: seasonId,
+      teamName: `Move ${status}`,
+      captainPersonId: teamOwner,
+      players: [{ name: "Captain" }, { name: "Player" }],
+      status,
+      reviewedBy: status === "submitted" ? null : founder,
+      reviewedAt: status === "submitted" ? null : new Date("2026-10-01T00:00:00Z"),
+    });
+  }
+  originalEntries = await owner
+    .select()
+    .from(teamEntries)
+    .where(eq(teamEntries.competitionId, seasonId))
+    .orderBy(teamEntries.id);
+  const otherSeason = await createCompetition(owner, fromId, founder, {
+    name: `Unrelated entry season ${RUN}`,
+    sport: "cricket",
+    location: "Pune",
+  });
+  otherSeasonId = otherSeason.id;
+  await owner.insert(teamEntries).values({
+    id: newId(),
+    orgId: fromId,
+    competitionId: otherSeasonId,
+    teamName: "Unrelated entry",
+    captainPersonId: teamOwner,
+    players: [{ name: "Unrelated captain" }],
+    status: "submitted",
+  });
+  await owner.insert(teamManagers).values({
+    id: newId(),
+    teamId,
+    orgId: fromId,
+    competitionId: seasonId,
+    personId: teamOwner,
+    role: "manager",
+    source: "auction_owner",
+    createdBy: founder,
+  });
+  await owner.insert(fixtureOfficials).values({
+    id: newId(),
+    fixtureId,
+    orgId: fromId,
+    competitionId: seasonId,
+    role: "scorer",
+    personId: founder,
+    displayName: "Scorer",
+    createdBy: founder,
+  });
+
   await owner.insert(grants).values({
     id: newId(),
     personId: superadmin,
@@ -167,19 +373,26 @@ afterAll(async () => {
 });
 
 describe("moving a tournament to another club under the production roles", () => {
+  it("preserves the eight-argument security-definer function signature", async () => {
+    const rows = await ownerHandle.sql<{ pronargs: number; prosecdef: boolean }[]>`
+      select pronargs, prosecdef from pg_proc where oid='platform_move_tournament(character,character,character,text,character,character,character,text)'::regprocedure`;
+    expect(rows).toEqual([{ pronargs: 8, prosecdef: true }]);
+  });
+
   it("refuses a caller without the superadmin grant, though the app role may EXECUTE", async () => {
     await expect(
       inOrg(founder, fromId, (tx) =>
         tx.execute(
-          sql`select platform_move_tournament(${tournamentId}, ${null}, ${toId}, ${REASON}, ${newId()}, ${newId()})`,
+          sql`select platform_move_tournament(${tournamentId}, ${null}, ${toId}, ${REASON}, ${newId()}, ${newId()}, ${null}, ${null})`,
         ),
       ),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ cause: { code: "P0001", message: "move_not_superadmin" } });
     const [row] = await owner
       .select({ orgId: competitions.orgId })
       .from(competitions)
       .where(eq(competitions.id, seasonId));
     expect(row?.orgId).toBe(fromId);
+    await assertC42Unmoved();
   });
 
   it("refuses while the auction is live, and moves nothing", async () => {
@@ -199,7 +412,68 @@ describe("moving a tournament to another club under the production roles", () =>
       .from(teams)
       .where(eq(teams.id, teamId));
     expect(row?.orgId).toBe(fromId);
+    await assertC42Unmoved();
     await owner.update(auctions).set({ status: "scheduled" }).where(eq(auctions.id, auctionId));
+  });
+
+  it("allows person-only fact reads without granting projection mutation", async () => {
+    const [fact] = await owner.select().from(ballFacts).where(eq(ballFacts.fixtureId, fixtureId));
+    if (!fact) throw new Error("Missing seeded fact");
+    const own = await asPerson(teamOwner, (tx) =>
+      tx.select().from(ballFacts).where(eq(ballFacts.fixtureId, fixtureId)),
+    );
+    expect(own).toEqual([fact]);
+    expect(
+      await asPerson(founder, (tx) =>
+        tx.select().from(ballFacts).where(eq(ballFacts.fixtureId, fixtureId)),
+      ),
+    ).toEqual([]);
+    expect(
+      await asPerson(teamOwner, (tx) =>
+        tx
+          .update(ballFacts)
+          .set({ runsBat: 99 })
+          .where(eq(ballFacts.fixtureId, fixtureId))
+          .returning(),
+      ),
+    ).toEqual([]);
+    expect(
+      await asPerson(teamOwner, (tx) =>
+        tx.delete(ballFacts).where(eq(ballFacts.fixtureId, fixtureId)).returning(),
+      ),
+    ).toEqual([]);
+    await expect(
+      asPerson(teamOwner, (tx) => tx.insert(ballFacts).values({ ...fact, seq: 2 })),
+    ).rejects.toMatchObject({ cause: { code: "42501" } });
+    expect(await owner.select().from(ballFacts).where(eq(ballFacts.fixtureId, fixtureId))).toEqual([
+      fact,
+    ]);
+  });
+
+  it("rolls back all new projections and entries when the move transaction aborts", async () => {
+    await expect(
+      inOrg(superadmin, fromId, async (tx) => {
+        await tx.execute(
+          sql`select platform_move_tournament(${tournamentId}, ${null}, ${toId}, ${REASON}, ${newId()}, ${newId()}, ${null}, ${null})`,
+        );
+        throw new Error("deliberate_move_rollback");
+      }),
+    ).rejects.toThrow("deliberate_move_rollback");
+    for (const table of [ballFacts, matchConfirmations]) {
+      expect(
+        await owner
+          .select({ orgId: table.orgId })
+          .from(table)
+          .where(eq(table.competitionId, seasonId)),
+      ).toEqual([{ orgId: fromId }]);
+    }
+    expect(
+      await owner
+        .select()
+        .from(teamEntries)
+        .where(eq(teamEntries.competitionId, seasonId))
+        .orderBy(teamEntries.id),
+    ).toEqual(originalEntries);
   });
 
   it("moves the tournament with its season, team and auction, and audits both clubs", async () => {
@@ -229,6 +503,91 @@ describe("moving a tournament to another club under the production roles", () =>
       .from(auctions)
       .where(eq(auctions.id, auctionId));
     expect([t?.orgId, c?.orgId, team?.orgId, a?.orgId]).toEqual([toId, toId, toId, toId]);
+    for (const table of [
+      matches,
+      matchEvents,
+      fixtureParticipants,
+      matchLiveState,
+      matchPlayerLines,
+      matchAwards,
+      ballFacts,
+      matchConfirmations,
+      teamManagers,
+      fixtureOfficials,
+    ]) {
+      const rows = await owner
+        .select({ orgId: table.orgId })
+        .from(table)
+        .where(eq(table.competitionId, seasonId));
+      const expectedRows = Array.from({ length: table === matchAwards ? 2 : 1 }, () => ({
+        orgId: toId,
+      }));
+      expect(rows).toEqual(expectedRows);
+      const visible = await inOrg(founder, toId, (tx) =>
+        tx.select({ orgId: table.orgId }).from(table).where(eq(table.competitionId, seasonId)),
+      );
+      expect(visible).toEqual(expectedRows);
+      const hidden = await inOrg(founder, fromId, (tx) =>
+        tx.select({ orgId: table.orgId }).from(table).where(eq(table.competitionId, seasonId)),
+      );
+      expect(hidden).toEqual([]);
+    }
+
+    expect(
+      await inOrg(founder, toId, (tx) =>
+        tx
+          .select({ source: fixtureParticipants.source, score: fixtureParticipants.score })
+          .from(fixtureParticipants)
+          .where(eq(fixtureParticipants.fixtureId, fixtureId)),
+      ),
+    ).toEqual([{ source: "scored", score: { kills: 7 } }]);
+    expect(
+      await inOrg(founder, fromId, (tx) =>
+        tx.select().from(fixtureParticipants).where(eq(fixtureParticipants.fixtureId, fixtureId)),
+      ),
+    ).toEqual([]);
+    const [movedScorerAward] = await owner
+      .select()
+      .from(matchAwards)
+      .where(eq(matchAwards.id, scorerAwardId));
+    expect(movedScorerAward).toMatchObject({
+      orgId: toId,
+      computedPersonId: founder,
+      winnerPersonId: founder,
+      computedRegistrationId: null,
+      winnerRegistrationId: null,
+      scope: "season",
+      kind: "scorer_of_season",
+    });
+    const movedEntries = await owner
+      .select()
+      .from(teamEntries)
+      .where(eq(teamEntries.competitionId, seasonId))
+      .orderBy(teamEntries.id);
+    expect(movedEntries).toEqual(originalEntries.map((row) => ({ ...row, orgId: toId })));
+    const entryIds = async (personId: string, orgId: string) =>
+      inOrg(personId, orgId, (tx) =>
+        tx
+          .select({ id: teamEntries.id })
+          .from(teamEntries)
+          .where(eq(teamEntries.competitionId, seasonId))
+          .orderBy(teamEntries.id),
+      );
+    expect(await entryIds(founder, toId)).toEqual(originalEntries.map(({ id }) => ({ id })));
+    expect(await entryIds(founder, fromId)).toEqual([]);
+    const captainRows = await asPerson(teamOwner, (tx) =>
+      tx
+        .select()
+        .from(teamEntries)
+        .where(eq(teamEntries.competitionId, seasonId))
+        .orderBy(teamEntries.id),
+    );
+    expect(captainRows).toEqual(movedEntries);
+    const unrelated = await owner
+      .select({ orgId: teamEntries.orgId })
+      .from(teamEntries)
+      .where(eq(teamEntries.competitionId, otherSeasonId));
+    expect(unrelated).toEqual([{ orgId: fromId }]);
 
     const member = await owner
       .select({ personId: orgMembers.personId })

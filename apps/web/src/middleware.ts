@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { scoringShellArtifact } from "./server/scoring/shell-artifact";
 import { env } from "./env";
-import { buildContentSecurityPolicy, mintNonce } from "./lib/csp";
+import { buildDocumentPolicy, buildScoringShellPolicy, mintNonce } from "./lib/csp";
 import { isPublicPath, NOINDEX_HEADER } from "./server/seo/routes";
 
 /**
@@ -33,7 +34,7 @@ export const config = {
       // and not the installed app's files: the worker, its scriptless
       // offline page, and the manifest.
       source:
-        "/((?!_next/static|_next/image|api/|favicon.ico|icon.png|apple-icon.png|sw.js|offline.html|manifest.webmanifest|brand/|marketing/|_media/).*)",
+        "/((?!_next/static|_next/image|\\.well-known/|api/|favicon.ico|icon.png|apple-icon.png|sw.js|offline.html|manifest.webmanifest|brand/|marketing/|_media/).*)",
       // A router prefetch renders nothing a nonce could protect.
       missing: [
         { type: "header", key: "next-router-prefetch" },
@@ -43,16 +44,23 @@ export const config = {
   ],
 };
 
-export function middleware(request: NextRequest): NextResponse {
+export async function middleware(request: NextRequest): Promise<NextResponse> {
   const nonce = mintNonce();
-  const policy = buildContentSecurityPolicy({
-    nonce,
-    engineWsUrl: env.ENGINE_PUBLIC_WS_URL,
-    mediaPublicBase: env.MEDIA_PUBLIC_BASE,
-    mediaUploadEndpoint: env.MEDIA_S3_ENDPOINT,
-    development: env.NODE_ENV === "development",
-    reportUri: "/api/csp-report",
-  });
+  const policy = buildDocumentPolicy(
+    {
+      nonce,
+      engineWsUrl: env.ENGINE_PUBLIC_WS_URL,
+      liveWsUrl: env.NEXT_PUBLIC_LIVE_WS_PATH
+        ? env.PUBLIC_BASE_URL.replace(/^http/, "ws")
+        : undefined,
+      mediaPublicBase: env.MEDIA_PUBLIC_BASE,
+      mediaUploadEndpoint: env.MEDIA_S3_ENDPOINT,
+      development: env.NODE_ENV === "development",
+      reportUri: "/api/csp-report",
+    },
+    request.nextUrl.pathname,
+    env.CSP_ENFORCE,
+  );
   const header = env.CSP_ENFORCE
     ? "content-security-policy"
     : "content-security-policy-report-only";
@@ -67,9 +75,71 @@ export function middleware(request: NextRequest): NextResponse {
     offered !== null && /^[A-Za-z0-9._-]{1,64}$/.test(offered) ? offered : crypto.randomUUID();
   requestHeaders.set("x-request-id", requestId);
 
+  // LS-1 C27: this exact static, data-free document has a build-hash policy.
+  // Authenticated pages and router RSC requests retain the normal nonce policy.
+  if (
+    request.nextUrl.pathname === "/score/shell" &&
+    ["GET", "HEAD"].includes(request.method) &&
+    !request.headers.has("rsc") &&
+    !request.headers.has("next-router-state-tree") &&
+    !request.headers.has("next-router-prefetch")
+  ) {
+    try {
+      const artifact = await scoringShellArtifact();
+      const shellPolicy = buildScoringShellPolicy(
+        {
+          nonce,
+          engineWsUrl: env.ENGINE_PUBLIC_WS_URL,
+          liveWsUrl: env.NEXT_PUBLIC_LIVE_WS_PATH
+            ? env.PUBLIC_BASE_URL.replace(/^http/, "ws")
+            : undefined,
+          mediaPublicBase: env.MEDIA_PUBLIC_BASE,
+          mediaUploadEndpoint: env.MEDIA_S3_ENDPOINT,
+          development: false,
+          reportUri: "/api/csp-report",
+          frameAncestors: env.CSP_ENFORCE ? "'none'" : undefined,
+        },
+        artifact.scriptHashes,
+      );
+      return new NextResponse(request.method === "HEAD" ? null : artifact.html, {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control": "no-cache",
+          [header]: shellPolicy,
+          "x-request-id": requestId,
+          "x-robots-tag": NOINDEX_HEADER,
+          "x-frame-options": "DENY",
+          "x-content-type-options": "nosniff",
+          "referrer-policy": "strict-origin-when-cross-origin",
+        },
+      });
+    } catch {
+      return new NextResponse(
+        request.method === "HEAD"
+          ? null
+          : '<!doctype html><html lang="en"><title>Scoring offline unavailable</title><h1>Offline scoring is unavailable</h1><p>Connect and retry match-day preparation.</p></html>',
+        {
+          status: 503,
+          headers: {
+            "content-type": "text/html; charset=utf-8",
+            "cache-control": "no-store",
+            "content-security-policy":
+              "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+            "x-request-id": requestId,
+            "x-robots-tag": NOINDEX_HEADER,
+            "x-frame-options": "DENY",
+            "x-content-type-options": "nosniff",
+          },
+        },
+      );
+    }
+  }
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set(header, policy);
   response.headers.set("x-request-id", requestId);
+  if (request.nextUrl.pathname === "/inbox" && request.nextUrl.searchParams.has("reminder")) {
+    response.headers.set("cache-control", "private, no-store");
+  }
   if (!isPublicPath(request.nextUrl.pathname)) {
     response.headers.set("x-robots-tag", NOINDEX_HEADER);
   }

@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 import { env } from "../env";
-import { CONSOLE_SEGMENTS, ROBOTS_ALLOW_INSIDE_CONSOLE } from "../server/seo/routes";
+import { robotsDisallows, ROBOTS_ALLOW_INSIDE_CONSOLE } from "../server/seo/routes";
 
 // Built from the SEO route registry (server/seo/routes.ts). Robots.txt only
 // saves crawl budget. What keeps a console out of search is the noindex header
@@ -26,7 +26,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: ["/", ...ROBOTS_ALLOW_INSIDE_CONSOLE],
-        disallow: CONSOLE_SEGMENTS.map((segment) => `/${segment}`),
+        disallow: robotsDisallows(),
       },
     ],
     sitemap: `${env.PUBLIC_BASE_URL}/sitemap.xml`,

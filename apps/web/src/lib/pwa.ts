@@ -177,3 +177,13 @@ export function useInstallOffer(): InstallOffer {
     () => "none",
   );
 }
+
+/** Ask after an explicit match-day preparation action; refusal is recoverable. */
+export async function requestPersistentStorage(): Promise<boolean> {
+  try {
+    const storage = navigator as { storage?: { persist?: () => Promise<boolean> } };
+    return (await storage.storage?.persist?.()) ?? false;
+  } catch {
+    return false;
+  }
+}

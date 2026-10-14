@@ -75,6 +75,13 @@ export function OverviewPanel({
         <StatCard
           icon={<IconFlag />}
           concept="club"
+          value={<KpiValue n={totals.personal} />}
+          label="Personal"
+          hint="Personal match spaces"
+        />
+        <StatCard
+          icon={<IconFlag />}
+          concept="club"
           value={<KpiValue n={totals.orgs} />}
           label="Organizations"
           hint="All clubs"

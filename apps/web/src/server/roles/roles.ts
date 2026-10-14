@@ -9,6 +9,8 @@ import {
   playerProfiles,
   registrations,
   teams,
+  fixtureOfficials,
+  teamManagers,
 } from "@desiauction/db";
 import { and, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { cache } from "react";
@@ -66,6 +68,8 @@ export interface PersonRoles {
   operates: boolean;
   /** Seasons whose auction this person was appointed to run (auction:conductor). */
   conducts: ConductedSeason[];
+  /** Seasons with an active scoring appointment or team-manager assignment. */
+  scores: ScoringSeason[];
 }
 
 export interface ConductedSeason {
@@ -79,6 +83,54 @@ export interface ConductedSeason {
   competitionStatus: string;
   /** Local wall-clock "YYYY-MM-DD…", or null. The queue orders by it. */
   startsOn: string | null;
+}
+
+export interface ScoringSeason {
+  orgId: string;
+  competitionId: string;
+  competitionSlug: string;
+  competitionName: string;
+  competitionStatus: string;
+  startsOn: string | null;
+}
+
+async function scoringSeasons(personId: string, grantedIds: string[]): Promise<ScoringSeason[]> {
+  const [official, managed] = await Promise.all([
+    systemDb
+      .select({ competitionId: fixtureOfficials.competitionId })
+      .from(fixtureOfficials)
+      .where(
+        and(
+          eq(fixtureOfficials.personId, personId),
+          eq(fixtureOfficials.role, "scorer"),
+          isNull(fixtureOfficials.removedAt),
+        ),
+      ),
+    systemDb
+      .select({ competitionId: teamManagers.competitionId })
+      .from(teamManagers)
+      .where(and(eq(teamManagers.personId, personId), isNull(teamManagers.revokedAt))),
+  ]);
+  const ids = [
+    ...new Set([
+      ...grantedIds,
+      ...official.map((row) => row.competitionId),
+      ...managed.map((row) => row.competitionId),
+    ]),
+  ];
+  if (ids.length === 0) return [];
+  return systemDb
+    .select({
+      orgId: competitions.orgId,
+      competitionId: competitions.id,
+      competitionSlug: competitions.slug,
+      competitionName: competitions.name,
+      competitionStatus: competitions.status,
+      startsOn: competitions.startsOn,
+    })
+    .from(competitions)
+    .where(inArray(competitions.id, ids))
+    .orderBy(competitions.id);
 }
 
 const MANAGING_SETS = new Set(["org:owner", "org:staff"]);
@@ -276,13 +328,24 @@ export const rolesOf = cache(async (personId: string): Promise<PersonRoles> => {
       )
       .map((grant) => grant.scopeId),
   );
+  const scores = await scoringSeasons(
+    personId,
+    grants
+      .filter(
+        (grant) =>
+          grant.revokedAt === null &&
+          grant.scopeType === "tournament" &&
+          grant.capabilitySet === "fixture:scorer",
+      )
+      .map((grant) => grant.scopeId),
+  );
   const operates = grants.some(
     (grant) =>
       grant.revokedAt === null &&
       grant.scopeType === PLATFORM_SCOPE_TYPE &&
       grant.scopeId === PLATFORM_SCOPE_ID,
   );
-  return { organizes, memberOf, owns, plays, operates, conducts };
+  return { organizes, memberOf, owns, plays, operates, conducts, scores };
 });
 
 const AUCTION_OVER = new Set(["completed", "reconciled"]);

@@ -542,6 +542,14 @@ export default async function PublicCompetitionPage({
                           {match.groundName ?? "Being played now"}
                         </span>
                       </span>
+                      {match.livePage ? (
+                        <Link
+                          href={`/c/${view.slug}/m/${encodeURIComponent(match.fixtureNumber)}`}
+                          className="public-season-more"
+                        >
+                          Open match
+                        </Link>
+                      ) : null}
                     </li>
                   ))}
                   {/* Played days with no result yet: said, not dropped (census 9). */}
@@ -560,6 +568,14 @@ export default async function PublicCompetitionPage({
                         </span>
                         <span className="public-match-meta">Result to come</span>
                       </span>
+                      {match.livePage ? (
+                        <Link
+                          href={`/c/${view.slug}/m/${encodeURIComponent(match.fixtureNumber)}`}
+                          className="public-season-more"
+                        >
+                          Open match
+                        </Link>
+                      ) : null}
                     </li>
                   ))}
                   {play.upcoming.map((match) => (
@@ -581,6 +597,14 @@ export default async function PublicCompetitionPage({
                             .join(" · ") || "Time to be announced"}
                         </span>
                       </span>
+                      {match.livePage ? (
+                        <Link
+                          href={`/c/${view.slug}/m/${encodeURIComponent(match.fixtureNumber)}`}
+                          className="public-season-more"
+                        >
+                          Open match
+                        </Link>
+                      ) : null}
                     </li>
                   ))}
                   {play.recent.map((match) => {
@@ -594,6 +618,14 @@ export default async function PublicCompetitionPage({
                             {said.rest}
                           </span>
                         </span>
+                        {match.livePage ? (
+                          <Link
+                            href={`/c/${view.slug}/m/${encodeURIComponent(match.fixtureNumber)}`}
+                            className="public-season-more"
+                          >
+                            Scorecard
+                          </Link>
+                        ) : null}
                       </li>
                     );
                   })}
@@ -736,6 +768,14 @@ export default async function PublicCompetitionPage({
                     {fixture.groundName !== null ? ` · ${fixture.groundName}` : ""}
                     {fixture.venueName !== null ? `, ${fixture.venueName}` : ""}
                   </span>
+                  {sportPackFor(view.sport).scoring ? (
+                    <Link
+                      href={`/c/${view.slug}/m/${encodeURIComponent(fixture.number)}`}
+                      className="public-hint"
+                    >
+                      Open match
+                    </Link>
+                  ) : null}
                 </li>
               ))}
             </ul>

@@ -1,3 +1,4 @@
+import { TIMED_FORMAT_PRESETS } from "../scoring/timed/formats";
 import { termsOf, type TermDetail } from "./vocabulary";
 import { difference, summariseFields, total } from "./tiebreakers";
 
@@ -80,6 +81,13 @@ const TERMS: Terminology = {
 };
 
 export const HOCKEY: SportPack = {
+  scoring: {
+    family: "timed",
+    depth: 2,
+    defaultFormat: "hockey_60",
+    awardTable: "unscored",
+    formats: [TIMED_FORMAT_PRESETS.hockey_60, TIMED_FORMAT_PRESETS.hockey_60_shootout],
+  },
   key: "hockey",
   label: "Hockey",
   roles: ROLES,

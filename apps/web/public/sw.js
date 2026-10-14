@@ -18,7 +18,8 @@
  *
  * WHAT IT NEVER DOES, ON PURPOSE:
  *
- *   - Store a page. Pages carry squads, money and phone numbers, and phones are
+ *   - Store a private page. The documented LS-1 C27 exception below caches
+ *     only the data-free /score/shell. Other pages carry squads, money and phone numbers, and phones are
  *     shared. A stored page is somebody's data on somebody else's device after
  *     they signed out, and a balance that is wrong by the time it is read. The
  *     network is the only source of a page; offline gets a screen that says so.
@@ -53,11 +54,13 @@
  *   });
  */
 
-// A digest of offline.html. pwa.test.ts recomputes it and fails, naming the new
+// A digest of offline.html plus sw-score-route.js (LS-1 C27). pwa.test.ts recomputes it and fails, naming the new
 // value, when the page changes and this line does not. This line changing is
 // what makes browsers install a new worker, and the new worker is what stores
 // the new page.
-const OFFLINE_REVISION = "565c3285";
+const OFFLINE_REVISION = "40c03fdd";
+importScripts("/sw-score-route.js");
+const SCORE_SHELL_URL = "/score/shell";
 
 const OFFLINE_URL = "/offline.html";
 const PREFIX = "da-";
@@ -78,7 +81,16 @@ self.addEventListener("install", (event) => {
       .open(SHELL_CACHE)
       // `reload`: from the server, never the HTTP cache, so a new worker can
       // never store the previous deploy's page.
-      .then((cache) => cache.add(new Request(OFFLINE_URL, { cache: "reload" })))
+      .then(async (cache) => {
+        await cache.add(new Request(OFFLINE_URL, { cache: "reload" }));
+        // LS-1 execution plan C27 exception: static data-free shell only.
+        // Private data remains actor-bound IndexedDB and is cleared on sign-out.
+        try {
+          await cache.add(new Request(SCORE_SHELL_URL, { cache: "reload", credentials: "omit" }));
+        } catch {
+          /* Preparation retries and verifies the complete build graph. */
+        }
+      })
       .then(() => self.skipWaiting()),
   );
 });
@@ -139,6 +151,19 @@ async function navigate(event) {
   } catch (error) {
     // A server that answers, even with a 500, is not offline, and its answer
     // was returned above. Only a request that got no response at all is here.
+    // LS-1 C27 exact-pad exception: redirect only after network failure,
+    // retaining the id in a fragment for the data-free static shell.
+    const url = new URL(event.request.url);
+    const fixtureId = self.scoringOfflineFixture(url.pathname);
+    if (fixtureId && (await caches.match(SCORE_SHELL_URL, { cacheName: SHELL_CACHE })))
+      return Response.redirect(
+        new URL(`${SCORE_SHELL_URL}#${fixtureId}`, self.location.origin).href,
+        302,
+      );
+    if (url.pathname === SCORE_SHELL_URL) {
+      const shell = await caches.match(SCORE_SHELL_URL, { cacheName: SHELL_CACHE });
+      if (shell) return shell;
+    }
     const offline = await caches
       .match(OFFLINE_URL, { cacheName: SHELL_CACHE })
       .catch(() => undefined);

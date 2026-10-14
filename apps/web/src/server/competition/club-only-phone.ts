@@ -35,7 +35,9 @@ import { and, eq, isNotNull, sql } from "drizzle-orm";
 export type AttachPhoneResult =
   /** `personId` is who the registration belongs to now. */
   | { ok: true; personId: string; linked: boolean }
-  | { ok: false; reason: "not_club_only" | "already_in_season" };
+  | { ok: false; reason: "not_club_only" | "already_in_season" }
+  /** Only with `linkHeld: false`: an account holds the number; nothing moved. */
+  | { ok: false; reason: "held"; holderId: string };
 
 export async function attachPhoneToClubOnly(
   db: Db,
@@ -46,7 +48,12 @@ export async function attachPhoneToClubOnly(
     registrationId: string;
     /** E.164, validated by the caller. */
     phone: string;
-    source: "organizer_manual" | "csv_import";
+    source: "organizer_manual" | "csv_import" | "scorer_guest_claim";
+    /**
+     * False when the caller may not move a registration onto somebody's
+     * account: a scorer's claim becomes an offer the holder accepts (F09).
+     */
+    linkHeld?: boolean;
   },
 ): Promise<AttachPhoneResult> {
   const [entry] = await db
@@ -94,6 +101,9 @@ export async function attachPhoneToClubOnly(
     }
   }
 
+  if (holder !== undefined && input.linkHeld === false) {
+    return { ok: false, reason: "held", holderId: holder };
+  }
   let personId = entry.personId;
   if (holder !== undefined) {
     const [already] = await db

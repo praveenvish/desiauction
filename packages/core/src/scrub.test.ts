@@ -38,10 +38,16 @@ describe("scrub", () => {
   });
 
   it("redacts capability-link tokens in paths", () => {
-    for (const path of ["/join/AbC123xyz", "/owner-join/t0k3n", "/demo/h4ndle", "/review/r3v"]) {
+    for (const path of [
+      "/join/AbC123xyz",
+      "/owner-join/t0k3n",
+      "/demo/h4ndle",
+      "/review/r3v",
+      "/match/confirm/short",
+    ]) {
       const out = scrubText(`GET https://desiauction.in${path}?x=1`);
       expect(out).toContain("[token]");
-      expect(out).not.toContain(path.split("/")[2]);
+      expect(out).not.toContain(path.split("/").at(-1));
     }
   });
 

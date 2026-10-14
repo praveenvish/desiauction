@@ -1,3 +1,6 @@
+import { CricketCareerSection } from "../../components/cricket-career";
+import { PreviousCareerForm } from "../../components/previous-career-form";
+import { previousCareerFor } from "../../server/player/previous-career";
 import { SPORTS, roleLabelIn, sportPackFor, type MoneyUnit } from "@desiauction/core";
 import {
   ButtonLink,
@@ -31,6 +34,7 @@ import { seasonUnit } from "../../server/competition/season-unit";
 import { currentSession } from "../../server/auth/actions";
 import {
   playerCareer,
+  ownCricketCareer,
   playerMatches,
   playerUpcomingMatches,
   teamSeason,
@@ -144,6 +148,8 @@ export default async function MyProfilePage({
     completeness,
     photoUrl,
     roles,
+    cricketCareer,
+    previousCareer,
   ] = await Promise.all([
     searchParams,
     playerCareer(session.personId),
@@ -154,6 +160,8 @@ export default async function MyProfilePage({
     profileCompletenessFor(session.personId),
     ownPhotoUrl(session.personId),
     rolesOf(session.personId),
+    ownCricketCareer(session.personId),
+    previousCareerFor(session.personId),
   ]);
   const owns = roles.owns;
   /** Owns a team and has never entered as a player. */
@@ -454,6 +462,9 @@ export default async function MyProfilePage({
           )
         }
       />
+      <Link href="/me/insights">Player insights</Link>
+      <CricketCareerSection career={cricketCareer} />
+      <PreviousCareerForm summary={previousCareer} />
 
       {filterable.length > 1 ? (
         <nav className="mp-filter" aria-label="Filter by sport">

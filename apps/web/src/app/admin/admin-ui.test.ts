@@ -1,3 +1,4 @@
+import { messageKeyLabel } from "./message-key-label";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -5,7 +6,6 @@ import {
   foldSignInRequests,
   foldRuns,
   humanAction,
-  messageKeyLabel,
   relativeAge,
   scopeTypeLabel,
 } from "./admin-ui";

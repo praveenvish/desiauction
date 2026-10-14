@@ -40,6 +40,7 @@ const { requestErasureAction, withdrawErasureAction, myErasureRequest } =
   await import("../server/privacy/actions");
 const { eraseAccountAction, declineErasureAction } =
   await import("../server/admin/erasure-actions");
+const { storage } = await import("../server/media");
 const { erasureDesk } = await import("../server/privacy/desk");
 const { createOrg } = await import("../server/orgs/orgs");
 const { advanceCompetition, createCompetition } =
@@ -149,6 +150,7 @@ beforeAll(async () => {
   await sql`insert into player_profiles (id, person_id, gender) values (${newId()}, ${target}, 'male')`;
   await sql`insert into consent_records (id, person_id, purpose, granted, source)
             values (${newId()}, ${target}, 'publication', true, 'registration')`;
+  await sql`insert into player_previous_careers (person_id, sport, summary, screenshot_key) values (${target}, 'cricket', '{"runs":123}'::jsonb, ${`previous-career/${target}/cricket.png`}), (${clubOwner}, 'cricket', '{"runs":999}'::jsonb, ${`previous-career/${clubOwner}/cricket.png`})`;
   // What they told us (FR-1): a review we asked for and they wrote, and a
   // problem report with a way to answer them.
   reviewRequestId = newId();
@@ -177,6 +179,7 @@ afterAll(async () => {
     await sql`delete from grants where person_id = any(${people})`;
     await sql`delete from audit_log where actor = any(${people}) or subject = any(${people})`;
     await sql`delete from sessions where person_id = any(${people})`;
+    await sql`delete from player_previous_careers where person_id = any(${people})`;
     await sql`delete from player_profiles where person_id = any(${people})`;
     await sql`delete from people where id = any(${people})`;
   }
@@ -209,7 +212,21 @@ describe("POSTURE — erasure under the app role", () => {
     expect(row?.blocked, "the desk refused an erasure that should go ahead").toBeNull();
     expect(row?.clubs).toBe(2);
 
-    const result = await eraseAccountAction(requestId, "ERASE", "");
+    const deletedKeys: string[] = [];
+    const deleteObject = vi.spyOn(storage, "delete").mockImplementation(async (key) => {
+      expect(
+        (await sql`select 1 from player_previous_careers where person_id = ${target}`).length,
+      ).toBe(0);
+      deletedKeys.push(key);
+    });
+    let result;
+    try {
+      result = await eraseAccountAction(requestId, "ERASE", "");
+    } finally {
+      deleteObject.mockRestore();
+    }
+    expect(deletedKeys).toEqual([`previous-career/${target}/cricket.png`]);
+
     expect(result, JSON.stringify(result)).toEqual({
       ok: true,
       message: "Account erased across 2 clubs.",
@@ -241,6 +258,12 @@ describe("POSTURE — erasure under the app role", () => {
 
     expect((await sql`select 1 from sessions where person_id = ${target}`).length).toBe(0);
     expect((await sql`select 1 from player_profiles where person_id = ${target}`).length).toBe(0);
+    expect(
+      (await sql`select 1 from player_previous_careers where person_id = ${target}`).length,
+    ).toBe(0);
+    expect(
+      (await sql`select 1 from player_previous_careers where person_id = ${clubOwner}`).length,
+    ).toBe(1);
     expect(
       (await sql`select 1 from org_members where person_id = ${target} and org_id = ${orgB}`)
         .length,

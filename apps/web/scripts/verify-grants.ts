@@ -91,6 +91,8 @@ const RUNNER_DELIVERY_READS = [
  */
 const APPEND_ONLY = [
   "auction_events",
+  "match_events",
+  "match_awards",
   "settlement_events",
   "finops_events",
   "audit_log",
@@ -272,6 +274,7 @@ const APP_WRITES_UNPROTECTED = [
  * on this device" button writes it on the app pool.
  */
 const APP_WRITES_PERSON = [
+  "player_previous_careers",
   "player_profiles",
   "consent_records",
   "notification_preferences",
@@ -329,6 +332,14 @@ function expectations(allTables: string[]): Expectation[] {
       });
     }
   }
+
+  out.push({
+    role: "desiauction_app",
+    table: "player_previous_careers",
+    verb: "DELETE",
+    allowed: true,
+    why: "self-reported person history can be removed by its owner or account erasure",
+  });
 
   // Turning a device off, and a push service's "gone", delete the row (PR18).
   out.push({
@@ -391,7 +402,9 @@ function expectations(allTables: string[]): Expectation[] {
   }
 
   for (const table of APPEND_ONLY) {
-    for (const role of RUNTIME_ROLES) {
+    for (const role of ["match_events", "match_awards"].includes(table)
+      ? [...RUNTIME_ROLES, "desiauction_system"]
+      : RUNTIME_ROLES) {
       for (const verb of ["UPDATE", "DELETE"] as const) {
         out.push({
           role,
@@ -444,6 +457,44 @@ function expectations(allTables: string[]): Expectation[] {
       "(the app role already holds full DML on every projection rebuilt from " +
       "this log, so blocking only the append contained nothing)",
   });
+
+  for (const table of [
+    "matches",
+    "match_confirmations",
+    "team_entries",
+    "team_managers",
+    "fixture_officials",
+    "match_events",
+    "match_live_state",
+    "match_player_lines",
+    "ball_facts",
+    "match_awards",
+    "player_previous_careers",
+  ]) {
+    for (const role of ["desiauction_engine", "desiauction_runner"]) {
+      for (const verb of ["SELECT", "INSERT", "UPDATE", "DELETE"] as const)
+        out.push({
+          role,
+          table,
+          verb,
+          allowed: false,
+          why: "LS-1 scoring is confined to the web tier",
+        });
+    }
+  }
+
+  // F07: the internet-facing live service reads through two P-1 functions
+  // (0127) and holds nothing on any table.
+  for (const table of allTables) {
+    for (const verb of ["SELECT", "INSERT", "UPDATE", "DELETE"] as const)
+      out.push({
+        role: "desiauction_live",
+        table,
+        verb,
+        allowed: false,
+        why: "the live service reads only through live_snapshot / live_history_entry",
+      });
+  }
 
   for (const table of PRIVATE_PLAN_TABLES) {
     for (const role of ["desiauction_engine", "desiauction_runner"]) {
@@ -522,12 +573,14 @@ async function main(): Promise<void> {
     const roleRows = await handle.sql<{ rolname: string }[]>`
       select rolname from pg_roles where rolname like 'desiauction\\_%'`;
     const present = new Set(roleRows.map((row) => row.rolname));
-    const missing = [...RUNTIME_ROLES, "desiauction_system"].filter((r) => !present.has(r));
+    const missing = [...RUNTIME_ROLES, "desiauction_system", "desiauction_live"].filter(
+      (r) => !present.has(r),
+    );
     if (missing.length > 0) {
       console.error(
         `grants:verify — these roles do not exist: ${missing.join(", ")}\n` +
           `  fix: psql -v app_password=… -v system_password=… -v engine_password=… ` +
-          `-v runner_password=… -f ops/db/create-app-role.sql`,
+          `-v runner_password=… -v live_password=… -f ops/db/create-app-role.sql`,
       );
       process.exit(1);
     }
@@ -583,18 +636,42 @@ async function main(): Promise<void> {
       }
     }
 
+    /*
+     * F07: the two live functions — callable by the live role and by no other
+     * runtime role, and running as the read-only system role, never as the
+     * superuser that created them.
+     */
+    for (const fn of [
+      "live_snapshot(char, text, text)",
+      "live_history_entry(char, text, text, int)",
+    ]) {
+      for (const role of ["desiauction_live", ...RUNTIME_ROLES]) {
+        const [row] = await handle.sql<{ ok: boolean }[]>`
+          select has_function_privilege(${role}, ${fn}, 'EXECUTE') as ok`;
+        const allowed = role === "desiauction_live";
+        if ((row?.ok ?? false) !== allowed)
+          failures.push(
+            `  ${role} ${allowed ? "MUST" : "MUST NOT"} EXECUTE ${fn} — the live read path`,
+          );
+      }
+      const [owner] = await handle.sql<{ owner: string }[]>`
+        select pg_get_userbyid(proowner) as owner from pg_proc where oid = ${fn}::regprocedure`;
+      if (owner?.owner !== "desiauction_system")
+        failures.push(`  ${fn} MUST run as desiauction_system — it is SECURITY DEFINER`);
+    }
+
     if (failures.length > 0) {
       console.error(
         `grants:verify FAILED — ${String(failures.length)} expectation(s) drifted:\n` +
           failures.join("\n") +
-          `\n\n  fix: re-run ops/db/create-app-role.sql with all four passwords, and if a new\n` +
+          `\n\n  fix: re-run ops/db/create-app-role.sql with all five passwords, and if a new\n` +
           `  write path was added, extend BOTH that file and this script's manifest.`,
       );
       process.exit(1);
     }
     console.log(
       `GRANTS VERIFIED — ${String(expectations(allTables).length)} expectations across ` +
-        `${String(allTables.length)} tables and 4 roles.`,
+        `${String(allTables.length)} tables and 5 roles.`,
     );
   } finally {
     await handle.sql.end();

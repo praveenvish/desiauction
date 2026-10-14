@@ -888,7 +888,7 @@ describe("PRR P0-2 — a minor's data is never on a public surface (DPDP §9)", 
 
     // Two approved players, both with a photo AND photo consent on file, so the
     // ONLY thing that can withhold the minor's photo is the age gate itself.
-    const minor = { id: newId(), phone: `+9193${RUN}01`, name: `Minor ${RUN}` };
+    const minor = { id: newId(), phone: `+9193${RUN}01`, name: "Minor Player" };
     const adult = { id: newId(), phone: `+9193${RUN}02`, name: `Adult ${RUN}` };
     await db.insert(people).values([
       { ...minor, photoUrl: `k/${minor.id}.jpg`, photoConsentAt: new Date() },
@@ -918,7 +918,9 @@ describe("PRR P0-2 — a minor's data is never on a public surface (DPDP §9)", 
     ]);
 
     const pool = await publicShowcase(competition.slug);
-    const minorRow = pool?.players.find((p) => p.name === minor.name);
+    const minorRow = pool?.players.find((p) => p.number === `MN${RUN.slice(-3)}001`);
+    expect(minorRow?.name).toBe("MP");
+    expect(pool?.players.some((p) => p.name === minor.name)).toBe(false);
     const adultRow = pool?.players.find((p) => p.name === adult.name);
 
     // The minor: no age, no photo — even though consent is on file.
@@ -945,7 +947,7 @@ describe("PRR P0-2 — a minor's data is never on a public surface (DPDP §9)", 
     // All three have a photo and consent; only age and the club's word differ.
     const unsaid = { id: newId(), phone: `+9193${RUN}03`, name: `Unsaid ${RUN}` };
     const said = { id: newId(), phone: `+9193${RUN}04`, name: `Said ${RUN}` };
-    const child = { id: newId(), phone: `+9193${RUN}05`, name: `Child ${RUN}` };
+    const child = { id: newId(), phone: `+9193${RUN}05`, name: "Child Player" };
     const ids = [unsaid.id, said.id, child.id];
     await db.insert(people).values(
       [unsaid, said, child].map((p) => ({
@@ -982,7 +984,9 @@ describe("PRR P0-2 — a minor's data is never on a public surface (DPDP §9)", 
     const photoOf = (name: string) => pool?.players.find((p) => p.name === name)?.photoUrl;
     expect(photoOf(unsaid.name), "no date, nobody said: hidden").toBeNull();
     expect(photoOf(said.name), "no date, the club said 18+: shown").not.toBeNull();
-    expect(photoOf(child.name), "a date that says 11 wins over the tick").toBeNull();
+    expect(pool?.players.find((p) => p.number === regs[2]?.registrationNumber)?.name).toBe("CP");
+    expect(photoOf("CP"), "a date that says 11 wins over the tick").toBeNull();
+    expect(pool?.players.some((p) => p.name === child.name)).toBe(false);
 
     await db.delete(registrationsTable).where(eq(registrationsTable.competitionId, competition.id));
     await db.delete(people).where(inArray(people.id, ids));

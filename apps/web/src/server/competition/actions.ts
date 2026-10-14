@@ -76,6 +76,7 @@ import { ForbiddenError } from "../orgs/authz";
 import { canSettlement } from "../settlement/authz";
 import { orgsFor } from "../orgs/orgs";
 import { canCompetition, requireCompetitionCapability } from "./authz";
+import { isTeamFormation } from "./team-entry-code";
 import {
   advanceCompetition,
   cloneCompetition,
@@ -287,6 +288,10 @@ export async function createCompetitionAction(
   const sport = formString(formData, "sport");
   // 0091: rupees or points. Absent (older forms) is rupees; anything else is
   // refused rather than guessed — the unit decides whether money is owed.
+  const formationRaw = formString(formData, "teamFormation") || "auction";
+  if (!isTeamFormation(formationRaw)) {
+    return { error: "Choose how teams will be formed.", field: "form" };
+  }
   const unitRaw = formString(formData, "auctionUnit");
   if (unitRaw !== "" && !isMoneyUnit(unitRaw)) {
     return { error: "Choose rupees or points for the auction.", field: "form" };
@@ -335,6 +340,7 @@ export async function createCompetitionAction(
       async (db) => {
         await requireCompetitionCapability(db, session.personId, { orgId }, "competition.create");
         return createCompetition(db, orgId, session.personId, {
+          teamFormation: formationRaw,
           name,
           location,
           startsOn,

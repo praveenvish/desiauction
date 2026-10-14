@@ -105,6 +105,9 @@ test("player-shaped users reach home directly; completion meter and notification
   await expect(page.getByTestId("inbox-list")).not.toContainText("Sign-in code requested");
   const firstRow = page.getByTestId("inbox-row").first();
   await expect(firstRow).toHaveAttribute("data-unread", "true");
+  // Marking read is a server action fired on mount; reloading before it lands
+  // cancels it. The bell clears once it has been recorded.
+  await expect(page.getByTestId("shell-bell")).toHaveAttribute("data-unread", "false");
   await page.reload();
   await expect(page.getByTestId("inbox-row").first()).toHaveAttribute("data-unread", "false");
   await expect(page.getByTestId("shell-bell")).toHaveAttribute("data-unread", "false");

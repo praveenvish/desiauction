@@ -1,3 +1,4 @@
+import { TIMED_FORMAT_PRESETS } from "../scoring/timed/formats";
 import { termsOf, type TermDetail } from "./vocabulary";
 import { difference, summariseFields, total } from "./tiebreakers";
 
@@ -97,6 +98,13 @@ const TERMS: Terminology = {
 };
 
 export const BASKETBALL: SportPack = {
+  scoring: {
+    family: "timed",
+    depth: 2,
+    defaultFormat: "basketball_40",
+    awardTable: "basketball-lite-v1",
+    formats: [TIMED_FORMAT_PRESETS.basketball_40],
+  },
   key: "basketball",
   label: "Basketball",
   roles: ROLES,
@@ -129,9 +137,8 @@ export const BASKETBALL: SportPack = {
      * every FIBA table and resolves itself once the fixtures even out; it is
      * recorded here so the next reader knows it is the sport, not a bug.
      *
-     * `tie` is 1 and UNREACHABLE: basketball plays overtime until somebody
-     * wins. It is filled in rather than left at zero so a future format that
-     * can draw does not silently award nothing.
+     * `basketball_40` supports a regulation tie and awards one point each.
+     * Overtime is not implemented by this scoring preset.
      */
     points: { win: 2, tie: 1, loss: 1, noResult: 1 },
     /*

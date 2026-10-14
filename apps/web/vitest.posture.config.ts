@@ -24,7 +24,8 @@ import { defineConfig } from "vitest/config";
  *
  * Prerequisite: the four roles must exist. Create them with
  *   psql -v ON_ERROR_STOP=1 -v app_password=… -v system_password=… \
- *        -v engine_password=… -v runner_password=… -f ops/db/create-app-role.sql
+ *        -v engine_password=… -v runner_password=… -v live_password=… \
+ *        -f ops/db/create-app-role.sql
  * (CI does this already for grants:verify and rls:verify.)
  *
  * Run: pnpm --filter @desiauction/web posture:verify
@@ -49,6 +50,8 @@ export default defineConfig({
     // "should not exist" assertion.
     fileParallelism: false,
     env: {
+      // Suites edit a snapshot and read it back within a second (F05 cache).
+      LIVE_API_CACHE_MS: "0",
       // The app under test: the non-BYPASSRLS role, exactly as production.
       DATABASE_URL:
         process.env["APP_DATABASE_URL"] ??

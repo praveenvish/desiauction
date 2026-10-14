@@ -26,6 +26,7 @@ import {
 import { renderStadiumPlayer, renderStadiumSquad } from "./poster-stadium";
 import { renderStadiumSeason, renderStadiumTopBuys } from "./poster-stadium-season";
 import { FIGURES } from "./poster-fonts";
+export { renderResultPoster } from "./poster-result";
 import { withoutHiddenEffects } from "./poster-strip";
 import {
   Footer,

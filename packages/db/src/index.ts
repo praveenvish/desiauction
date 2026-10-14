@@ -169,3 +169,10 @@ export async function withTenantDb<T>(
     return fn(tx);
   });
 }
+
+export {
+  liveHistoryEntry,
+  liveHistoryStamps,
+  scoringPublicAccess,
+  type ScoringPublicProof,
+} from "./scoring-public";

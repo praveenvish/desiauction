@@ -9,9 +9,11 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgTable,
   date,
   primaryKey,
+  real,
   smallint,
   text,
   timestamp,
@@ -212,6 +214,19 @@ export const playerProfiles = pgTable(
  * Keyed by (person_id, sport) with no surrogate id: the row IS that pair, and a
  * generated id would be a second way to name the same thing.
  */
+/** Person-scoped self-reported history; never included in canonical scoring. */
+export const playerPreviousCareers = pgTable(
+  "player_previous_careers",
+  {
+    personId: char("person_id", { length: 26 }).notNull(),
+    sport: text("sport").notNull(),
+    summary: jsonb("summary").notNull(),
+    screenshotKey: text("screenshot_key"),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.personId, table.sport] })],
+);
+
 export const playerSportProfiles = pgTable(
   "player_sport_profiles",
   {
@@ -281,18 +296,30 @@ export const emailVerifications = pgTable(
   ],
 );
 
-export const organizations = pgTable("organizations", {
-  id: id(),
-  name: text("name").notNull(),
-  slug: text("slug").notNull().unique(),
-  // The club's own words for the Org Detail "About" banner — nullable, edited
-  // in place by an owner. Never fabricated; empty until someone writes it.
-  description: text("description"),
-  createdBy: char("created_by", { length: 26 })
-    .notNull()
-    .references(() => people.id, { onDelete: "restrict" }),
-  createdAt: ts("created_at").notNull().defaultNow(),
-});
+export const organizations = pgTable(
+  "organizations",
+  {
+    kind: text("kind", { enum: ["club", "personal"] })
+      .notNull()
+      .default("club"),
+    id: id(),
+    name: text("name").notNull(),
+    slug: text("slug").notNull().unique(),
+    // The club's own words for the Org Detail "About" banner — nullable, edited
+    // in place by an owner. Never fabricated; empty until someone writes it.
+    description: text("description"),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    check("organizations_kind_check", sql`${table.kind} IN ('club', 'personal')`),
+    uniqueIndex("organizations_personal_owner_uq")
+      .on(table.createdBy)
+      .where(sql`${table.kind} = 'personal'`),
+  ],
+);
 
 export const orgMembers = pgTable(
   "org_members",
@@ -838,10 +865,10 @@ export const grants = pgTable(
   (table) => [
     index("grants_person_idx").on(table.personId),
     index("grants_scope_idx").on(table.scopeType, table.scopeId),
-    // 0077: a season scope carries the auctioneer and nothing else, once.
+    // 0114: season-scoped auctioneer and scorer appointments, once per set.
     check(
-      "grants_tournament_scope_is_conductor",
-      sql`${table.scopeType} <> 'tournament' or ${table.capabilitySet} = 'auction:conductor'`,
+      "grants_tournament_scope_capability_check",
+      sql`${table.scopeType} <> 'tournament' or ${table.capabilitySet} IN ('auction:conductor','fixture:scorer')`,
     ),
     uniqueIndex("grants_tournament_active_uq")
       .on(table.personId, table.scopeId, table.capabilitySet)
@@ -973,6 +1000,11 @@ export const competitions = pgTable(
   "competitions",
   {
     id: id(),
+    teamFormation: text("team_formation", { enum: ["auction", "organizer", "team_entry"] })
+      .notNull()
+      .default("auction"),
+    entryCode: text("entry_code"),
+    scoringRules: jsonb("scoring_rules").notNull().default({}),
     orgId: char("org_id", { length: 26 })
       .notNull()
       .references(() => organizations.id, { onDelete: "restrict" }),
@@ -1102,6 +1134,13 @@ export const competitions = pgTable(
     }),
   },
   (table) => [
+    check(
+      "competitions_team_formation_check",
+      sql`${table.teamFormation} IN ('auction','organizer','team_entry')`,
+    ),
+    uniqueIndex("competitions_entry_code_uq")
+      .on(table.entryCode)
+      .where(sql`${table.entryCode} IS NOT NULL`),
     index("competitions_org_idx").on(table.orgId),
     index("competitions_tournament_idx").on(table.tournamentId),
   ],
@@ -1110,7 +1149,7 @@ export const competitions = pgTable(
 /**
  * THE TEAM THAT COMES BACK (PI-1 P6) — the 0019 tournaments pattern applied
  * to teams: a durable org-scoped name that editions' team rows point at.
- * Written only by the clone path; read only by career/grouping surfaces.
+ * Written by the clone path and bounded personal quick-match writer; read by career/grouping surfaces.
  * Never an authority — the auction, rosters and money key on `teams` alone.
  */
 export const franchises = pgTable(
@@ -1432,6 +1471,9 @@ export const fixtureResults = pgTable(
   "fixture_results",
   {
     fixtureId: char("fixture_id", { length: 26 }).primaryKey(),
+    source: text("source", { enum: ["typed", "scored"] })
+      .notNull()
+      .default("typed"),
     orgId: char("org_id", { length: 26 }).notNull(),
     competitionId: char("competition_id", { length: 26 }).notNull(),
     /**
@@ -1470,7 +1512,10 @@ export const fixtureResults = pgTable(
     recordedAt: ts("recorded_at").notNull().defaultNow(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },
-  (table) => [index("fixture_results_competition_idx").on(table.competitionId)],
+  (table) => [
+    index("fixture_results_competition_idx").on(table.competitionId),
+    check("fixture_results_source_check", sql`${table.source} IN ('typed','scored')`),
+  ],
 );
 
 /**
@@ -1491,6 +1536,7 @@ export const fixtureParticipants = pgTable(
     competitionId: char("competition_id", { length: 26 }).notNull(),
     /** 1 is the win. Null until the result is in; two squads may share one. */
     placement: integer("placement"),
+    source: text("source").$type<"typed" | "scored">(),
     /** The squad's own numbers, in the pack's shape — `{ kills: 7 }`. */
     score: jsonb("score").$type<Record<string, number>>(),
     createdAt: ts("created_at").notNull().defaultNow(),
@@ -2907,4 +2953,334 @@ export const reviewReports = pgTable(
     }),
   },
   (table) => [index("review_reports_ip_idx").on(table.reporterIp, table.createdAt)],
+);
+
+// LS-1: frozen match configuration, append-only events and live read projection.
+export const matches = pgTable(
+  "matches",
+  {
+    fixtureId: char("fixture_id", { length: 26 })
+      .primaryKey()
+      .references(() => fixtures.id, { onDelete: "cascade" }),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    competitionId: char("competition_id", { length: 26 }).notNull(),
+    attempt: integer("attempt").notNull().default(1),
+    format: jsonb("format").notNull(),
+    conditions: jsonb("conditions").notNull().default({}),
+    awardVersion: text("award_version").notNull(),
+    phase: text("phase", {
+      enum: [
+        "not_started",
+        "toss",
+        "live",
+        "innings_break",
+        "interrupted",
+        "result_reached",
+        "finished",
+        "final",
+        "stalled",
+        "no_result",
+        "abandoned",
+        "walkover",
+        "void",
+      ],
+    })
+      .notNull()
+      .default("not_started"),
+    scorerPersonId: char("scorer_person_id", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
+    scorerClaimedAt: ts("scorer_claimed_at"),
+    scorerDeviceId: text("scorer_device_id"),
+    trustReasons: jsonb("trust_reasons").notNull().default([]),
+    trustLevel: text("trust_level", { enum: ["verified", "confirmed", "self_scored", "flagged"] })
+      .notNull()
+      .default("self_scored"),
+    shareToken: text("share_token").notNull(),
+    lastSeq: bigint("last_seq", { mode: "number" }).notNull().default(0),
+    viewerPeak: integer("viewer_peak").notNull().default(0),
+    startedAt: ts("started_at"),
+    finishedAt: ts("finished_at"),
+    finalizedAt: ts("finalized_at"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("matches_share_token_uq").on(table.shareToken),
+    index("matches_competition_idx").on(table.competitionId),
+    check(
+      "matches_phase_check",
+      sql`${table.phase} IN ('not_started','toss','live','innings_break','interrupted','result_reached','finished','final','stalled','no_result','abandoned','walkover','void')`,
+    ),
+    check(
+      "matches_trust_check",
+      sql`${table.trustLevel} IN ('verified','confirmed','self_scored','flagged')`,
+    ),
+    check("matches_attempt_check", sql`${table.attempt} >= 1`),
+  ],
+);
+export const matchEvents = pgTable(
+  "match_events",
+  {
+    fixtureId: char("fixture_id", { length: 26 })
+      .notNull()
+      .references(() => fixtures.id, { onDelete: "cascade" }),
+    seq: bigint("seq", { mode: "number" }).notNull(),
+    eventId: char("event_id", { length: 26 }).notNull(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    competitionId: char("competition_id", { length: 26 }).notNull(),
+    attempt: integer("attempt").notNull(),
+    type: text("type").notNull(),
+    v: smallint("v").notNull().default(1),
+    payload: jsonb("payload").notNull(),
+    targetEventId: char("target_event_id", { length: 26 }),
+    actorPersonId: char("actor_person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
+    clientSeq: integer("client_seq").notNull(),
+    clientRecordedAt: ts("client_recorded_at").notNull(),
+    receivedAt: ts("received_at").notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ name: "match_events_pkey", columns: [table.fixtureId, table.seq] }),
+    uniqueIndex("match_events_event_uq").on(table.fixtureId, table.eventId),
+    index("match_events_competition_idx").on(table.competitionId),
+  ],
+);
+export const matchLiveState = pgTable("match_live_state", {
+  fixtureId: char("fixture_id", { length: 26 })
+    .primaryKey()
+    .references(() => fixtures.id, { onDelete: "cascade" }),
+  orgId: char("org_id", { length: 26 }).notNull(),
+  competitionId: char("competition_id", { length: 26 }).notNull(),
+  seq: bigint("seq", { mode: "number" }).notNull(),
+  state: jsonb("state").notNull(),
+  /**
+   * The last 30 snapshots the betting delay releases from (0126). Kept out of
+   * `state` so a hot read fetches one released entry, never all thirty.
+   */
+  history: jsonb("history")
+    .notNull()
+    .default(sql`'[]'::jsonb`),
+  updatedAt: ts("updated_at").notNull().defaultNow(),
+});
+
+export const teamManagers = pgTable(
+  "team_managers",
+  {
+    id: id(),
+    teamId: char("team_id", { length: 26 })
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    competitionId: char("competition_id", { length: 26 }).notNull(),
+    role: text("role", { enum: ["captain", "manager"] }).notNull(),
+    source: text("source", { enum: ["auction_owner", "organizer", "team_entry"] }).notNull(),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    revokedAt: ts("revoked_at"),
+  },
+  (table) => [
+    uniqueIndex("team_managers_active_uq")
+      .on(table.teamId, table.personId)
+      .where(sql`${table.revokedAt} IS NULL`),
+    check("team_managers_role_check", sql`${table.role} IN ('captain','manager')`),
+    check(
+      "team_managers_source_check",
+      sql`${table.source} IN ('auction_owner','organizer','team_entry')`,
+    ),
+  ],
+);
+export const ballFacts = pgTable(
+  "ball_facts",
+  {
+    fixtureId: char("fixture_id", { length: 26 }).notNull(),
+    seq: bigint("seq", { mode: "number" }).notNull(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    competitionId: char("competition_id", { length: 26 }).notNull(),
+    inningsNo: smallint("innings_no").notNull(),
+    overNo: smallint("over_no").notNull(),
+    ballInOver: smallint("ball_in_over").notNull(),
+    legal: boolean("legal").notNull(),
+    phase: text("phase").notNull(),
+    batterId: char("batter_id", { length: 26 }).notNull(),
+    batterHand: text("batter_hand"),
+    bowlerId: char("bowler_id", { length: 26 }).notNull(),
+    bowlerStyle: text("bowler_style"),
+    runsBat: smallint("runs_bat").notNull(),
+    extras: smallint("extras").notNull(),
+    extraKind: text("extra_kind"),
+    boundary: smallint("boundary"),
+    zone: text("zone"),
+    angle: smallint("angle"),
+    wicketKind: text("wicket_kind"),
+    playerOutId: char("player_out_id", { length: 26 }),
+    fielderId: char("fielder_id", { length: 26 }),
+    wicketX: real("wicket_x"),
+    wicketY: real("wicket_y"),
+    timeOfDay: text("time_of_day"),
+    ballType: text("ball_type"),
+    groundType: text("ground_type"),
+    pitch: text("pitch"),
+    trustLevel: text("trust_level").notNull(),
+    formatKey: text("format_key").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.fixtureId, table.seq], name: "ball_facts_pkey" }),
+    index("ball_facts_batter_idx").on(table.batterId),
+    index("ball_facts_bowler_idx").on(table.bowlerId),
+    index("ball_facts_competition_idx").on(table.competitionId),
+  ],
+);
+
+export const matchPlayerLines = pgTable(
+  "match_player_lines",
+  {
+    fixtureId: char("fixture_id", { length: 26 })
+      .notNull()
+      .references(() => fixtures.id, { onDelete: "cascade" }),
+    registrationId: char("registration_id", { length: 26 })
+      .notNull()
+      .references(() => registrations.id, { onDelete: "cascade" }),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    competitionId: char("competition_id", { length: 26 }).notNull(),
+    teamId: char("team_id", { length: 26 })
+      .notNull()
+      .references(() => teams.id, { onDelete: "restrict" }),
+    sport: text("sport").notNull(),
+    formatKey: text("format_key").notNull(),
+    conditions: jsonb("conditions").notNull(),
+    stats: jsonb("stats").notNull(),
+    points: numeric("points", { precision: 8, scale: 2 }).notNull(),
+    pointsLines: jsonb("points_lines").notNull(),
+    trustLevel: text("trust_level").notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.fixtureId, table.registrationId],
+      name: "match_player_lines_pkey",
+    }),
+    index("match_player_lines_registration_idx").on(table.registrationId),
+    index("match_player_lines_competition_idx").on(table.competitionId),
+  ],
+);
+export const matchAwards = pgTable(
+  "match_awards",
+  {
+    id: id(),
+    fixtureId: char("fixture_id", { length: 26 }),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    competitionId: char("competition_id", { length: 26 }).notNull(),
+    scope: text("scope", { enum: ["match", "season"] }).notNull(),
+    kind: text("kind").notNull(),
+    computedRegistrationId: char("computed_registration_id", { length: 26 }),
+    winnerRegistrationId: char("winner_registration_id", { length: 26 }),
+    computedPersonId: char("computed_person_id", { length: 26 }),
+    winnerPersonId: char("winner_person_id", { length: 26 }),
+    source: text("source", { enum: ["auto", "organizer", "fans"] }).notNull(),
+    reason: text("reason"),
+    score: numeric("score", { precision: 8, scale: 2 }),
+    actorPersonId: char("actor_person_id", { length: 26 }),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    check(
+      "match_awards_identity_check",
+      sql`CASE WHEN ${table.scope} = 'season' AND ${table.kind} = 'scorer_of_season' THEN ${table.computedRegistrationId} IS NULL AND ${table.winnerRegistrationId} IS NULL ELSE ${table.computedPersonId} IS NULL AND ${table.winnerPersonId} IS NULL END`,
+    ),
+    check("match_awards_scope_check", sql`${table.scope} IN ('match','season')`),
+    check("match_awards_source_check", sql`${table.source} IN ('auto','organizer','fans')`),
+    check(
+      "match_awards_address_check",
+      sql`(${table.scope} = 'match' AND ${table.fixtureId} IS NOT NULL) OR (${table.scope} = 'season' AND ${table.fixtureId} IS NULL)`,
+    ),
+    index("match_awards_fixture_current_idx").on(
+      table.scope,
+      table.fixtureId,
+      table.kind,
+      table.createdAt.desc(),
+      table.id.desc(),
+    ),
+    index("match_awards_competition_current_idx").on(
+      table.scope,
+      table.competitionId,
+      table.kind,
+      table.createdAt.desc(),
+      table.id.desc(),
+    ),
+  ],
+);
+export const fixtureOfficials = pgTable(
+  "fixture_officials",
+  {
+    id: id(),
+    fixtureId: char("fixture_id", { length: 26 })
+      .notNull()
+      .references(() => fixtures.id, { onDelete: "cascade" }),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    competitionId: char("competition_id", { length: 26 }).notNull(),
+    role: text("role", { enum: ["scorer", "umpire", "referee", "commentator"] }).notNull(),
+    personId: char("person_id", { length: 26 }).references(() => people.id, {
+      onDelete: "restrict",
+    }),
+    displayName: text("display_name").notNull(),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    removedAt: ts("removed_at"),
+  },
+  (table) => [
+    index("fixture_officials_fixture_idx").on(table.fixtureId),
+    check(
+      "fixture_officials_role_check",
+      sql`${table.role} IN ('scorer','umpire','referee','commentator')`,
+    ),
+  ],
+);
+
+export const matchConfirmations = pgTable(
+  "match_confirmations",
+  {
+    id: id(),
+    fixtureId: char("fixture_id", { length: 26 }).notNull(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    competitionId: char("competition_id", { length: 26 }).notNull(),
+    teamId: char("team_id", { length: 26 }).notNull(),
+    personId: char("person_id", { length: 26 }).notNull(),
+    verdict: text("verdict", { enum: ["confirmed", "disputed"] }).notNull(),
+    note: text("note"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("match_confirmations_one_uq").on(table.fixtureId, table.teamId),
+    check("match_confirmations_verdict_check", sql`${table.verdict} IN ('confirmed','disputed')`),
+  ],
+);
+
+export const teamEntries = pgTable(
+  "team_entries",
+  {
+    id: id(),
+    orgId: char("org_id", { length: 26 }).notNull(),
+    competitionId: char("competition_id", { length: 26 }).notNull(),
+    teamName: text("team_name").notNull(),
+    captainPersonId: char("captain_person_id", { length: 26 }).notNull(),
+    players: jsonb("players").$type<{ name: string; phone?: string }[]>().notNull(),
+    status: text("status", { enum: ["submitted", "approved", "rejected"] })
+      .notNull()
+      .default("submitted"),
+    reviewedBy: char("reviewed_by", { length: 26 }),
+    reviewedAt: ts("reviewed_at"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    check("team_entries_status_check", sql`${table.status} IN ('submitted','approved','rejected')`),
+  ],
 );

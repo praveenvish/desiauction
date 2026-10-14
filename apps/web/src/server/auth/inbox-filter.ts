@@ -38,6 +38,7 @@ export const ACCOUNT_ONLY_ACTIONS = [
  * are a counter, not news and not security activity: neither page shows them.
  */
 export const LEDGER_ONLY_ACTIONS = [
+  "match.notice_dispatched",
   "media.upload_requested",
   "media.own_upload_requested",
 ] as const;

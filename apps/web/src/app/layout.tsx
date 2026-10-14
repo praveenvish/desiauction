@@ -215,6 +215,7 @@ export default async function RootLayout({
       ? null
       : {
           organizes: roles.organizes.length > 0,
+          scores: roles.scores.length,
           // The Clubs item is offered only past one club (nav.ts).
           clubs: roles.organizes.length,
           // EVERY team, not `currentTeam()`'s one: an owner with teams in two
@@ -278,6 +279,7 @@ export default async function RootLayout({
     orgSlug: orgSlugById.get(competition.orgId) ?? "",
     // A points season (0091) has nothing to settle: no Money tab, no settle
     // shortcut in search, whatever the person's grants in the club.
+    teamFormation: competition.teamFormation ?? "auction",
     canSettle: settlementOrgs.has(competition.orgId) && competition.auctionUnit === "inr",
     ...(ownTeamBySlug.has(competition.slug)
       ? { ownTeamId: ownTeamBySlug.get(competition.slug) as string }

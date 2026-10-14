@@ -137,6 +137,7 @@ export interface PlatformTotals {
   readonly auctions: number;
   readonly cases: number;
   readonly financeOrgs: number;
+  readonly personal: number;
 }
 
 export interface StatusLine {
@@ -401,6 +402,7 @@ async function liveAuctionsOf(db: Db, nowMs: number): Promise<{ total: number; s
 export async function platformOverview(deps: FinopsDeps, db: Db): Promise<PlatformOverview> {
   const [
     orgCount,
+    personalCount,
     competitionCount,
     peopleCount,
     auctionCount,
@@ -412,7 +414,14 @@ export async function platformOverview(deps: FinopsDeps, db: Db): Promise<Platfo
     recent,
     liveAuctions,
   ] = await Promise.all([
-    db.select({ n: sql<number>`count(*)::int` }).from(organizations),
+    db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(organizations)
+      .where(eq(organizations.kind, "club")),
+    db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(organizations)
+      .where(eq(organizations.kind, "personal")),
     db.select({ n: sql<number>`count(*)::int` }).from(competitions),
     db.select({ n: sql<number>`count(*)::int` }).from(people),
     db
@@ -447,6 +456,7 @@ export async function platformOverview(deps: FinopsDeps, db: Db): Promise<Platfo
   return {
     totals: {
       orgs: orgCount[0]?.n ?? 0,
+      personal: personalCount[0]?.n ?? 0,
       competitions: competitionCount[0]?.n ?? 0,
       people: peopleCount[0]?.n ?? 0,
       auctions: auctionCount[0]?.n ?? 0,
@@ -693,6 +703,7 @@ export interface OrgDirectory {
   readonly total: number;
   /** How many exist at all — the denominator, never confused with the match count. */
   readonly platformTotal: number;
+  readonly personalTotal: number;
   readonly filter: OrgFilter;
   readonly query: string;
   /** The id to pass as `?after=` for the next page, or null at the end. */
@@ -771,7 +782,7 @@ export async function organizationDirectory(
 ): Promise<OrgDirectory> {
   const query = (options.query ?? "").trim();
   const filter = options.filter ?? "all";
-  const clauses: SQL[] = [];
+  const clauses: SQL[] = [eq(organizations.kind, "club")];
   const pattern = containsPattern(query);
   if (query !== "") {
     // Hand-written aliases, never `${table.col}` inside a raw template (PX-9
@@ -840,7 +851,7 @@ export async function organizationDirectory(
     .orderBy(desc(organizations.createdAt), desc(organizations.id))
     .limit(ORG_PAGE + 1);
 
-  const [facetRows, everything] = await Promise.all([
+  const [facetRows, everything, personal] = await Promise.all([
     Promise.all(
       ORG_FILTERS.map((f) =>
         db
@@ -849,7 +860,14 @@ export async function organizationDirectory(
           .where(whereFor(f)),
       ),
     ),
-    db.select({ n: sql<number>`count(*)::int` }).from(organizations),
+    db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(organizations)
+      .where(eq(organizations.kind, "club")),
+    db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(organizations)
+      .where(eq(organizations.kind, "personal")),
   ]);
   const counts = Object.fromEntries(
     ORG_FILTERS.map((f, index) => [f, facetRows[index]?.[0]?.n ?? 0]),
@@ -863,6 +881,7 @@ export async function organizationDirectory(
     })),
     total: counts[filter],
     platformTotal: everything[0]?.n ?? 0,
+    personalTotal: personal[0]?.n ?? 0,
     filter,
     query,
     nextCursor: more ? (page[page.length - 1]?.id ?? null) : null,

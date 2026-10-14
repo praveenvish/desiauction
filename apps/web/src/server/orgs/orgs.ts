@@ -76,7 +76,7 @@ async function readOrgs(db: Db, personId: string): Promise<OrgSummary[]> {
     .select({ id: organizations.id, name: organizations.name, slug: organizations.slug })
     .from(orgMembers)
     .innerJoin(organizations, eq(organizations.id, orgMembers.orgId))
-    .where(eq(orgMembers.personId, personId));
+    .where(and(eq(orgMembers.personId, personId), eq(organizations.kind, "club")));
 }
 
 /**

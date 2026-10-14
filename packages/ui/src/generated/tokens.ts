@@ -10,6 +10,8 @@ export const tokens = {
   "text-on-danger": "var(--text-on-danger)",
   "text-accent": "var(--text-accent)",
   "text-heading": "var(--text-heading)",
+  "chart-s1": "var(--chart-s1)",
+  "chart-s2": "var(--chart-s2)",
   "surface": "var(--surface)",
   "surface-raised": "var(--surface-raised)",
   "surface-overlay": "var(--surface-overlay)",

@@ -52,6 +52,7 @@ English only, named in `WHATSAPP_TEMPLATE_NAME` (see WHATSAPP_SETUP.md).
 | auction.sold | `da_auction_sold` | `WHATSAPP_TEMPLATE_AUCTION_SOLD` |
 | team.appointed | `da_team_appointed` | `WHATSAPP_TEMPLATE_TEAM_APPOINTED` |
 | lineup.announced | `da_lineup_announced` | `WHATSAPP_TEMPLATE_LINEUP_ANNOUNCED` |
+| match.award | `da_match_award` | `WHATSAPP_TEMPLATE_MATCH_AWARD` |
 
 ### registration.approved
 
@@ -625,5 +626,61 @@ As received:
 
 ```text
 नमस्ते Arjun, आप Cup Kings की लाइनअप में हैं — Tigers के ख़िलाफ़, Sun, 4 Oct, 7:30 pm को। शुभकामनाएँ!
+```
+
+### match.award
+
+When a finalized match award is set — to the current winner, only on WhatsApp with consent.
+
+| Field | Value |
+|---|---|
+| Suggested name | `da_match_award` |
+| Category | Utility |
+| Languages | English (`en`), Hindi (`hi`) |
+| Header | None |
+| Footer | DesiAuction |
+| Button | Visit website → https://desiauction.in/home |
+| Env fallback for the approved name | `WHATSAPP_TEMPLATE_MATCH_AWARD` |
+
+#### English (`en`)
+
+Button label: “See your season”
+
+Body to submit:
+
+```text
+Hi {{1}}, you received a match award in {{2}}. Sign in to see your award and points.
+```
+
+Variable samples (Meta asks for one per variable):
+
+- `{{1}}` — Neel
+- `{{2}}` — MPL 2026
+
+As received:
+
+```text
+Hi Neel, you received a match award in MPL 2026. Sign in to see your award and points.
+```
+
+#### Hindi (`hi`)
+
+Button label: “अपना सीज़न देखें”
+
+Body to submit:
+
+```text
+नमस्ते {{1}}, आपको {{2}} में मैच पुरस्कार मिला है। अपना पुरस्कार और अंक देखने के लिए साइन इन करें।
+```
+
+Variable samples (Meta asks for one per variable):
+
+- `{{1}}` — Neel
+- `{{2}}` — MPL 2026
+
+As received:
+
+```text
+नमस्ते Neel, आपको MPL 2026 में मैच पुरस्कार मिला है। अपना पुरस्कार और अंक देखने के लिए साइन इन करें।
 ```
 

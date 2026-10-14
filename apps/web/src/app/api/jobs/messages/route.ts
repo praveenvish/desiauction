@@ -7,6 +7,7 @@ import { recordJobRun } from "../../../../server/jobs/job-runs";
 import { sweepAuctionReminders } from "../../../../server/competition/auction-reminders";
 import { sweepMatchDays } from "../../../../server/competition/match-day";
 import { logger, withRequestId } from "../../../../server/logger";
+import { sweepScoring } from "../../../../server/scoring/sweep";
 import { drainOutbox } from "../../../../server/messaging/outbox";
 
 /**
@@ -48,8 +49,12 @@ async function handle(request: Request): Promise<NextResponse> {
     logger().error({ err: error }, "match_day.sweep_failed");
     return "failed" as const;
   });
+  const scoring = await sweepScoring().catch((error: unknown) => {
+    logger().error({ err: error }, "scoring.sweep_failed");
+    return "failed" as const;
+  });
   const drained = await drainOutbox({ limit: 200 });
-  return NextResponse.json({ reminders, matchDays, drained });
+  return NextResponse.json({ reminders, matchDays, scoring, drained });
 }
 
 export function POST(request: Request): Promise<Response> {

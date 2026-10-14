@@ -172,6 +172,8 @@ try {
         `engine_password=${process.env["ENGINE_DB_PASSWORD"] ?? "local-engine"}`,
         "-v",
         `runner_password=${process.env["RUNNER_DB_PASSWORD"] ?? "local-runner"}`,
+        "-v",
+        `live_password=${process.env["LIVE_DB_PASSWORD"] ?? "local-live"}`,
         "-f",
         "-",
       ],

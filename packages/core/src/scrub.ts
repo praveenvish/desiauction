@@ -66,6 +66,7 @@ const PATTERNS: readonly { readonly re: RegExp; readonly label: string }[] = [
   // The same Indian mobile WITHOUT the plus, as providers write it (91XXXXXXXXXX).
   { re: /(?<![\d+])91[6-9]\d{9}(?!\d)/g, label: "[phone]" },
   // Capability links: the path segment IS the credential.
+  { re: /\/match\/confirm\/[^/?#\s"']+/g, label: "/match/confirm/[token]" },
   { re: /\/(join|owner-join|demo|review)\/[^/?#\s"']+/g, label: "/$1/[token]" },
 ];
 

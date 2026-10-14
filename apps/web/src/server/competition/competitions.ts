@@ -10,6 +10,7 @@ import {
   type EntryCategory,
   type MoneyUnit,
 } from "@desiauction/core";
+import { NEW_SEASON_SCORING_RULES } from "@desiauction/core/scoring";
 import { isRealAuction } from "@desiauction/auction";
 import {
   auctions,
@@ -28,6 +29,7 @@ import {
 import { and, asc, desc, eq, ne, sql } from "drizzle-orm";
 
 import { storage } from "../media";
+import { newTeamEntryCode, type TeamFormation } from "./team-entry-code";
 import { squadListingDecision, type SquadListing } from "../seo/squads";
 
 // Competition + Tournament + Team persistence (IP-3 §4). All rules come from core;
@@ -106,6 +108,8 @@ export interface CompetitionSummary {
   auctionUnit: MoneyUnit;
   /** 0110: run live here, or held elsewhere and typed in on the Teams tab. */
   auctionSource: AuctionSource;
+  teamFormation?: TeamFormation;
+  entryCode?: string | null;
   location: string | null;
   startsOn: string | null;
   endsOn: string | null;
@@ -127,6 +131,7 @@ export interface NewCompetition {
   endsOn?: string;
   /** 0091: absent takes the column default, rupees. */
   auctionUnit?: MoneyUnit;
+  teamFormation?: TeamFormation;
 }
 
 export async function createCompetition(
@@ -148,6 +153,9 @@ export async function createCompetition(
     name: valid.value,
     slug,
     sport: input.sport,
+    scoringRules: NEW_SEASON_SCORING_RULES,
+    teamFormation: input.teamFormation ?? "auction",
+    entryCode: input.teamFormation === "team_entry" ? newTeamEntryCode() : null,
     ...(input.auctionUnit !== undefined ? { auctionUnit: input.auctionUnit } : {}),
     ...(input.tournamentId !== undefined ? { tournamentId: input.tournamentId } : {}),
     ...(input.location !== undefined && input.location !== "" ? { location: input.location } : {}),
@@ -180,6 +188,7 @@ export async function createCompetition(
     entryCategory: "open",
     auctionUnit: input.auctionUnit ?? "inr",
     auctionSource: "app",
+    teamFormation: input.teamFormation ?? "auction",
     visibility: "private",
     location: input.location ?? null,
     startsOn: input.startsOn ?? null,
@@ -218,6 +227,8 @@ export async function competitionsForPerson(db: Db, personId: string): Promise<S
       entryCategory: competitions.entryCategory,
       auctionUnit: competitions.auctionUnit,
       auctionSource: competitions.auctionSource,
+      teamFormation: competitions.teamFormation,
+      entryCode: competitions.entryCode,
       location: competitions.location,
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,
@@ -257,6 +268,8 @@ export async function competitionsOfTournament(
       entryCategory: competitions.entryCategory,
       auctionUnit: competitions.auctionUnit,
       auctionSource: competitions.auctionSource,
+      teamFormation: competitions.teamFormation,
+      entryCode: competitions.entryCode,
       location: competitions.location,
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,
@@ -332,6 +345,8 @@ export async function resolveCompetition(
       entryCategory: competitions.entryCategory,
       auctionUnit: competitions.auctionUnit,
       auctionSource: competitions.auctionSource,
+      teamFormation: competitions.teamFormation,
+      entryCode: competitions.entryCode,
       location: competitions.location,
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,

@@ -1,0 +1,49 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`player lines and commentary > en commentary 'dot' 1`] = `"0.1 Player a1 to Player h1, no run."`;
+
+exports[`player lines and commentary > en commentary 'four with zone' 1`] = `"0.1 Player a1 to Player h1, FOUR to cover."`;
+
+exports[`player lines and commentary > en commentary 'leg bye' 1`] = `"0.1 Player a1 to Player h1, 1 leg bye."`;
+
+exports[`player lines and commentary > en commentary 'no ball and four' 1`] = `"0.1 Player a1 to Player h1, no ball and 4."`;
+
+exports[`player lines and commentary > en commentary 'no ball' 1`] = `"0.1 Player a1 to Player h1, no ball."`;
+
+exports[`player lines and commentary > en commentary 'single' 1`] = `"0.1 Player a1 to Player h1, 1 run."`;
+
+exports[`player lines and commentary > en commentary 'six' 1`] = `"0.1 Player a1 to Player h1, SIX."`;
+
+exports[`player lines and commentary > en commentary 'three wides' 1`] = `"0.1 Player a1 to Player h1, 3 wides."`;
+
+exports[`player lines and commentary > en commentary 'three' 1`] = `"0.1 Player a1 to Player h1, 3 runs."`;
+
+exports[`player lines and commentary > en commentary 'two byes' 1`] = `"0.1 Player a1 to Player h1, 2 byes."`;
+
+exports[`player lines and commentary > en commentary 'wicket' 1`] = `"0.1 Player a1 to Player h1, OUT, caught."`;
+
+exports[`player lines and commentary > en commentary 'wide' 1`] = `"0.1 Player a1 to Player h1, wide."`;
+
+exports[`player lines and commentary > hi commentary 'dot' 1`] = `"0.1 Player a1 से Player h1 को, कोई रन नहीं।"`;
+
+exports[`player lines and commentary > hi commentary 'four with zone' 1`] = `"0.1 Player a1 से Player h1 को, चौका कवर की ओर।"`;
+
+exports[`player lines and commentary > hi commentary 'leg bye' 1`] = `"0.1 Player a1 से Player h1 को, 1 लेग बाई।"`;
+
+exports[`player lines and commentary > hi commentary 'no ball and four' 1`] = `"0.1 Player a1 से Player h1 को, नो बॉल और 4।"`;
+
+exports[`player lines and commentary > hi commentary 'no ball' 1`] = `"0.1 Player a1 से Player h1 को, नो बॉल।"`;
+
+exports[`player lines and commentary > hi commentary 'single' 1`] = `"0.1 Player a1 से Player h1 को, 1 रन।"`;
+
+exports[`player lines and commentary > hi commentary 'six' 1`] = `"0.1 Player a1 से Player h1 को, छक्का।"`;
+
+exports[`player lines and commentary > hi commentary 'three wides' 1`] = `"0.1 Player a1 से Player h1 को, 3 वाइड।"`;
+
+exports[`player lines and commentary > hi commentary 'three' 1`] = `"0.1 Player a1 से Player h1 को, 3 रन।"`;
+
+exports[`player lines and commentary > hi commentary 'two byes' 1`] = `"0.1 Player a1 से Player h1 को, 2 बाई।"`;
+
+exports[`player lines and commentary > hi commentary 'wicket' 1`] = `"0.1 Player a1 से Player h1 को, आउट, कैच।"`;
+
+exports[`player lines and commentary > hi commentary 'wide' 1`] = `"0.1 Player a1 से Player h1 को, वाइड।"`;

@@ -1,3 +1,4 @@
+import { RAID_FORMAT_PRESETS } from "../scoring/raid/formats";
 import { termsOf, type TermDetail } from "./vocabulary";
 import { difference, summariseFields, total } from "./tiebreakers";
 
@@ -98,6 +99,13 @@ const TERMS: Terminology = {
 };
 
 export const KABADDI: SportPack = {
+  scoring: {
+    family: "raid",
+    depth: 2,
+    formats: Object.values(RAID_FORMAT_PRESETS),
+    defaultFormat: "pkl_40",
+    awardTable: "kabaddi-v1",
+  },
   key: "kabaddi",
   label: "Kabaddi",
   roles: ROLES,

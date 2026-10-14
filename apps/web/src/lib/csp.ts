@@ -30,8 +30,8 @@
  *                wider (no *.google.com), and scripts still need no host entry:
  *                Google's loaders are inserted by our own trusted bundle, which
  *                'strict-dynamic' extends trust to.
- *   everything else 'self' or 'none' — except frame-ancestors, which stays in
- *                the static header (see the note in the directive list).
+ *   frame-ancestors is explicit when enforcing this policy, because it replaces
+ *                the static header. Report-Only retains static framing protection.
  */
 
 /** Google's sign-in (token popup + its helper frame). */
@@ -45,6 +45,7 @@ export interface CspInputs {
   readonly nonce: string;
   /** ENGINE_PUBLIC_WS_URL — the live room's socket. */
   readonly engineWsUrl: string;
+  readonly liveWsUrl?: string | undefined;
   /** MEDIA_PUBLIC_BASE — where photos and crests are read from, if set. */
   readonly mediaPublicBase?: string | undefined;
   /** MEDIA_S3_ENDPOINT — where presigned uploads are PUT, if set. */
@@ -52,6 +53,7 @@ export interface CspInputs {
   /** Next's dev server evaluates code for fast refresh; production never does. */
   readonly development: boolean;
   readonly reportUri: string;
+  readonly frameAncestors?: "*" | "'none'" | undefined;
 }
 
 /** The origin of a URL, or null when it is not one we can use. */
@@ -104,6 +106,7 @@ export function buildContentSecurityPolicy(input: CspInputs): string {
       unique([
         "'self'",
         engine,
+        originOf(input.liveWsUrl),
         upload,
         GOOGLE_SIGN_IN,
         GOOGLE_DRIVE_API,
@@ -118,16 +121,36 @@ export function buildContentSecurityPolicy(input: CspInputs): string {
     ["object-src", ["'none'"]],
     ["base-uri", ["'self'"]],
     ["form-action", ["'self'"]],
-    // NOT frame-ancestors. Browsers ignore it in a Report-Only policy (the spec
-    // says so, and WebKit logs a warning on every page that sends one), so in
-    // the default mode it protected nothing. It is enforced where it works: the
-    // static header in next.config.mjs, which reaches every response, including
-    // those middleware never sees, with X-Frame-Options beside it. Once
-    // CSP_ENFORCE is on, a second copy here would only intersect with the same
-    // 'none'.
+    ...(input.frameAncestors
+      ? [["frame-ancestors", [input.frameAncestors]] as [string, string[]]]
+      : []),
     ["report-uri", [input.reportUri]],
   ];
   return directives.map(([name, values]) => `${name} ${values.join(" ")}`).join("; ");
+}
+
+/** Preserve the static route exceptions when the nonce policy replaces it. */
+export function buildDocumentPolicy(input: CspInputs, pathname: string, enforce: boolean): string {
+  if (enforce && /^\/admin\/reports\/[^/]+\/screenshot\/?$/.test(pathname))
+    return "default-src 'none'; frame-ancestors 'none'; sandbox";
+  return buildContentSecurityPolicy({
+    ...input,
+    frameAncestors: enforce
+      ? pathname === "/embed" || pathname.startsWith("/embed/")
+        ? "*"
+        : "'none'"
+      : undefined,
+  });
+}
+
+/** Exact data-free static scoring shell: build hashes replace the nonce only. */
+export function buildScoringShellPolicy(input: CspInputs, hashes: readonly string[]): string {
+  if (hashes.length === 0 || hashes.some((hash) => !/^sha256-[A-Za-z0-9+/]+={0,2}$/.test(hash)))
+    throw new Error("Invalid scoring shell script hashes");
+  return buildContentSecurityPolicy(input).replace(
+    /script-src [^;]+/,
+    `script-src ${hashes.map((hash) => `'${hash}'`).join(" ")} 'strict-dynamic'`,
+  );
 }
 
 /**

@@ -344,7 +344,7 @@ export async function submitRegistration(
  * (`storedForImport`), so a second club-only player with the same name in the
  * same season is refused rather than created.
  */
-async function addClubOnlyPlayer(
+export async function addClubOnlyPlayer(
   db: Db,
   competitionId: string,
   orgId: string,
@@ -355,6 +355,7 @@ async function addClubOnlyPlayer(
     basePriceBand: string | null;
     profile?: PlayerProfileInput;
   },
+  auditSource = "organizer_manual",
 ): Promise<AddPlayerResult> {
   // Compared in JS with the import's own key, so the two doors agree exactly.
   const clubOnly = await db
@@ -388,7 +389,7 @@ async function addClubOnlyPlayer(
     scopeType: "org",
     scopeId: orgId,
     subject: id,
-    meta: { competitionId, role: player.role, source: "organizer_manual", clubOnly: "true" },
+    meta: { competitionId, role: player.role, source: auditSource, clubOnly: "true" },
   });
   return {
     ok: true,

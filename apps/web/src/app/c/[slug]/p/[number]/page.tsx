@@ -1,3 +1,4 @@
+import { CricketCareerSection } from "../../../../../components/cricket-career";
 import { cache } from "react";
 import {
   buildPlayerPoster,
@@ -14,7 +15,11 @@ import { notFound } from "next/navigation";
 
 import { env } from "../../../../../env";
 import { preSignedWord, type PreSignedKind } from "../../../../../lib/pre-signed";
-import { publicPlayer, publicPlayerPoster } from "../../../../../server/competition/public";
+import {
+  publicPlayer,
+  publicPlayerPoster,
+  publicCricketCareer,
+} from "../../../../../server/competition/public";
 import { linkCardAlt } from "../../../../seasons/[slug]/posters/poster-link";
 import {
   HeroFact,
@@ -157,6 +162,7 @@ export default async function PlayerProfilePage({
   // whether the card works.
   const refSuffix = typeof ref === "string" && ref !== "" ? `?ref=${encodeURIComponent(ref)}` : "";
   // The words that travel with the link — the same sentence the card draws.
+  const cricketCareer = await publicCricketCareer(slug, number);
   const poster = await posterView(slug, number);
   const shareModel =
     poster === null
@@ -333,6 +339,12 @@ export default async function PlayerProfilePage({
       />
 
       <PageBody>
+        {cricketCareer ? (
+          <>
+            <Link href={`/c/${slug}/p/${number}/insights`}>Player insights</Link>
+            <CricketCareerSection career={cricketCareer} />
+          </>
+        ) : null}
         {facts.length > 0 ? (
           <StatStrip label={`${player.name} — player details`} stats={facts} />
         ) : null}

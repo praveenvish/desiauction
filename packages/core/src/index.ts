@@ -405,6 +405,9 @@ export {
 } from "./tiers";
 export {
   buildPlayerPoster,
+  buildResultPoster,
+  type ResultPoster,
+  type ResultPosterInput,
   buildSeasonPoster,
   buildTeamPoster,
   roleTagOf,

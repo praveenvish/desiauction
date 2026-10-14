@@ -2,7 +2,14 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { buildContentSecurityPolicy, mintNonce, originOf, redactReportedUrl } from "./csp";
+import {
+  buildContentSecurityPolicy,
+  buildDocumentPolicy,
+  buildScoringShellPolicy,
+  mintNonce,
+  originOf,
+  redactReportedUrl,
+} from "./csp";
 
 const base = {
   nonce: "abc123==",
@@ -58,13 +65,44 @@ describe("the script policy", () => {
     expect(directive(policy, "form-action")).toEqual(["'self'"]);
   });
 
-  it("leaves frame-ancestors to the static header, where it is always enforced", () => {
+  it("leaves report-only framing to the static enforced header", () => {
     // Browsers ignore frame-ancestors in a Report-Only policy (WebKit warns on
     // every page), so here it would guard nothing in the default mode.
     expect(directive(buildContentSecurityPolicy(base), "frame-ancestors")).toEqual([]);
     const config = readFileSync(new URL("../../next.config.mjs", import.meta.url), "utf8");
     expect(config).toContain(`"frame-ancestors 'none'"`);
     expect(config).toContain(`key: "X-Frame-Options", value: "DENY"`);
+  });
+
+  it("preserves exact embed framing and denies ordinary, shell and near-match paths", () => {
+    for (const path of ["/embed", "/embed/season"])
+      expect(directive(buildDocumentPolicy(base, path, true), "frame-ancestors")).toEqual(["*"]);
+    for (const path of ["/", "/embedded", "/embedder/season", "/score/shell"])
+      expect(directive(buildDocumentPolicy(base, path, true), "frame-ancestors")).toEqual([
+        "'none'",
+      ]);
+    for (const path of ["/", "/embed/season", "/score/shell"])
+      expect(directive(buildDocumentPolicy(base, path, false), "frame-ancestors")).toEqual([]);
+    expect(directive(buildDocumentPolicy(base, "/embed/season", true), "script-src")).toEqual([
+      "'nonce-abc123=='",
+      "'strict-dynamic'",
+    ]);
+    const shell = buildScoringShellPolicy({ ...base, frameAncestors: "'none'" }, [
+      "sha256-YWJjZA==",
+    ]);
+    expect(directive(shell, "frame-ancestors")).toEqual(["'none'"]);
+    expect(directive(shell, "script-src")).toEqual(["'sha256-YWJjZA=='", "'strict-dynamic'"]);
+  });
+
+  it("preserves the screenshot sandbox without applying its exception to adjacent paths", () => {
+    const strict = "default-src 'none'; frame-ancestors 'none'; sandbox";
+    for (const path of ["/admin/reports/id/screenshot", "/admin/reports/id/screenshot/"])
+      expect(buildDocumentPolicy(base, path, true)).toBe(strict);
+    for (const path of ["/admin/reports/id/screenshot-extra", "/admin/reports/id/screenshot/extra"])
+      expect(buildDocumentPolicy(base, path, true)).not.toBe(strict);
+    expect(buildDocumentPolicy(base, "/admin/reports/id/screenshot", false)).not.toContain(
+      "sandbox",
+    );
   });
 
   it("relaxes only what the dev server needs, only in development", () => {
@@ -109,4 +147,10 @@ describe("violation report addresses", () => {
     expect(originOf("not a url")).toBeNull();
     expect(originOf(undefined)).toBeNull();
   });
+});
+
+it("permits only the explicit same-origin live socket, without a socket wildcard", () => {
+  const policy = buildContentSecurityPolicy({ ...base, liveWsUrl: "wss://desiauction.in/live/ws" });
+  expect(directive(policy, "connect-src")).toContain("wss://desiauction.in");
+  expect(directive(policy, "connect-src")).not.toContain("wss:");
 });

@@ -6,7 +6,23 @@
   "exports": {
     ".": "./src/index.ts",
     "./sport-labels": "./src/sports/labels.ts",
-    "./initials": "./src/initials.ts"
+    "./initials": "./src/initials.ts",
+    "./scoring": "./src/scoring/index.ts",
+    "./scoring/live-etag": "./src/scoring/live-etag.ts",
+    "./scoring/replay-error": "./src/scoring/replay-error.ts",
+    "./scoring/panels": "./src/scoring/panels.ts",
+    "./scoring/messages": "./src/scoring/messages.ts",
+    "./scoring/rally-replay": "./src/scoring/rally/replay.ts",
+    "./scoring/rally-engine": "./src/scoring/rally/engine.ts",
+    "./scoring/raid-engine": "./src/scoring/raid/engine.ts",
+    "./scoring/raid-replay": "./src/scoring/raid/replay.ts",
+    "./scoring/timed-engine": "./src/scoring/timed/engine.ts",
+    "./scoring/timed-replay": "./src/scoring/timed/replay.ts",
+    "./scoring/timed-clock": "./src/scoring/timed/clock.ts",
+    "./scoring/raid-clock": "./src/scoring/raid/clock.ts",
+    "./scoring/placement-engine": "./src/scoring/placement/engine.ts",
+    "./scoring/placement-replay": "./src/scoring/placement/replay.ts",
+    "./scoring/placement-formats": "./src/scoring/placement/formats.ts"
   },
   "scripts": {
     "lint": "eslint src --max-warnings 0",

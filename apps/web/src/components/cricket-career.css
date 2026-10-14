@@ -1,0 +1,90 @@
+.cricket-career {
+  margin-block: 2rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 1rem;
+}
+.cricket-career h3 {
+  margin-block: 1.5rem 0.75rem;
+}
+.career-filters,
+.career-innings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.career-filters button {
+  min-height: 44px;
+  padding: 0.65rem 1rem;
+  border: 1px solid currentColor;
+  border-radius: 2rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.career-filters button[aria-pressed="true"] {
+  font-weight: 700;
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+.career-innings,
+.career-recent {
+  list-style: none;
+  padding: 0;
+}
+.career-innings li {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.75rem;
+}
+.career-innings strong {
+  font-size: 1.5rem;
+}
+.career-recent li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  padding-block: 0.75rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.cricket-career details {
+  margin-block: 1rem;
+}
+
+.cricket-career form {
+  display: grid;
+  gap: var(--space-4);
+  max-width: 32rem;
+  margin-block: var(--space-4);
+}
+.cricket-career summary {
+  min-height: 44px;
+  padding-block: var(--space-3);
+  cursor: pointer;
+}
+.career-filters button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.career-awards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  list-style: none;
+  padding: 0;
+}
+.career-awards li {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+}
+.career-awards strong {
+  color: var(--text-accent);
+  font-size: 1.5rem;
+}

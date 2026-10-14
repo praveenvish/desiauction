@@ -25,7 +25,8 @@
 import { termsOf, type TermDetail } from "./vocabulary";
 import { DEFAULT_POINTS } from "../standings";
 import { ballsOf } from "./overs";
-import { netRate, summariseFields } from "./tiebreakers";
+import { netRateWithFallback, summariseFields } from "./tiebreakers";
+import { FORMAT_PRESETS } from "../scoring/formats";
 
 import type {
   AttributeSpec,
@@ -287,6 +288,19 @@ const TERMS: Terminology = {
 };
 
 export const CRICKET: SportPack = {
+  scoring: {
+    family: "delivery",
+    depth: 2,
+    formats: [
+      FORMAT_PRESETS.t20,
+      FORMAT_PRESETS.t10,
+      FORMAT_PRESETS.odi,
+      FORMAT_PRESETS.six_over,
+      FORMAT_PRESETS.tennis_gully,
+    ],
+    defaultFormat: "t20",
+    awardTable: "cricket-v1",
+  },
   key: "cricket",
   label: "Cricket",
   roles: ROLES,
@@ -302,7 +316,12 @@ export const CRICKET: SportPack = {
   standings: {
     points: DEFAULT_POINTS,
     /* Runs per BALL times six — never runs per decimal over. See `netRate`. */
-    tiebreakers: [netRate("runs", "balls", 6, "NRR", { key: "net_run_rate" })],
+    tiebreakers: [
+      netRateWithFallback("runs", "nrr_balls", "balls", 6, "NRR", {
+        key: "net_run_rate",
+        preferredNumerator: "nrr_runs",
+      }),
+    ],
     summariseSide: summariseFields("{runs}/{balls:overs}"),
   },
   terms: TERMS,

@@ -45,7 +45,9 @@ compose stack, env files, PITR), [RESTORE_RUNBOOK](RESTORE_RUNBOOK.md),
    ```
 5. **E** — Point each service at its own role: web `DATABASE_URL` →
    `desiauction_app`, web `SYSTEM_DATABASE_URL` → `desiauction_system`, engine
-   → `desiauction_engine`, runner → `desiauction_runner`. Never the owner.
+   → `desiauction_engine`, runner → `desiauction_runner`, live
+   `LIVE_DATABASE_URL` → `desiauction_live` (EXECUTE on two P-1 functions,
+   no table grants). Never the owner.
 6. **E** — Confirm the four roles work together as a system, not only table by
    table, before any real person touches it:
    ```sh

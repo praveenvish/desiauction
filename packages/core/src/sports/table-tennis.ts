@@ -1,3 +1,4 @@
+import { RALLY_FORMAT_PRESETS } from "../scoring/rally/formats";
 import { optionsOf, termsOf, type TermDetail } from "./vocabulary";
 import { difference, summariseFields } from "./tiebreakers";
 
@@ -85,6 +86,13 @@ const TERMS: Terminology = {
 };
 
 export const TABLE_TENNIS: SportPack = {
+  scoring: {
+    family: "rally",
+    depth: 2,
+    formats: [RALLY_FORMAT_PRESETS.tt_bo5, RALLY_FORMAT_PRESETS.tt_tie_5],
+    defaultFormat: "tt_bo5",
+    awardTable: "table-tennis-v1",
+  },
   key: "table_tennis",
   label: "Table tennis",
   roles: ROLES,

@@ -174,7 +174,9 @@ module.exports = {
      * after, with `apps/web/src` coverage unchanged at 532.
      */
     exclude: {
-      path: "(^|/)(\\.next|\\.next-e2e|\\.local|dist|coverage|playwright-report|test-results)/",
+      // `.next[^/]*` also covers the per-run build dirs a parallel UI run
+      // leaves behind (`.next-ui-*`); 96 of them crashed the heap again.
+      path: "(^|/)(\\.next[^/]*|\\.local|dist|coverage|playwright-report|test-results)/",
     },
     doNotFollow: { path: "node_modules" },
     tsPreCompilationDeps: true,

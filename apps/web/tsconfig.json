@@ -17,7 +17,8 @@
     "next-globals.d.ts",
     "scripts",
     "src",
-    ".next-e2e/types/**/*.ts"
+    ".next-e2e/types/**/*.ts",
+    "src/app/.well-known/**/*.ts"
   ],
   "exclude": ["node_modules"]
 }

@@ -778,6 +778,118 @@
       "when": 1793289600000,
       "tag": "0111_team_badge",
       "breakpoints": true
+    },
+    {
+      "idx": 111,
+      "version": "7",
+      "when": 1793376000000,
+      "tag": "0112_ls1_match_core",
+      "breakpoints": true
+    },
+    {
+      "idx": 112,
+      "version": "7",
+      "when": 1793462400000,
+      "tag": "0113_ls1_people_on_match",
+      "breakpoints": true
+    },
+    {
+      "idx": 113,
+      "version": "7",
+      "when": 1793548800000,
+      "tag": "0114_ls1_scorer_grant_and_result_source",
+      "breakpoints": true
+    },
+    {
+      "idx": 114,
+      "version": "7",
+      "when": 1793635200000,
+      "tag": "0115_ls1_move_tournament_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 115,
+      "version": "7",
+      "when": 1793721600000,
+      "tag": "0116_ls1_lines_and_awards",
+      "breakpoints": true
+    },
+    {
+      "idx": 116,
+      "version": "7",
+      "when": 1793808000000,
+      "tag": "0117_ls1_previous_career",
+      "breakpoints": true
+    },
+    {
+      "idx": 117,
+      "version": "7",
+      "when": 1793894400000,
+      "tag": "0118_ls1_trust",
+      "breakpoints": true
+    },
+    {
+      "idx": 118,
+      "version": "7",
+      "when": 1793980800000,
+      "tag": "0119_ls1_personal_org",
+      "breakpoints": true
+    },
+    {
+      "idx": 119,
+      "version": "7",
+      "when": 1794067200000,
+      "tag": "0120_ls1_team_formation",
+      "breakpoints": true
+    },
+    {
+      "idx": 120,
+      "version": "7",
+      "when": 1794153600000,
+      "tag": "0121_ls1_ball_facts",
+      "breakpoints": true
+    },
+    {
+      "idx": 121,
+      "version": "7",
+      "when": 1794240000000,
+      "tag": "0122_ls1_move_tournament_tables_2",
+      "breakpoints": true
+    },
+    {
+      "idx": 122,
+      "version": "7",
+      "when": 1794326400000,
+      "tag": "0123_ls1_scorer_award_identity",
+      "breakpoints": true
+    },
+    {
+      "idx": 123,
+      "version": "7",
+      "when": 1794412800000,
+      "tag": "0124_ls1_lobby_result_source",
+      "breakpoints": true
+    },
+    {
+      "idx": 124,
+      "version": "7",
+      "when": 1794499200000,
+      "tag": "0125_ls1_manager_policy_split",
+      "breakpoints": true
+    },
+    {
+      "idx": 125,
+      "version": "7",
+      "when": 1794585600000,
+      "tag": "0126_ls1_live_history_column",
+      "breakpoints": true
+    },
+    {
+      "idx": 126,
+      "version": "7",
+      "when": 1794672000000,
+      "tag": "0127_ls1_live_role_functions",
+      "breakpoints": true
     }
   ]
 }

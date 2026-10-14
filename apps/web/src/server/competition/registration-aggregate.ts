@@ -277,6 +277,7 @@ export async function transition(
   registrationId: string,
   reviewerId: string,
   event: RegistrationEvent,
+  options: { notifyPlayer?: boolean } = {},
 ): Promise<TransitionResult> {
   const [current] = await db
     .select({ status: registrations.status })
@@ -363,7 +364,7 @@ export async function transition(
   if (outcome !== null) {
     return { ok: false, reason: "tier_limit", message: outcome.tierLimited };
   }
-  await notifyPlayer(db, [registrationId], event);
+  if (options.notifyPlayer !== false) await notifyPlayer(db, [registrationId], event);
   return { ok: true, status: decision.next };
 }
 

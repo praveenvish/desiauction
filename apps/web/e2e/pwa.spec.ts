@@ -234,7 +234,9 @@ test.describe("offline", () => {
     expect(installabilityErrors.map((error) => error.errorId)).toEqual([]);
   });
 
-  test("build files are kept on the device; pages never are", async ({ page }) => {
+  test("build files and the exact data-free scoring shell are cached; private pages never are", async ({
+    page,
+  }) => {
     await underWorker(page, "/help");
     // The first load ran before the worker controlled the page.
     await page.reload();
@@ -247,16 +249,56 @@ test.describe("offline", () => {
       )
       .toBeGreaterThan(0);
     const stored = await page.evaluate(async () => {
-      const urls: string[] = [];
+      const entries: {
+        url: string;
+        ok: boolean;
+        contentType: string;
+        policy: string;
+        html: string;
+      }[] = [];
       for (const name of await caches.keys()) {
         const cache = await caches.open(name);
-        urls.push(...(await cache.keys()).map((request) => new URL(request.url).pathname));
+        for (const request of await cache.keys()) {
+          const response = await cache.match(request);
+          entries.push({
+            url: request.url,
+            ok: response?.ok ?? false,
+            contentType: response?.headers.get("content-type") ?? "",
+            policy:
+              response?.headers.get("content-security-policy-report-only") ??
+              response?.headers.get("content-security-policy") ??
+              "",
+            html:
+              new URL(request.url).pathname === "/score/shell"
+                ? ((await response?.text()) ?? "")
+                : "",
+          });
+        }
       }
-      return urls;
+      return entries;
     });
-    for (const path of stored) {
-      expect(path === "/offline.html" || path.startsWith("/_next/static/"), path).toBe(true);
+    for (const entry of stored) {
+      const url = new URL(entry.url);
+      expect(url.origin).toBe(new URL(page.url()).origin);
+      const path = url.pathname;
+      expect(
+        path === "/offline.html" || path.startsWith("/_next/static/") || path === "/score/shell",
+        path,
+      ).toBe(true);
+      if (path === "/score/shell") {
+        expect(url.search).toBe("");
+        expect(url.hash).toBe("");
+        expect(entry.ok).toBe(true);
+        expect(entry.contentType).toContain("text/html");
+        expect(entry.html).toContain("<h1>Offline scoring</h1>");
+        expect(entry.html).not.toContain("da_session");
+        expect(entry.policy).toContain("'sha256-");
+        expect(entry.policy).toContain("'strict-dynamic'");
+        expect(entry.policy).not.toContain("'nonce-");
+        // C27's production probe separately proves no actor data and enforced hash hydration.
+      }
     }
+    expect(stored.some((entry) => new URL(entry.url).pathname === "/score/shell")).toBe(true);
   });
 });
 

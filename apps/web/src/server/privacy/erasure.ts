@@ -19,6 +19,7 @@ import {
   passkeyCredentials,
   people,
   playerProfiles,
+  playerPreviousCareers,
   playerSportProfiles,
   problemReports,
   registrations,
@@ -313,6 +314,11 @@ export async function executeErasure(input: {
     await tx.delete(sessions).where(eq(sessions.personId, personId));
     await tx.delete(passkeyCredentials).where(eq(passkeyCredentials.personId, personId));
     await tx.delete(notificationPreferences).where(eq(notificationPreferences.personId, personId));
+    const previousCareerFiles = await tx
+      .select({ key: playerPreviousCareers.screenshotKey })
+      .from(playerPreviousCareers)
+      .where(eq(playerPreviousCareers.personId, personId));
+    await tx.delete(playerPreviousCareers).where(eq(playerPreviousCareers.personId, personId));
     await tx.delete(playerProfiles).where(eq(playerProfiles.personId, personId));
     await tx.delete(playerSportProfiles).where(eq(playerSportProfiles.personId, personId));
     await tx.delete(emailVerifications).where(eq(emailVerifications.personId, personId));
@@ -401,7 +407,12 @@ export async function executeErasure(input: {
         decisionNote: input.note,
       })
       .where(eq(erasureRequests.id, input.requestId));
-    return { ok: true as const, clubs: orgIds.length, photoKey: before?.photoUrl ?? null };
+    return {
+      ok: true as const,
+      clubs: orgIds.length,
+      photoKey: before?.photoUrl ?? null,
+      previousCareerKeys: previousCareerFiles.flatMap(({ key }) => (key ? [key] : [])),
+    };
   });
 
   // Storage is not transactional, so the photo goes only once the erasure has
@@ -415,6 +426,16 @@ export async function executeErasure(input: {
       await storage.delete(outcome.photoKey);
     } catch (error) {
       logger().error({ err: error, requestId: input.requestId }, "erasure.photo_delete_failed");
+    }
+  }
+  for (const key of new Set(outcome.previousCareerKeys)) {
+    try {
+      await storage.delete(key);
+    } catch (error) {
+      logger().error(
+        { err: error, requestId: input.requestId },
+        "erasure.previous_career_delete_failed",
+      );
     }
   }
   return { ok: true, clubs: outcome.clubs };

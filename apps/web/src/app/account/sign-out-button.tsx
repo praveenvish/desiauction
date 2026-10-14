@@ -2,7 +2,7 @@
 
 import { Button } from "@desiauction/ui";
 
-import { clearInboxWatermarks } from "../../lib/inbox-events";
+import { scoringSignOut } from "../../lib/scoring-sign-out";
 
 /**
  * Sign out, and forget this device's inbox read-state on the way out.
@@ -16,12 +16,7 @@ import { clearInboxWatermarks } from "../../lib/inbox-events";
  */
 export function SignOutButton({ logout }: { logout: () => Promise<void> }) {
   return (
-    <form
-      action={logout}
-      onSubmit={() => {
-        clearInboxWatermarks();
-      }}
-    >
+    <form action={() => scoringSignOut(logout)}>
       <Button type="submit" variant="secondary">
         Sign out
       </Button>

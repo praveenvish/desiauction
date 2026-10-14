@@ -1,6 +1,7 @@
 import {
   auditLog,
   fixtureLineups,
+  fixtureParticipants,
   fixtures,
   newId,
   people,
@@ -193,7 +194,20 @@ export async function saveLineup(
     return { ok: false, reason: "not_found" };
   }
   if (fixture.homeTeamId !== input.teamId && fixture.awayTeamId !== input.teamId) {
-    return { ok: false, reason: "not_a_side" };
+    const [scheduled] = await db
+      .select({ teamId: fixtureParticipants.teamId })
+      .from(fixtureParticipants)
+      .where(
+        and(
+          eq(fixtureParticipants.fixtureId, input.fixtureId),
+          eq(fixtureParticipants.teamId, input.teamId),
+          eq(fixtureParticipants.orgId, input.orgId),
+          eq(fixtureParticipants.competitionId, input.competitionId),
+        ),
+      )
+      .limit(1);
+    if (fixture.homeTeamId !== null || fixture.awayTeamId !== null || !scheduled)
+      return { ok: false, reason: "not_a_side" };
   }
   const wanted = [...new Set(input.registrationIds)];
   if (wanted.length > 0) {
