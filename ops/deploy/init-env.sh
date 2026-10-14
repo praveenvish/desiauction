@@ -137,6 +137,8 @@ SETTLEMENT_JOB_SECRET=$(secret)
 DEMO_JOB_SECRET=$(secret)
 DEMO_TOKEN_SECRET=$(secret 32)
 REVIEW_TOKEN_SECRET=$(secret 32)
+# Signs live-scoring handover, confirmation and view tokens; web refuses to serve without it.
+SCORING_HANDOVER_SECRET=$(secret 32)
 $INDEXNOW
 
 # ---- FOUNDER: values only you hold (.env.example explains each) ----

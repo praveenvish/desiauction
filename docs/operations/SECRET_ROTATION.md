@@ -24,6 +24,7 @@ longer exists and listed seven secrets of the twenty below.
 | Mirror keys (`MIRROR_S3_ACCESS_KEY` / `_SECRET_KEY`) | `mirror.env` | Two keys, no cutover; restart `minio-mirror` |
 | `FEEDBACK_JOB_SECRET`, `SETTLEMENT_JOB_SECRET`, `DEMO_JOB_SECRET` | `web.env` (the scheduler reads the same file) | Restart web and scheduler together; a scheduler holding the old value gets 404 from the job routes and `da-jobs-failed` fires |
 | `DEMO_TOKEN_SECRET`, `REVIEW_TOKEN_SECRET` | `web.env` | Every demo-booking and review link already mailed stops working. Rotate only on exposure |
+| `SCORING_HANDOVER_SECRET` | `web.env` | Signs live-scoring handover QR codes (10 min), result-confirmation links (7 days) and viewer tokens. Rotating it voids handovers in progress and confirmation links already sent. **Hosts created before LS-1 must add it once** (`openssl rand -hex 32`) before the first LS-1 deploy, or the production preflight refuses the deploy |
 | `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` | GitHub environment secret (build time) | Pages open across the deploy that changes it must be reloaded once. Otherwise never needs rotating |
 | WhatsApp (`WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN`) | `web.env`, founder-held | Meta System User token: generate the new one, set, restart web. The app secret and verify token change in Meta's console at the same moment as here |
 | `SES_ACCESS_KEY_ID` / `SES_SECRET_ACCESS_KEY` | `web.env`, `runner.env`, founder-held | Two keys per IAM user: create, set in both, restart both, then delete the old one |
