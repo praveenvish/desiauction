@@ -8,7 +8,25 @@
 
 **Status (2026-10-14):**
 - The founder accepted every recommendation in §3 (R1–R7).
-- **F01 is done** (`0e5ecedf`). The architect is now executing F02–F13 on this branch.
+- **Fixes landed (architect, 2026-10-14):**
+
+  | Fix | Commit | Note |
+  |---|---|---|
+  | F01 split UI refinement | `0e5ecedf` | `feat/ui-refinement` kept locally |
+  | F02 merge main | `3f468aad` | one trivial test conflict |
+  | F03 results behind the delay | `c4b95343` | done as a query filter (`releasedToPublic`), not a `public_at` column; no migration |
+  | F04 real viewers | `edff5e60` | per-minute salted client keys; scorer and both sides' managers never count |
+  | F05 live reads | `79c61b34`, `f9d1d0c2` | 0126 `history` column; one read per (room, proof); `/api/live` 1 s cache; socket load 5×300 p95 16.4 ms. `f9d1d0c2` closes a ring-rotation race the two-step read introduced |
+  | F06 deploy secret | `ca580d5c` | |
+  | F07 live role | `80d2bf66` | 0127; two functions (`live_snapshot`, `live_history_entry`) instead of one `live_release`, so the delay rule stays in core; 420-case P-1 parity test |
+  | F08 eligibility | `95b37a7f` | |
+  | F09 claims and policies | `4ae55b5f` | 0125; guest claim to an existing account is an offer accepted at `/me/claims` |
+  | F10 penalty target | `38c0332e` | |
+  | F11 NRR | `eb02057b` | `nrr_runs` / `nrr_balls` |
+  | F12 law gaps | `e15aa276` | |
+  | Hygiene | `1770d45b`, `60659657`, `edc0ce8f` | depcruise skips `.next*`; two format fixes |
+
+  F13 and F-GATE follow.
 - ⚠️ A local-only merge commit `7a190185` ("Merge verified UI checkpoint 680d3c64 into main") exists on the **local** `main` (worktree `main-ui-merge`). **Never push it.** It carries the UI-refinement programme (storage-gated auction bids, 27 MB `BASELINE.json`) and is based on a stale `main`. When LS-1 merges, reset local `main` to `origin/main`.
 
 The live-scoring work (`55c97aef`) is high quality and close to mergeable. The branch also carries a separate unreleased programme (UI-REFINEMENT) that changes live-auction bidding, and the review found five launch-blocking security/integrity issues plus three cricket-law bugs. Fix them in the order below, on the same branch (rules from `00-README.md` still apply), then the architect re-validates.
