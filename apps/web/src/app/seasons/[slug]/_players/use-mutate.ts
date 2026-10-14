@@ -4,7 +4,7 @@ import { useToast } from "@desiauction/ui";
 import { useCallback } from "react";
 
 import {
-  registrationDetailAction,
+  registrationRowsAction,
   squadWriteStateAction,
 } from "../../../../server/competition/actions";
 import {
@@ -84,11 +84,12 @@ export function useMutate(roster: Roster, slug: string): Mutate {
             typeof optimistic.teamId === "string" ? [optimistic.teamId] : [],
           );
           if (!before.ok) throw new Error("Read refused");
-          const complete = await Promise.all(
-            before.rows.map((item) => registrationDetailAction(slug, item.id)),
+          const complete = await registrationRowsAction(
+            slug,
+            before.rows.map((item) => item.id),
           );
-          if (complete.some((item) => !item.ok)) throw new Error("Read refused");
-          affected = complete.flatMap((item) => (item.ok ? [item.row] : []));
+          if (!complete.ok) throw new Error("Read refused");
+          affected = complete.rows;
           refineWrite(
             slug,
             lease,
@@ -135,11 +136,12 @@ export function useMutate(roster: Roster, slug: string): Mutate {
       if (result.unconfirmed !== true) {
         changeWrite(slug, lease, "checking");
         try {
-          const observed = await Promise.all(
-            affected.map((other) => registrationDetailAction(slug, other.id)),
+          const observed = await registrationRowsAction(
+            slug,
+            affected.map((other) => other.id),
           );
-          if (observed.some((item) => !item.ok)) throw new Error("Read refused");
-          for (const item of observed) if (item.ok) apply(item.row.id, item.row);
+          if (!observed.ok) throw new Error("Read refused");
+          for (const item of observed.rows) apply(item.id, item);
         } catch {
           if (result.ok) for (const undo of undoes) undo();
           result = {

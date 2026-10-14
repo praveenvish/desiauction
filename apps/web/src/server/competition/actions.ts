@@ -2258,6 +2258,29 @@ export async function registrationDetailAction(
     : { ok: true, ...found };
 }
 
+/**
+ * MANY PLAYERS IN ONE CALL — the player desk's before/after reads around a
+ * captain or team change. Next runs a client's server actions one at a time,
+ * so a row per call made a captain toggle on a full team ~17 round trips.
+ * All-or-nothing: any id not in this season refuses the whole read.
+ */
+export async function registrationRowsAction(
+  slug: string,
+  registrationIds: readonly string[],
+): Promise<{ ok: true; rows: RegistrationRow[] } | { ok: false; error: string }> {
+  if (registrationIds.length > 200) return { ok: false, error: "Too many players at once." };
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error };
+  }
+  const rows = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    Promise.all(registrationIds.map((id) => registrationRowById(db, gate.competition.id, id))),
+  );
+  return rows.every((row): row is RegistrationRow => row !== null)
+    ? { ok: true, rows }
+    : { ok: false, error: "That player is not in this season." };
+}
+
 export interface SquadCandidate {
   /** The registration id — also the seed of the player's initials mark. */
   id: string;
