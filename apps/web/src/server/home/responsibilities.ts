@@ -12,6 +12,7 @@ import { scoringResponsibilitiesForPerson } from "../scoring/home";
 import { reminderId } from "../scoring/reminder-link";
 import { confirmationHomeTask } from "../scoring/confirmation-home";
 import { settlementOrgIds, settlementDashboard } from "../settlement/actions";
+import { logger } from "../logger";
 
 export interface HomeResponsibilities {
   tasks: HomeTask[];
@@ -22,28 +23,50 @@ export interface HomeResponsibilities {
   hasDocuments: boolean;
 }
 
+/**
+ * One failing reader drops its own section, never Home: before this file, Home
+ * did not depend on any of them, and a person with nothing in that area should
+ * not lose the rest of their page to it.
+ */
+async function optional<T>(reader: string, work: Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await work;
+  } catch (error) {
+    logger().warn({ err: error, reader }, "home.reader_failed");
+    return fallback;
+  }
+}
+/** Bounded so a long notice history cannot turn Home into dozens of reads. */
+const CONFIRMATION_NOTICES = 20;
+
 /** Each reader retains its own current person/capability/tenant gate. No Home grant. */
 export async function homeResponsibilities(
   personId: string,
   roles: PersonRoles,
 ): Promise<HomeResponsibilities> {
   const [scoring, financeIds, settleIds, platform, orgs, documents, notices] = await Promise.all([
-    scoringResponsibilitiesForPerson(personId),
-    finopsOrgIds(),
-    settlementOrgIds(),
-    platformDoorCapabilities(),
-    orgsOfPerson(personId),
-    myDocuments(personId),
-    listInboxEvents(personId, 50),
+    optional("scoring", scoringResponsibilitiesForPerson(personId), []),
+    optional("finops", finopsOrgIds(), []),
+    optional("settlement", settlementOrgIds(), []),
+    optional("platform", platformDoorCapabilities(), []),
+    optional("orgs", orgsOfPerson(personId), []),
+    optional("documents", myDocuments(personId), []),
+    optional("notices", listInboxEvents(personId, 50), []),
   ]);
   const managedOrgs = new Set(roles.organizes.map((org) => org.orgId));
   const managedSeasons = managedOrgs.size
-    ? (await memberCompetitions(personId)).filter((season) => managedOrgs.has(season.orgId))
+    ? (await optional("seasons", memberCompetitions(personId), [])).filter((season) =>
+        managedOrgs.has(season.orgId),
+      )
     : [];
-  const tasks: HomeTask[] = await homeLineupTasks(personId, [
-    ...roles.owns.map((team) => team.competitionSlug),
-    ...managedSeasons.map((season) => season.slug),
-  ]);
+  const tasks: HomeTask[] = await optional(
+    "lineups",
+    homeLineupTasks(personId, [
+      ...roles.owns.map((team) => team.competitionSlug),
+      ...managedSeasons.map((season) => season.slug),
+    ]),
+    [],
+  );
   for (const season of roles.conducts) {
     if (!["live", "paused"].includes(season.auctionStatus ?? "")) continue;
     tasks.push({
@@ -125,9 +148,15 @@ export async function homeResponsibilities(
     )
       continue;
     const id = reminderId(notice.meta.noticeId);
-    if (!id || seenNotices.has(id)) continue;
-    seenNotices.add(id);
-    const result = await confirmationHomeTask(personId, id);
+    if (id && seenNotices.size < CONFIRMATION_NOTICES) seenNotices.add(id);
+  }
+  // Read in parallel, then fold in notice order so the first revision wins.
+  const confirmations = await Promise.all(
+    [...seenNotices].map((id) =>
+      optional("confirmation", confirmationHomeTask(personId, id), null),
+    ),
+  );
+  for (const result of confirmations) {
     if (!result || seenRevisions.has(result.key)) continue;
     seenRevisions.add(result.key);
     const ready = result.state === "ready";
@@ -163,7 +192,7 @@ export async function homeResponsibilities(
     settlements = new Set(settleIds);
   for (const org of orgs) {
     if (settlements.has(org.id)) {
-      const desk = await settlementDashboard(org.slug);
+      const desk = await optional("settlement-desk", settlementDashboard(org.slug), null);
       if (desk) {
         for (const row of desk.view.cases) {
           if (!row.needsAttention) continue;
