@@ -2,7 +2,7 @@ import { scoringEngine } from "./engine";
 import {
   parseSeasonScoringRules,
   publicLiveProjection,
-  selectDelayedEntry,
+  delayedHistoryIndex,
   type PublicScoringState as PublicLiveState,
   type RaidClockContext,
   type PublicScorecard,
@@ -18,6 +18,8 @@ import {
   withTenantDb,
   type Db,
   type DbHandle,
+  liveHistoryEntry,
+  liveHistoryStamps,
 } from "@desiauction/db";
 import { and, eq, exists, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { createHash } from "node:crypto";
@@ -27,7 +29,7 @@ import { aggregateFacts, withSample } from "../insights/sample";
 import { slowestBowlingMatchup } from "../insights/batter";
 import type { PublicOverlay } from "./overlay-types";
 import { dbHandle, systemDb } from "../db";
-import type { StoredLiveState } from "./live-state";
+import { isLiveHistoryEntry, type StoredLiveState } from "./live-state";
 import { SCORING_SYSTEM_ACTOR } from "./system-actor";
 import { resultDetailsProjection, type PublicResultDetails } from "./result-details";
 
@@ -92,6 +94,7 @@ async function selectedPublicEntry(
   const [row] = await reader
     .select({
       state: matchLiveState.state,
+      stamps: liveHistoryStamps,
       trust: matches.trustLevel,
       phase: matches.phase,
       rules: competitions.scoringRules,
@@ -115,6 +118,8 @@ async function selectedPublicEntry(
   if (!engine) return null;
   const stored = row.state as StoredLiveState;
   const delay = parseSeasonScoringRules(row.rules).publicDelaySeconds;
+  const stamps = Array.isArray(row.stamps) ? row.stamps : [];
+  const index = delayedHistoryIndex(stamps, row.trust, delay, now.getTime());
   let selected:
     | {
         state: PublicLiveState;
@@ -123,20 +128,36 @@ async function selectedPublicEntry(
         resultDetails?: PublicResultDetails;
         overlay?: OverlayProjection;
       }
-    | undefined = {
-    state: stored,
-    ...(stored.scorecard ? { scorecard: stored.scorecard } : {}),
-    ...(stored.charts ? { charts: stored.charts } : {}),
-    ...(stored.resultDetails ? { resultDetails: stored.resultDetails } : {}),
-    ...(stored.overlay ? { overlay: stored.overlay } : {}),
-  };
-  selected = selectDelayedEntry(
-    selected,
-    Array.isArray(stored.history) ? stored.history : [],
-    row.trust,
-    delay,
-    now.getTime(),
-  );
+    | undefined;
+  if (index === "current")
+    selected = {
+      state: stored,
+      ...(stored.scorecard ? { scorecard: stored.scorecard } : {}),
+      ...(stored.charts ? { charts: stored.charts } : {}),
+      ...(stored.resultDetails ? { resultDetails: stored.resultDetails } : {}),
+      ...(stored.overlay ? { overlay: stored.overlay } : {}),
+    };
+  else if (index !== undefined) {
+    // Rechecks access in the same statement, so a revocation between the two
+    // reads still discloses nothing.
+    const [entry] = await reader
+      .select({ entry: liveHistoryEntry(index) })
+      .from(fixtures)
+      .innerJoin(matches, eq(matches.fixtureId, fixtures.id))
+      .innerJoin(competitions, eq(competitions.id, fixtures.competitionId))
+      .innerJoin(
+        matchLiveState,
+        and(
+          eq(matchLiveState.fixtureId, fixtures.id),
+          eq(matchLiveState.orgId, fixtures.orgId),
+          eq(matchLiveState.competitionId, fixtures.competitionId),
+        ),
+      )
+      .where(scoringPublicAccess(fixtureId, proof))
+      .limit(1);
+    if (!entry) return null;
+    selected = isLiveHistoryEntry(entry.entry) ? entry.entry : undefined;
+  }
   const projected = selected ? publicLiveProjection(selected.state, engine.family) : null;
   return selected && projected
     ? {

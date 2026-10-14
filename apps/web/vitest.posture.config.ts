@@ -49,6 +49,8 @@ export default defineConfig({
     // "should not exist" assertion.
     fileParallelism: false,
     env: {
+      // Suites edit a snapshot and read it back within a second (F05 cache).
+      LIVE_API_CACHE_MS: "0",
       // The app under test: the non-BYPASSRLS role, exactly as production.
       DATABASE_URL:
         process.env["APP_DATABASE_URL"] ??

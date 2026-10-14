@@ -9,6 +9,10 @@ import {
   publicLiveOverlay,
   overlayRepresentationEtag,
 } from "../../../../server/scoring/public";
+import { env } from "../../../../env";
+import { createLiveApiCache } from "../../../../server/scoring/live-api-cache";
+
+const cache = createLiveApiCache(env.LIVE_API_CACHE_MS);
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export async function GET(request: Request, context: { params: Promise<{ fixtureId: string }> }) {
@@ -22,8 +26,17 @@ export async function GET(request: Request, context: { params: Promise<{ fixture
   const charts = query.get("view") === "charts";
   const result = query.get("view") === "result";
   const overlay = query.get("view") === "overlay";
-  const body = proof
-    ? overlay
+  const view = overlay
+    ? "overlay"
+    : result
+      ? "result"
+      : charts
+        ? "charts"
+        : scorecard
+          ? "scorecard"
+          : "live";
+  const load = async (proof: NonNullable<ReturnType<typeof publicAccessProof>>) =>
+    overlay
       ? await publicLiveOverlay(fixtureId, proof)
       : result
         ? await publicLiveResult(fixtureId, proof)
@@ -31,7 +44,11 @@ export async function GET(request: Request, context: { params: Promise<{ fixture
           ? await publicLiveCharts(fixtureId, proof)
           : scorecard
             ? await publicLiveScorecard(fixtureId, proof)
-            : await publicLiveEnvelope(fixtureId, proof)
+            : await publicLiveEnvelope(fixtureId, proof);
+  const body = proof
+    ? await cache.read(JSON.stringify([fixtureId, proof.s ?? null, proof.t ?? null, view]), () =>
+        load(proof),
+      )
     : null;
   const state = body && "live" in body ? body.live : body;
   if (!state)

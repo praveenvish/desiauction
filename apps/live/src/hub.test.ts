@@ -39,6 +39,24 @@ it("coalesces duplicate notifications, disconnects slow consumers and removes ro
   leave();
   hub.close();
 });
+it("reads once per proof per tick and fans the frame out to every holder", async () => {
+  const live = state();
+  const read = vi.fn(() => Promise.resolve({ allowed: true, live }));
+  const hub = createHub(read, vi.fn());
+  const peers = Array.from({ length: 500 }, () => peer());
+  for (const p of peers) hub.join("room", { s: "cup" }, p);
+  const ticketed = peer();
+  hub.join("room", { t: "ticket" }, ticketed);
+  await tick();
+  read.mockClear();
+  live.seq++;
+  hub.refresh();
+  await tick();
+  expect(read).toHaveBeenCalledTimes(2);
+  expect(peers.every((p) => p.send.mock.calls.length === 2)).toBe(true);
+  expect(ticketed.send).toHaveBeenCalledTimes(2);
+  hub.close();
+});
 it("isolates bearer proofs in the same room and closes pending readers on shutdown", async () => {
   const a = peer(),
     b = peer();

@@ -27,6 +27,11 @@ const envSchema = z.object({
    * single Vercel/Fly ingress, set 1.
    */
   TRUSTED_PROXY_COUNT: z.coerce.number().int().min(0).max(10).default(0),
+  /**
+   * How long /api/live reuses one projection per (fixture, proof, view) on this
+   * process (F05). Matches the CDN's s-maxage; 0 turns it off.
+   */
+  LIVE_API_CACHE_MS: z.coerce.number().int().min(0).max(5000).default(1000),
   // Matches the engine and the runner, so all three services are read the same
   // way by whatever aggregates them.
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),

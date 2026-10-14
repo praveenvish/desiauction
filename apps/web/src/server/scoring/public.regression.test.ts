@@ -45,7 +45,15 @@ import { overlayPageFacts } from "./overlay-page";
 import { publicPage } from "./public-page";
 import { publicName } from "./public-name";
 import type { PublicResultDetails } from "./result-details";
-import type { StoredLiveState } from "./live-state";
+import type { LiveHistoryEntry, StoredLiveState } from "./live-state";
+
+/** The snapshot and its delay ring (0126) as one object, the way tests edit them. */
+type StoredRow = StoredLiveState & { history: LiveHistoryEntry[] };
+const storedOf = (row: { state: unknown; history: unknown }): StoredRow => ({
+  ...(row.state as StoredLiveState),
+  history: row.history as LiveHistoryEntry[],
+});
+const rowOf = ({ history, ...state }: StoredRow) => ({ state, history });
 
 const owner = createDb(env.DATABASE_URL);
 const app = env.APP_DATABASE_URL ? createDb(env.APP_DATABASE_URL) : owner;
@@ -257,7 +265,7 @@ it("retains insertion order at exact delayed cutoffs and clamps legacy advanced 
     .from(matchLiveState)
     .where(eq(matchLiveState.fixtureId, id));
   if (!row) throw new Error("Missing live fixture");
-  const stored = row.state as StoredLiveState;
+  const stored = storedOf(row);
   expect(row.updatedAt).toEqual(advanced);
   expect(stored.history).toHaveLength(30);
   expect(stored.history.every((entry) => entry.updatedAt === advanced.toISOString())).toBe(true);
@@ -271,7 +279,7 @@ it("selects the last same-time award revision and subsequent correction without 
     .from(matchLiveState)
     .where(eq(matchLiveState.fixtureId, id));
   if (!row) throw new Error("Missing live fixture");
-  const stored = row.state as StoredLiveState;
+  const stored = storedOf(row);
   const entry = stored.history.at(-1);
   if (!entry) throw new Error("Missing history");
   stored.history = ["override-one", "override-two", "correction"].map((revision, index) => ({
@@ -279,25 +287,16 @@ it("selects the last same-time award revision and subsequent correction without 
     state: { ...entry.state, seq: index === 2 ? 7 : 6, phase: "finished", result: "Home won" },
     resultDetails: { v: 1, seq: index === 2 ? 7 : 6, revision, awards: [] },
   }));
-  await owner.db
-    .update(matchLiveState)
-    .set({ state: stored })
-    .where(eq(matchLiveState.fixtureId, id));
+  await owner.db.update(matchLiveState).set(rowOf(stored)).where(eq(matchLiveState.fixtureId, id));
   await owner.db.update(matches).set({ phase: "finished" }).where(eq(matches.fixtureId, id));
   expect(await publicLiveResult(id, {}, new Date(recent.getTime() + 59999), owner.db)).toBeNull();
   const correction = stored.history.pop();
-  await owner.db
-    .update(matchLiveState)
-    .set({ state: stored })
-    .where(eq(matchLiveState.fixtureId, id));
+  await owner.db.update(matchLiveState).set(rowOf(stored)).where(eq(matchLiveState.fixtureId, id));
   const second = await publicLiveResult(id, {}, new Date(recent.getTime() + 60000), owner.db);
   expect(second?.resultDetails?.revision).toBe("override-two");
   if (!correction) throw new Error("Missing correction");
   stored.history.push(correction);
-  await owner.db
-    .update(matchLiveState)
-    .set({ state: stored })
-    .where(eq(matchLiveState.fixtureId, id));
+  await owner.db.update(matchLiveState).set(rowOf(stored)).where(eq(matchLiveState.fixtureId, id));
   const corrected = await publicLiveResult(id, {}, new Date(recent.getTime() + 60000), owner.db);
   expect(corrected?.live.seq).toBe(7);
   expect(corrected?.resultDetails?.revision).toBe("correction");
@@ -309,7 +308,7 @@ it("keeps result awards paired with the eligible delayed revision, strips privat
     .from(matchLiveState)
     .where(eq(matchLiveState.fixtureId, id));
   if (!row) throw new Error("Missing live fixture");
-  const stored = row.state as StoredLiveState;
+  const stored = storedOf(row);
   const details = (seq: number, revision: string, name: string): PublicResultDetails => ({
     v: 1,
     seq,
@@ -344,10 +343,7 @@ it("keeps result awards paired with the eligible delayed revision, strips privat
   stored.resultDetails = Object.assign(details(6, "award-6", "New winner"), {
     email: "private@example.test",
   });
-  await owner.db
-    .update(matchLiveState)
-    .set({ state: stored })
-    .where(eq(matchLiveState.fixtureId, id));
+  await owner.db.update(matchLiveState).set(rowOf(stored)).where(eq(matchLiveState.fixtureId, id));
   await owner.db.update(matches).set({ phase: "finished" }).where(eq(matches.fixtureId, id));
   const delayed = await publicLiveResult(id, {}, now, owner.db);
   expect(delayed?.live.seq).toBe(5);
@@ -361,10 +357,7 @@ it("keeps result awards paired with the eligible delayed revision, strips privat
   expect(firstTag).toBe('"result-6-award-6-verified"');
   expect(await first.json()).not.toHaveProperty("resultDetails.email");
   stored.resultDetails = details(6, "override-7", "AY");
-  await owner.db
-    .update(matchLiveState)
-    .set({ state: stored })
-    .where(eq(matchLiveState.fixtureId, id));
+  await owner.db.update(matchLiveState).set(rowOf(stored)).where(eq(matchLiveState.fixtureId, id));
   const changed = await get(id, "?view=result", firstTag ?? undefined);
   expect(changed.status).toBe(200);
   expect(changed.headers.get("etag")).toBe('"result-6-override-7-verified"');
@@ -378,7 +371,7 @@ it("withdraws every public representation and SSR before validators when a delay
     .from(matchLiveState)
     .where(eq(matchLiveState.fixtureId, id));
   if (!row) throw new Error("Missing live fixture");
-  const stored = row.state as StoredLiveState;
+  const stored = storedOf(row);
   for (const entry of stored.history) {
     entry.state.phase = "finished";
     entry.state.result = "Home won";
@@ -390,10 +383,7 @@ it("withdraws every public representation and SSR before validators when a delay
     updatedAt: recent.toISOString(),
     state: { ...previousEntry.state, phase: "void", result: null },
   });
-  await owner.db
-    .update(matchLiveState)
-    .set({ state: stored })
-    .where(eq(matchLiveState.fixtureId, id));
+  await owner.db.update(matchLiveState).set(rowOf(stored)).where(eq(matchLiveState.fixtureId, id));
   const previous = await get(id, "?view=result");
   expect(previous.status).toBe(200);
   const tag = previous.headers.get("etag");
@@ -424,7 +414,7 @@ it("withdraws every public representation and SSR before validators when a delay
     .select()
     .from(matchLiveState)
     .where(eq(matchLiveState.fixtureId, id));
-  expect(retained?.state).toEqual(stored);
+  expect(retained && storedOf(retained)).toEqual(stored);
 });
 it("does not substitute current awards for missing historical result details", async () => {
   const { id } = await seed();
@@ -520,14 +510,10 @@ it("does not replace an eligible snapshot's missing scorecard with a future side
     .select()
     .from(matchLiveState)
     .where(eq(matchLiveState.fixtureId, id));
-  const stored = row?.state as {
-    history: { state: PublicLiveState; scorecard?: PublicScorecard; updatedAt: string }[];
-  };
+  if (!row) throw new Error("Missing snapshot");
+  const stored = storedOf(row);
   for (const entry of stored.history) if (entry.state.seq === 5) delete entry.scorecard;
-  await owner.db
-    .update(matchLiveState)
-    .set({ state: stored })
-    .where(eq(matchLiveState.fixtureId, id));
+  await owner.db.update(matchLiveState).set(rowOf(stored)).where(eq(matchLiveState.fixtureId, id));
   const response = await get(id, "?view=scorecard", '"scorecard-5-self_scored"');
   expect(response.status).toBe(404);
   expect(response.headers.get("cache-control")).toBe("no-store");
@@ -640,10 +626,7 @@ it("fails closed without an eligible ring snapshot and never emits an ETag", asy
     .where(eq(matchLiveState.fixtureId, id));
   if (!row) throw new Error("Missing projection");
   for (const history of [[], [{ updatedAt: recent.toISOString(), state: row.state }]]) {
-    await owner.db
-      .update(matchLiveState)
-      .set({ state: { ...(row.state as object), history } })
-      .where(eq(matchLiveState.fixtureId, id));
+    await owner.db.update(matchLiveState).set({ history }).where(eq(matchLiveState.fixtureId, id));
     const response = await get(id, "", "*");
     expect(response.status).toBe(404);
     expect(response.headers.get("etag")).toBeNull();
@@ -782,14 +765,10 @@ it("does not substitute a newer chart sidecar for a missing delayed chart", asyn
     .select()
     .from(matchLiveState)
     .where(eq(matchLiveState.fixtureId, id));
-  const stored = row?.state as {
-    history: { state: PublicLiveState; charts?: PublicCharts; updatedAt: string }[];
-  };
+  if (!row) throw new Error("Missing snapshot");
+  const stored = storedOf(row);
   for (const entry of stored.history) if (entry.state.seq === 5) delete entry.charts;
-  await owner.db
-    .update(matchLiveState)
-    .set({ state: stored })
-    .where(eq(matchLiveState.fixtureId, id));
+  await owner.db.update(matchLiveState).set(rowOf(stored)).where(eq(matchLiveState.fixtureId, id));
   const response = await get(id, "?view=charts", '"charts-5-self_scored"');
   expect(response.status).toBe(404);
   expect(response.headers.get("cache-control")).toBe("no-store");
@@ -868,13 +847,10 @@ it("leaves historical missing markers unavailable and gates overlay before condi
     .from(matchLiveState)
     .where(eq(matchLiveState.fixtureId, id));
   if (!row) throw new Error("Missing live state");
-  const stored = row.state as StoredLiveState;
+  const stored = storedOf(row);
   delete stored.overlay;
   for (const entry of stored.history) delete entry.overlay;
-  await owner.db
-    .update(matchLiveState)
-    .set({ state: stored })
-    .where(eq(matchLiveState.fixtureId, id));
+  await owner.db.update(matchLiveState).set(rowOf(stored)).where(eq(matchLiveState.fixtureId, id));
   const historical = await publicLiveOverlay(id, {}, now, owner.db);
   expect(historical?.overlay).toBeNull();
   expect(historical?.stat).toBeNull();
@@ -942,7 +918,7 @@ it("C47 HTTP normalizes only the selected legacy delivery entry and strips untru
     .from(matchLiveState)
     .where(eq(matchLiveState.fixtureId, id));
   if (!row) throw new Error("Missing snapshot");
-  const stored = row.state as StoredLiveState;
+  const stored = storedOf(row);
   const oldEntry = stored.history[0];
   if (!oldEntry) throw new Error("Missing delayed entry");
   const legacy = { ...oldEntry.state } as Partial<PublicLiveState>;
@@ -950,7 +926,7 @@ it("C47 HTTP normalizes only the selected legacy delivery entry and strips untru
   delete legacy.panel;
   await owner.db
     .update(matchLiveState)
-    .set({ state: { ...stored, history: [{ ...oldEntry, state: legacy }] } })
+    .set({ history: [{ ...oldEntry, state: legacy }] })
     .where(eq(matchLiveState.fixtureId, id));
   const delayed = await publicLive(id, {}, now);
   expect(delayed).toMatchObject({
@@ -965,7 +941,7 @@ it("C47 HTTP normalizes only the selected legacy delivery entry and strips untru
     .update(matchLiveState)
     .set({
       state: {
-        ...stored,
+        ...rowOf(stored).state,
         panel: { v: 1, phone: "private", email: "private@example.test", history: ["private"] },
       },
     })
@@ -982,15 +958,12 @@ it("C47 HTTP normalizes only the selected legacy delivery entry and strips untru
   ]) {
     await owner.db
       .update(matchLiveState)
-      .set({ state: { ...stored, ...invalid } })
+      .set({ state: { ...rowOf(stored).state, ...invalid } })
       .where(eq(matchLiveState.fixtureId, id));
     expect(await publicLive(id, {}, now)).toBeNull();
     expect((await get(id)).status).toBe(404);
   }
-  await owner.db
-    .update(matchLiveState)
-    .set({ state: stored })
-    .where(eq(matchLiveState.fixtureId, id));
+  await owner.db.update(matchLiveState).set(rowOf(stored)).where(eq(matchLiveState.fixtureId, id));
   await owner.db
     .update(competitions)
     .set({ sport: "badminton" })

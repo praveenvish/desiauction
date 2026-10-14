@@ -23,6 +23,8 @@ const schema = z
           .filter(Boolean),
       ),
     TRUSTED_PROXY_COUNT: z.coerce.number().int().min(0).max(10).default(0),
+    /** Every socket on this process, across rooms (F05). */
+    LIVE_MAX_SOCKETS: z.coerce.number().int().min(1).max(100_000).default(5000),
     APP_VERSION: z.string().default("dev"),
   })
   .refine(

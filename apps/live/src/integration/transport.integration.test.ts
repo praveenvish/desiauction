@@ -5,6 +5,7 @@ import { WebSocket } from "ws";
 import { createServer } from "../server.js";
 import { parseEnv } from "../env.js";
 import { state } from "../test-state.js";
+import { socketLoad } from "../../../../scripts/live-load.mjs";
 const env = parseEnv({
   SYSTEM_DATABASE_URL: "postgres://desiauction_system:test@127.0.0.1:15437/ls1_c29_clean",
   LIVE_ALLOWED_ORIGINS: "https://allowed.test",
@@ -95,6 +96,66 @@ it("skips the per-client cap when no trustworthy address exists, instead of lump
     await app.server.close();
   }
 }, 15000);
+
+it("refuses sockets beyond LIVE_MAX_SOCKETS across every client", async () => {
+  const capped = parseEnv({
+    SYSTEM_DATABASE_URL: "postgres://desiauction_system:test@127.0.0.1:15437/ls1_c29_clean",
+    LIVE_ALLOWED_ORIGINS: "https://allowed.test",
+    LIVE_MAX_SOCKETS: "3",
+  });
+  const app = createServer(
+    capped,
+    () => Promise.resolve({ allowed: true, live: state() }),
+    () => Promise.resolve(true),
+  );
+  const clients: WebSocket[] = [];
+  try {
+    const address = await app.server.listen({ host: "127.0.0.1", port: 0 });
+    const target = address.replace("http:", "ws:") + "/live/ws";
+    for (let i = 0; i < 3; i++) {
+      const ws = new WebSocket(target, { origin: "https://allowed.test" });
+      clients.push(ws);
+      await once(ws, "open");
+    }
+    const excess = new WebSocket(target, { origin: "https://allowed.test" });
+    await expect(once(excess, "open")).rejects.toThrow();
+  } finally {
+    for (const client of clients) client.terminate();
+    await app.server.close();
+  }
+}, 15000);
+
+it("the socket load mode drives real rooms: 3 rooms × 50 sockets all get a first frame", async () => {
+  const read = vi.fn(() => Promise.resolve({ allowed: true, live: state() }));
+  const app = createServer(
+    parseEnv({
+      SYSTEM_DATABASE_URL: "postgres://desiauction_system:test@127.0.0.1:15437/ls1_c29_clean",
+      LIVE_ALLOWED_ORIGINS: "https://allowed.test",
+      TRUSTED_PROXY_COUNT: "1",
+    }),
+    read,
+    () => Promise.resolve(true),
+  );
+  try {
+    const address = await app.server.listen({ host: "127.0.0.1", port: 0 });
+    const result = await socketLoad(address.replace("http:", "ws:") + "/live/ws", {
+      fixtures: [
+        "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+        "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+        "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+      ],
+      perRoom: 50,
+      gate: { s: "cup" },
+      origin: "https://allowed.test",
+      durationSeconds: 1,
+      staggerMs: 200,
+      distinctClients: true,
+    });
+    expect(result).toMatchObject({ opened: 150, framed: 150, passed: true });
+  } finally {
+    await app.server.close();
+  }
+}, 20000);
 
 it("placement sockets preserve all squads, release only selected snapshots and close on revoked public access", async () => {
   const live: PublicPlacementState = {

@@ -76,3 +76,13 @@ test("percentiles use nearest rank including slow-tail samples", () => {
   assert.equal(percentile([], 0.95), null);
   assert.equal(percentile([2, 1, 500], 0.95), 500);
 });
+
+test("socket mode refuses an HTTP target, no fixtures or no origin", async () => {
+  const { socketLoad } = await import("./live-load.mjs");
+  await assert.rejects(
+    socketLoad("http://x/live/ws", { fixtures: ["a"], origin: "o" }),
+    /WebSocket/,
+  );
+  await assert.rejects(socketLoad("ws://x/live/ws", { fixtures: [], origin: "o" }), /fixture/);
+  await assert.rejects(socketLoad("ws://x/live/ws", { fixtures: ["a"] }), /Origin/);
+});

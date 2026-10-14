@@ -39,7 +39,7 @@ export { publicCharts } from "./delivery/public-charts";
 export { liveRepresentationEtag } from "./live-etag";
 export * from "./overlay";
 
-export { publicLiveProjection, selectDelayedEntry } from "./delay";
+export { delayedHistoryIndex, publicLiveProjection, selectDelayedEntry } from "./delay";
 
 export { rallyEngine } from "./rally/engine";
 export { replayRally } from "./rally/replay";

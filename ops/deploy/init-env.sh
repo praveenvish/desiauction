@@ -170,6 +170,8 @@ PORT=4100
 SYSTEM_DATABASE_URL=postgres://desiauction_system:$SYSTEM_PW@db:5432/$DB
 LIVE_ALLOWED_ORIGINS=$ORIGINS
 TRUSTED_PROXY_COUNT=1
+# Every socket on the live process, across rooms (F05).
+LIVE_MAX_SOCKETS=5000
 EOF
 
 write engine.env <<EOF

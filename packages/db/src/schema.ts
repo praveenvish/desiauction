@@ -3055,6 +3055,11 @@ export const matchLiveState = pgTable("match_live_state", {
   competitionId: char("competition_id", { length: 26 }).notNull(),
   seq: bigint("seq", { mode: "number" }).notNull(),
   state: jsonb("state").notNull(),
+  /**
+   * The last 30 snapshots the betting delay releases from (0126). Kept out of
+   * `state` so a hot read fetches one released entry, never all thirty.
+   */
+  history: jsonb("history").notNull().default(sql`'[]'::jsonb`),
   updatedAt: ts("updated_at").notNull().defaultNow(),
 });
 

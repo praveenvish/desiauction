@@ -17,6 +17,10 @@ interface Member {
   proof: ScoringPublicProof;
   last: string;
 }
+/** Members holding the same proof see the same release; they share one read. */
+function proofKey(proof: ScoringPublicProof): string {
+  return JSON.stringify([proof.s ?? null, proof.t ?? null]);
+}
 /** One bounded serial reader and a coalescing room queue. Each release rechecks P1/P3. */
 export function createHub(read: Reader, onError: (error: unknown) => void) {
   const rooms = new Map<string, Set<Member>>();
@@ -33,37 +37,54 @@ export function createHub(read: Reader, onError: (error: unknown) => void) {
         pending.delete(fixtureId);
         const members = rooms.get(fixtureId);
         if (!members) continue;
+        // F05: one read per proof per tick, fanned out to every socket that
+        // holds it — a 2,000-viewer room costs one query, not 2,000.
+        const groups = new Map<string, Member[]>();
         for (const member of members) {
+          const key = proofKey(member.proof);
+          const group = groups.get(key);
+          if (group) group.push(member);
+          else groups.set(key, [member]);
+        }
+        for (const group of groups.values()) {
+          const proof = group[0]?.proof;
+          if (!proof) continue;
+          let result: Awaited<ReturnType<Reader>>;
           try {
-            const result = await read(fixtureId, member.proof);
-            if (isClosed() || !members.has(member)) continue;
+            result = await read(fixtureId, proof);
+          } catch (error) {
+            onError(error);
+            for (const member of group) {
+              member.peer.close(1011);
+              members.delete(member);
+            }
+            continue;
+          }
+          if (isClosed()) break;
+          const identity = JSON.stringify({
+            live: result.live,
+            ...(result.clock ? { delayMs: result.clock.delayMs } : {}),
+          });
+          const frame = JSON.stringify({
+            t: "live",
+            live: result.live,
+            ...(result.clock ? { clock: result.clock } : {}),
+          });
+          for (const member of group) {
+            if (!members.has(member)) continue;
             if (!result.allowed) {
               member.peer.close(1008);
               members.delete(member);
               continue;
             }
-            const identity = JSON.stringify({
-              live: result.live,
-              ...(result.clock ? { delayMs: result.clock.delayMs } : {}),
-            });
-            const frame = JSON.stringify({
-              t: "live",
-              live: result.live,
-              ...(result.clock ? { clock: result.clock } : {}),
-            });
-            if (identity !== member.last) {
-              if (member.peer.bufferedAmount > 64 * 1024) {
-                member.peer.close(1013);
-                members.delete(member);
-                continue;
-              }
-              member.peer.send(frame);
-              member.last = identity;
+            if (identity === member.last) continue;
+            if (member.peer.bufferedAmount > 64 * 1024) {
+              member.peer.close(1013);
+              members.delete(member);
+              continue;
             }
-          } catch (error) {
-            onError(error);
-            member.peer.close(1011);
-            members.delete(member);
+            member.peer.send(frame);
+            member.last = identity;
           }
         }
         if (!members.size) rooms.delete(fixtureId);

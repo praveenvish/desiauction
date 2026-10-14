@@ -161,8 +161,8 @@ it("real system-role P1/P3 reads public/bearer, publication, delay, trust and re
       state: {
         ...current,
         panel: { v: 1, email: "private@example.test" },
-        history: [{ state: legacy, updatedAt: old.updatedAt }],
       },
+      history: [{ state: legacy, updatedAt: old.updatedAt }],
     });
     hub.join(
       fixtureId,

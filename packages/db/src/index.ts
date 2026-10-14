@@ -170,4 +170,9 @@ export async function withTenantDb<T>(
   });
 }
 
-export { scoringPublicAccess, type ScoringPublicProof } from "./scoring-public";
+export {
+  liveHistoryEntry,
+  liveHistoryStamps,
+  scoringPublicAccess,
+  type ScoringPublicProof,
+} from "./scoring-public";

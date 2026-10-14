@@ -46,8 +46,8 @@ export interface LiveHistoryEntry {
   resultDetails?: PublicResultDetails;
   overlay?: OverlayProjection;
 }
+/** `match_live_state.state`; the delay ring lives in its own `history` column (0126). */
 export type StoredLiveState = PublicLiveState & {
-  history: LiveHistoryEntry[];
   scorecard?: PublicScorecard;
   charts?: PublicCharts;
   resultDetails?: PublicResultDetails;
@@ -118,19 +118,21 @@ export async function scoringNames(
 }
 
 function historyOf(raw: unknown): LiveHistoryEntry[] {
-  if (!raw || typeof raw !== "object" || !("history" in raw) || !Array.isArray(raw.history))
-    return [];
-  return raw.history.filter((entry: unknown): entry is LiveHistoryEntry => {
-    if (!entry || typeof entry !== "object" || !("updatedAt" in entry) || !("state" in entry))
-      return false;
-    return (
-      typeof entry.updatedAt === "string" &&
-      entry.state !== null &&
-      typeof entry.state === "object" &&
-      "seq" in entry.state &&
-      typeof entry.state.seq === "number"
-    );
-  });
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(isLiveHistoryEntry);
+}
+
+/** One stored ring entry, as written by `writeLiveState`. */
+export function isLiveHistoryEntry(entry: unknown): entry is LiveHistoryEntry {
+  if (!entry || typeof entry !== "object" || !("updatedAt" in entry) || !("state" in entry))
+    return false;
+  return (
+    typeof entry.updatedAt === "string" &&
+    entry.state !== null &&
+    typeof entry.state === "object" &&
+    "seq" in entry.state &&
+    typeof entry.state.seq === "number"
+  );
 }
 
 export async function writeLiveState(
@@ -158,7 +160,7 @@ export async function writeLiveState(
     matchAgeDate(input.kickoffAt, input.startedAt),
   );
   const [previous] = await db
-    .select({ state: matchLiveState.state, updatedAt: matchLiveState.updatedAt })
+    .select({ history: matchLiveState.history, updatedAt: matchLiveState.updatedAt })
     .from(matchLiveState)
     .where(eq(matchLiveState.fixtureId, input.fixtureId));
   // Nondecreasing representation time preserves the delay after a clock regression.
@@ -192,7 +194,7 @@ export async function writeLiveState(
     sidecars = resultDetails ? { resultDetails } : {};
   }
   const history = [
-    ...historyOf(previous?.state),
+    ...historyOf(previous?.history),
     {
       updatedAt: state.updatedAt,
       state,
@@ -202,7 +204,6 @@ export async function writeLiveState(
   const stored: StoredLiveState = {
     ...state,
     ...sidecars,
-    history,
   };
   await db
     .insert(matchLiveState)
@@ -212,11 +213,12 @@ export async function writeLiveState(
       competitionId: input.competitionId,
       seq: input.state.lastSeq,
       state: stored,
+      history,
       updatedAt,
     })
     .onConflictDoUpdate({
       target: matchLiveState.fixtureId,
-      set: { seq: input.state.lastSeq, state: stored, updatedAt },
+      set: { seq: input.state.lastSeq, state: stored, history, updatedAt },
       setWhere: sql`${matchLiveState.orgId} = ${input.orgId} and ${matchLiveState.competitionId} = ${input.competitionId}`,
     });
 }

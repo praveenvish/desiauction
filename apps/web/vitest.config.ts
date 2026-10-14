@@ -21,6 +21,8 @@ export default defineConfig({
     // env.ts is fail-closed at import (§11); tests get the local docker-compose
     // URL (non-secret). CI overrides with its service container.
     env: {
+      // Suites edit a snapshot and read it back within a second (F05 cache).
+      LIVE_API_CACHE_MS: "0",
       DATABASE_URL:
         process.env["DATABASE_URL"] ??
         "postgres://desiauction:desiauction@localhost:5433/desiauction",

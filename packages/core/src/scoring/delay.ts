@@ -112,3 +112,30 @@ export function selectDelayedEntry<T extends { state: PublicScoringState }>(
     )
     .at(-1);
 }
+
+/**
+ * The same rule as `selectDelayedEntry`, decided from the history's timestamps
+ * alone, so a reader fetches only the one entry it will release (F05):
+ * "current" for no delay, the index into the history, or undefined when
+ * nothing is released yet.
+ */
+export function delayedHistoryIndex(
+  stamps: readonly unknown[],
+  trust: string,
+  delaySeconds: number,
+  nowMs: number,
+): "current" | number | undefined {
+  const current = { state: null as unknown as PublicScoringState, index: "current" as const };
+  const entries = stamps.map((stamp, index) => ({
+    state: current.state,
+    updatedAt: typeof stamp === "string" ? stamp : "",
+    index,
+  }));
+  return selectDelayedEntry<{ state: PublicScoringState; index: "current" | number }>(
+    current,
+    entries,
+    trust,
+    delaySeconds,
+    nowMs,
+  )?.index;
+}

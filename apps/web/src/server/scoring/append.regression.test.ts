@@ -28,7 +28,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { env } from "../../env";
 import { purgeOrg } from "../test-support/purge-org";
 import { appendScoringEvents, persistedMatchEvent, type ClientEvent } from "./append";
-import { matchAgeDate, scoringNames, type StoredLiveState } from "./live-state";
+import {
+  matchAgeDate,
+  scoringNames,
+  type LiveHistoryEntry,
+  type StoredLiveState,
+} from "./live-state";
 import { startScoredMatch } from "./start";
 import { addScoringGuest, GuestRefusal } from "./guests";
 import { claimScoring } from "./claim";
@@ -145,7 +150,11 @@ async function snapshot(id: string) {
     .from(matchLiveState)
     .where(eq(matchLiveState.fixtureId, id));
   if (!row) throw new Error("Missing live snapshot");
-  return { ...row, state: row.state as StoredLiveState };
+  return {
+    ...row,
+    state: row.state as StoredLiveState,
+    history: row.history as LiveHistoryEntry[],
+  };
 }
 beforeAll(async () => {
   await owner.db.insert(people).values(
@@ -262,7 +271,9 @@ describe("API-1 append events", () => {
         if (result.ok) expect(result.acks.every((ack) => ack.status === "stored")).toBe(true);
       }
       const live = await snapshot(id);
-      const { history, scorecard, charts, overlay, ...publicState } = live.state;
+      const { scorecard, charts, overlay, ...publicState } = live.state;
+      const history = live.history;
+      expect(live.state).not.toHaveProperty("history");
       expect(publicState).toEqual(expected);
       expect(scorecard).toEqual(publicScorecard(state, names));
       expect(charts).toEqual(publicCharts(state, names));
@@ -344,7 +355,7 @@ describe("API-1 append events", () => {
         { status: "duplicate", seq: 4 },
       ],
     });
-    expect((await snapshot(id)).state.history).toHaveLength(1);
+    expect((await snapshot(id)).history).toHaveLength(1);
     expect(await storedEvents(id)).toHaveLength(4);
   });
   it("stores earlier accepted entries, rejects the illegal event and skips later entries", async () => {

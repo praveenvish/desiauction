@@ -38,6 +38,10 @@ export function createServer(env: Env, read: Reader, ready: () => Promise<boolea
         request.socket.remoteAddress,
         env.TRUSTED_PROXY_COUNT,
       );
+      if (wss.clients.size >= env.LIVE_MAX_SOCKETS) {
+        socket.destroy();
+        return;
+      }
       // No trustworthy address: skip the per-client cap rather than lumping
       // every such client under one "" key (client-address.ts); the per-room
       // cap still holds.
