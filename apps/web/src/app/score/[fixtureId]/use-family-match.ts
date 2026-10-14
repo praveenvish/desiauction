@@ -317,7 +317,9 @@ export function useFamilyMatch<S extends LocalState>(
     window.addEventListener("offline", connection);
     let unwatch = () => {};
     void bindScoringActor(actorId)
-      .then(() => {
+      .then((receipt) => {
+        if (!active) return null;
+        if (!receipt.valid()) throw new Error("Account storage binding changed.");
         unwatch = onScoringStop(() => {
           active = false;
           current.ready = false;
@@ -327,8 +329,9 @@ export function useFamilyMatch<S extends LocalState>(
         });
         return Promise.all([loadQueue(fixtureId), scoringDevice()]);
       })
-      .then(([items, device]) => {
-        if (!active) return;
+      .then((restored) => {
+        if (!active || !restored) return;
+        const [items, device] = restored;
         current.offline = !navigator.onLine;
         current.restore(items, device);
         sender.current = startSync(fixtureId, current);

@@ -31,6 +31,8 @@ test("five offline balls survive a cold open and sync to the exact server sequen
   await context.setOffline(true);
   for (let ball = 0; ball < 5; ball++) await runBall(page);
   await expect(page.getByTestId("pad-sync")).toHaveAttribute("data-pending", "5");
+  await expect(page.getByTestId("pad-recent")).toContainText("Waiting for acceptance");
+  await expect(page.getByTestId("pad-recent").locator("li")).toHaveCount(0);
   const queuedIds = await committedQueue(page, fixture.fixtureId, Array<string>(5).fill("ball"));
   await page.goto(`/score/${fixture.fixtureId}`);
   await expect(page).toHaveURL(`/score/shell#${fixture.fixtureId}`);

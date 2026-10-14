@@ -43,6 +43,19 @@ export const PULSE_WINDOW_MS = 5 * 60 * 1000;
 /** How far back "recently ended" reaches. */
 export const ENDED_WINDOW_MS = 24 * 60 * 60 * 1000;
 
+export const LIVE_BOARD_PAGE_SIZE = 50;
+
+/** Query input never becomes an unbounded database offset. */
+export function liveBoardPage(value: unknown): number {
+  const page = typeof value === "string" && /^[1-9]\d*$/.test(value) ? Number(value) : value;
+  return typeof page === "number" &&
+    Number.isSafeInteger(page) &&
+    page > 0 &&
+    Number.isSafeInteger((page - 1) * LIVE_BOARD_PAGE_SIZE)
+    ? page
+    : 1;
+}
+
 const LIVE_STATUSES = ["live", "paused"] as const;
 const ENDED_STATUSES = ["completed", "reconciled", "abandoned"] as const;
 
@@ -88,6 +101,11 @@ export interface EndedAuctionRow {
 
 export interface LiveBoard {
   readonly generatedAtMs: number;
+  readonly pagination?: {
+    readonly page: number;
+    readonly pageSize: number;
+    readonly hasNext: boolean;
+  };
   /** Active, quiet and paused rooms — the ones a human might need to look at. */
   readonly running: readonly LiveAuctionRow[];
   /** `live` or `paused` in the database, silent for over twelve hours. */
@@ -114,7 +132,12 @@ function numOrNull(value: unknown): number | null {
   return value === null || value === undefined ? null : Number(value);
 }
 
-export async function liveAuctionBoard(db: Db, nowMs: number): Promise<LiveBoard> {
+export async function liveAuctionBoard(
+  db: Db,
+  nowMs: number,
+  requestedPage: unknown = 1,
+): Promise<LiveBoard> {
+  const page = liveBoardPage(requestedPage);
   const pulseSince = nowMs - PULSE_WINDOW_MS;
   const [liveRows, endedRows] = await Promise.all([
     db
@@ -146,7 +169,17 @@ export async function liveAuctionBoard(db: Db, nowMs: number): Promise<LiveBoard
       .innerJoin(organizations, eq(organizations.id, auctions.orgId))
       .innerJoin(competitions, eq(competitions.id, auctions.competitionId))
       .where(and(inArray(auctions.status, [...LIVE_STATUSES]), isRealAuction()))
-      .limit(200),
+      // Order the full qualifying relation BEFORE taking one bounded page.
+      // ID breaks equal pulse/clock ties so a stable dataset traverses exactly once.
+      .orderBy(
+        desc(
+          sql`(select count(*) from bids b where b.auction_id = auctions.id and b.status <> 'invalidated' and b.placed_at_ms > ${pulseSince})`,
+        ),
+        sql`(select e.at_ms from auction_events e where e.auction_id = auctions.id order by e.seq desc limit 1) desc nulls last`,
+        auctions.id,
+      )
+      .offset((page - 1) * LIVE_BOARD_PAGE_SIZE)
+      .limit(LIVE_BOARD_PAGE_SIZE + 1),
     db
       .select({
         auctionId: auctions.id,
@@ -180,7 +213,7 @@ export async function liveAuctionBoard(db: Db, nowMs: number): Promise<LiveBoard
       .limit(10),
   ]);
 
-  const shaped = liveRows.map((row): LiveAuctionRow => {
+  const shaped = liveRows.slice(0, LIVE_BOARD_PAGE_SIZE).map((row): LiveAuctionRow => {
     const total = num(row.lotsTotal);
     const sold = num(row.lotsSold);
     const unsold = num(row.lotsUnsold);
@@ -215,6 +248,11 @@ export async function liveAuctionBoard(db: Db, nowMs: number): Promise<LiveBoard
 
   return {
     generatedAtMs: nowMs,
+    pagination: {
+      page,
+      pageSize: LIVE_BOARD_PAGE_SIZE,
+      hasNext: liveRows.length > LIVE_BOARD_PAGE_SIZE,
+    },
     running: shaped.filter((row) => row.state !== "stale").sort(byRecency),
     stale: shaped.filter((row) => row.state === "stale").sort(byRecency),
     ended: endedRows

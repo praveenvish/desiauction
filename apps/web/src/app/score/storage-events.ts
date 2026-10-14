@@ -1,4 +1,6 @@
 let stopped = false;
+let generation = 0;
+export const scoringStopGeneration = () => generation;
 const stoppers = new Set<() => void>();
 let channel: BroadcastChannel | undefined;
 export const isScoringStopped = () => stopped;
@@ -12,6 +14,7 @@ export function clearScoringLocalStorage() {
   }
 }
 function stop() {
+  generation++;
   stopped = true;
   for (const listener of stoppers) listener();
 }
@@ -36,4 +39,5 @@ export function notifyScoringStop() {
   stop();
   channel?.postMessage("signout");
   clearScoringLocalStorage();
+  return generation;
 }

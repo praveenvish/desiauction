@@ -172,7 +172,12 @@ export default async function LedgerPage({
             faces={view.faces}
           />
         ) : (
-          <div className="ledger-scroll">
+          <div
+            className="ledger-scroll"
+            role="region"
+            aria-label="Auction ledger records"
+            tabIndex={0}
+          >
             <table className="ledger-grid" data-testid="ledger-table">
               <thead>
                 <tr>

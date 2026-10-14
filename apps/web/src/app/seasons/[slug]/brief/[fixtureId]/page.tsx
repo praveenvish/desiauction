@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { PlayerPortrait } from "@desiauction/ui";
+import { ButtonLink, PlayerPortrait } from "@desiauction/ui";
 import { styleLabel } from "@desiauction/core";
 import { RecordedShots } from "../../../../../components/cricket-insights";
 import { captainBrief } from "../../../../../server/insights/brief";
@@ -17,6 +17,12 @@ export default async function BriefPage({
   if (brief.locked)
     return (
       <main className="captain-brief">
+        <ButtonLink
+          href={`/seasons/${slug}/fixtures?match=${encodeURIComponent(fixtureId)}`}
+          variant="ghost"
+        >
+          Back to this match
+        </ButtonLink>
         <p>Captain’s brief · Pro</p>
         <h2>Know your opponent</h2>
         <p>Available on Pro seasons</p>
@@ -31,6 +37,12 @@ export default async function BriefPage({
   );
   return (
     <main className="captain-brief">
+      <ButtonLink
+        href={`/seasons/${slug}/fixtures?match=${encodeURIComponent(fixtureId)}`}
+        variant="ghost"
+      >
+        Back to this match
+      </ButtonLink>
       <p>Captain’s brief · {brief.fixtureNumber} · Pro</p>
       {brief.teams.map((team) => (
         <section key={team.id} aria-label={`Know ${team.name}`}>

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { MoneyUnitOverride } from "../../../../../components/money-unit";
 import { liveAuctionView } from "../../../../../server/auction/live-actions";
 import { PracticeBar } from "../practice-bar";
+import { AuctionTaskContext } from "../auction-task-context";
 import { LivePanel } from "./live-panel";
 import "../../../seasons.css";
 import "../auction.css";
@@ -46,6 +47,17 @@ export default async function LiveAuctionPage({ params }: { params: Promise<{ sl
         <main className="registrations-dash live-page">
           <div className="dash-stack">
             <h1 className="auction-sr-only">{view.competition.name} — live auction</h1>
+            <AuctionTaskContext
+              task={view.myTeamIds.length > 0 ? "Owner room" : "Auction room"}
+              scope={view.competition.name}
+              detail={
+                inPractice
+                  ? "Practice · no real spending"
+                  : finished
+                    ? "Results and squads"
+                    : undefined
+              }
+            />
             <PracticeBar
               slug={slug}
               practice={view.practice}

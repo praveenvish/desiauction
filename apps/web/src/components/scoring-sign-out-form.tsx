@@ -1,6 +1,6 @@
 "use client";
-import type { ReactNode } from "react";
-import { scoringSignOut } from "../lib/scoring-sign-out";
+import { useState, type ReactNode } from "react";
+import { SignOutDialog } from "./sign-out-dialog";
 export function ScoringSignOutForm({
   logout,
   children,
@@ -10,9 +10,25 @@ export function ScoringSignOutForm({
   children: ReactNode;
   className?: string;
 }) {
+  const [open, setOpen] = useState(false);
   return (
-    <form className={className} action={() => scoringSignOut(logout)}>
-      {children}
-    </form>
+    <>
+      <form
+        className={className}
+        onSubmit={(event) => {
+          event.preventDefault();
+          setOpen(true);
+        }}
+      >
+        {children}
+      </form>
+      <SignOutDialog
+        open={open}
+        onClose={() => {
+          setOpen(false);
+        }}
+        logout={logout}
+      />
+    </>
   );
 }

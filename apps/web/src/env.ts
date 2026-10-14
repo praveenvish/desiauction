@@ -4,6 +4,8 @@ import { z } from "zod";
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   APP_VERSION: z.string().min(1).default("dev"),
+  // UI refinement is presentation only; rollback never changes data, claims or grants.
+  UI_TREATMENT: z.enum(["baseline", "refined"]).default("baseline"),
   DATABASE_URL: z.string().startsWith("postgres"),
   // Optional app-role connection for schema isolation regression checks.
   APP_DATABASE_URL: z.string().startsWith("postgres").optional(),

@@ -2,7 +2,7 @@
 import { rallyEngine } from "@desiauction/core/scoring/rally-engine";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Button } from "@desiauction/ui";
+import { Button, TaskWorkspace } from "@desiauction/ui";
 import {
   type MatchEvent,
   type NameBook,
@@ -108,168 +108,188 @@ export function RallyPad({
       firstServer: proposed?.firstServer ?? "home",
     });
   }
+  const finishAccepted = state.finished && match.ready && match.pending === 0 && !match.error;
   return (
-    <main className="score-home rally-pad" data-testid="rally-pad">
+    <main className="score-home rally-pad family-pad" data-testid="rally-pad">
       <header className="score-header">
         <Link href="/score">Matches</Link>
         <a href={sharePath}>Watch live</a>
       </header>
+      <p className="score-cap">{setup.fixtureNumber} · Rally scoring</p>
       <h1>{setup.teams.map((team) => team.name).join(" vs ")}</h1>
       <p role="status">
-        {match.offline
-          ? `Offline · ${String(match.pending)} saved entries`
-          : match.pending
-            ? `${String(match.pending)} entries sending`
-            : "Saved"}
+        {match.error
+          ? "Check the match error before continuing."
+          : !match.ready
+            ? "Restoring match…"
+            : match.pending
+              ? match.offline
+                ? `Offline · ${String(match.pending)} entries waiting to send`
+                : `${String(match.pending)} entries sending`
+              : match.offline
+                ? "Saved · offline"
+                : "Saved"}
       </p>
       {match.error ? <p role="alert">{match.error}</p> : null}
-      <p className="score-cap">
-        Rubber {rubber?.no ?? 1} · Game {game?.no ?? 1}
-      </p>
-      <div className="rally-score" aria-label="Current points">
-        <strong data-testid="rally-home-points">{game?.points.home ?? 0}</strong>
-        <span>–</span>
-        <strong data-testid="rally-away-points">{game?.points.away ?? 0}</strong>
-      </div>
-      {game && !game.winner && !state.finished ? (
-        <p data-testid="rally-server">
-          Serving: {setup.teams[game.server === "home" ? 0 : 1].name}
-        </p>
-      ) : null}
-      {state.streak ? (
-        <p>
-          {setup.teams[state.streak.side === "home" ? 0 : 1].name} · {state.streak.count} rallies in
-          a row
-        </p>
-      ) : null}
-      <p>Tap the side that won the rally.</p>
-      <div className="rally-point-buttons">
-        {(["home", "away"] as const).map((side, index) => (
-          <Button
-            key={side}
-            size="touch"
-            data-testid={`rally-point-${side}`}
-            disabled={!playable}
-            onClick={() => {
-              point(side);
-            }}
-          >
-            {setup.teams[index]?.name} · {game?.points[side] ?? 0}
-          </Button>
-        ))}
-      </div>
-      <Button
-        variant="secondary"
-        size="touch"
-        data-testid="rally-undo"
-        disabled={!match.ready || state.finished || !state.rallies.length}
-        onClick={() => {
-          match.undo();
-        }}
+      <TaskWorkspace
+        className="family-workspace"
+        label="Rally scoring actions"
+        supportingLabel="Game history"
+        supporting={
+          <section>
+            <h2>Games</h2>
+            <ul>
+              {state.rubbers.map((row) => (
+                <li key={row.no}>
+                  Rubber {row.no}:{" "}
+                  {row.games
+                    .map((value) => `${String(value.points.home)}–${String(value.points.away)}`)
+                    .join(" · ")}
+                </li>
+              ))}
+            </ul>
+          </section>
+        }
       >
-        Undo rally
-      </Button>
-      <Button
-        variant="secondary"
-        size="touch"
-        aria-pressed={details}
-        onClick={() => {
-          setDetails(!details);
-        }}
-      >
-        Track how points end
-      </Button>
-      {details ? (
-        <fieldset>
-          <legend>How the rally ended (optional)</legend>
-          <div className="score-tiles">
-            {(["ace", "winner", "error", "kill", "block", "fault"] as const).map((value) => (
-              <Button
-                key={value}
-                variant="secondary"
-                aria-pressed={endedBy === value}
-                onClick={() => {
-                  setEndedBy(endedBy === value ? undefined : value);
-                }}
-              >
-                {value}
-              </Button>
-            ))}
-          </div>
-        </fieldset>
-      ) : null}
-      {volumeSupported ? (
-        <label>
-          <input
-            type="checkbox"
-            checked={volumeOptIn}
-            onChange={(event) => {
-              setVolumeOptIn(event.target.checked);
-            }}
-          />
-          Use volume buttons: up for {setup.teams[0].name}, down for {setup.teams[1].name}
-        </label>
-      ) : null}
-      {game?.winner && !result && !selection ? (
-        <Button size="touch" data-testid="rally-next-game" onClick={nextGame}>
-          Next {rubber?.winner ? "rubber" : "game"}
-        </Button>
-      ) : null}
-      {selection ? (
-        <>
-          <RubberSelection teams={setup.teams} value={selection} onChange={setSelection} />
-          <Button
-            size="touch"
-            disabled={
-              !match.ready || !selection.homePlayers.length || !selection.awayPlayers.length
-            }
-            data-testid="rally-start-game"
-            onClick={() => {
-              if (match.applyBatch([{ type: "rubber_started", payload: selection }]))
-                setSelection(null);
-            }}
-          >
-            Start game
-          </Button>
-        </>
-      ) : null}
-      {result ? (
-        <section>
-          <h2 data-testid="rally-result">
-            {result.winnerTeamId
-              ? `${names.teams[result.winnerTeamId]?.name ?? "Winner"} won · `
-              : ""}
-            {result.marginText}
-          </h2>
-          {!state.finished ? (
+        <p className="score-cap">
+          Rubber {rubber?.no ?? 1} · Game {game?.no ?? 1}
+        </p>
+        <div className="rally-score" aria-label="Current points">
+          <strong data-testid="rally-home-points">{game?.points.home ?? 0}</strong>
+          <span>–</span>
+          <strong data-testid="rally-away-points">{game?.points.away ?? 0}</strong>
+        </div>
+        {game && !game.winner && !state.finished ? (
+          <p data-testid="rally-server">
+            Serving: {setup.teams[game.server === "home" ? 0 : 1].name}
+          </p>
+        ) : null}
+        {state.streak ? (
+          <p>
+            {setup.teams[state.streak.side === "home" ? 0 : 1].name} · {state.streak.count} rallies
+            in a row
+          </p>
+        ) : null}
+        <p>Tap the side that won the rally.</p>
+        <div className="rally-point-buttons">
+          {(["home", "away"] as const).map((side, index) => (
             <Button
+              key={side}
               size="touch"
-              data-testid="rally-finish"
-              disabled={!match.ready || match.pending > 0}
+              data-testid={`rally-point-${side}`}
+              disabled={!playable}
               onClick={() => {
-                match.applyBatch([{ type: "finish", payload: {} }]);
+                point(side);
               }}
             >
-              Finish match
+              {setup.teams[index]?.name} · {game?.points[side] ?? 0}
             </Button>
-          ) : (
-            <p>Match finished</p>
-          )}
-        </section>
-      ) : null}
-      <section>
-        <h2>Games</h2>
-        <ul>
-          {state.rubbers.map((row) => (
-            <li key={row.no}>
-              Rubber {row.no}:{" "}
-              {row.games
-                .map((value) => `${String(value.points.home)}–${String(value.points.away)}`)
-                .join(" · ")}
-            </li>
           ))}
-        </ul>
-      </section>
+        </div>
+        <Button
+          variant="secondary"
+          size="touch"
+          data-testid="rally-undo"
+          disabled={!match.ready || state.finished || !state.rallies.length}
+          onClick={() => {
+            match.undo();
+          }}
+        >
+          Undo rally
+        </Button>
+        <Button
+          variant="secondary"
+          size="touch"
+          aria-pressed={details}
+          onClick={() => {
+            setDetails(!details);
+          }}
+        >
+          Track how points end
+        </Button>
+        {details ? (
+          <fieldset>
+            <legend>How the rally ended (optional)</legend>
+            <div className="score-tiles">
+              {(["ace", "winner", "error", "kill", "block", "fault"] as const).map((value) => (
+                <Button
+                  key={value}
+                  variant="secondary"
+                  aria-pressed={endedBy === value}
+                  onClick={() => {
+                    setEndedBy(endedBy === value ? undefined : value);
+                  }}
+                >
+                  {value}
+                </Button>
+              ))}
+            </div>
+          </fieldset>
+        ) : null}
+        {volumeSupported ? (
+          <label>
+            <input
+              type="checkbox"
+              checked={volumeOptIn}
+              onChange={(event) => {
+                setVolumeOptIn(event.target.checked);
+              }}
+            />
+            Use volume buttons: up for {setup.teams[0].name}, down for {setup.teams[1].name}
+          </label>
+        ) : null}
+        {game?.winner && !result && !selection ? (
+          <Button size="touch" data-testid="rally-next-game" onClick={nextGame}>
+            Next {rubber?.winner ? "rubber" : "game"}
+          </Button>
+        ) : null}
+        {selection ? (
+          <>
+            <RubberSelection teams={setup.teams} value={selection} onChange={setSelection} />
+            <Button
+              size="touch"
+              disabled={
+                !match.ready || !selection.homePlayers.length || !selection.awayPlayers.length
+              }
+              data-testid="rally-start-game"
+              onClick={() => {
+                if (match.applyBatch([{ type: "rubber_started", payload: selection }]))
+                  setSelection(null);
+              }}
+            >
+              Start game
+            </Button>
+          </>
+        ) : null}
+        {result ? (
+          <section>
+            <h2 data-testid="rally-result">
+              {result.winnerTeamId
+                ? `${names.teams[result.winnerTeamId]?.name ?? "Winner"} won · `
+                : ""}
+              {result.marginText}
+            </h2>
+            {!state.finished ? (
+              <Button
+                size="touch"
+                data-testid="rally-finish"
+                disabled={!match.ready || match.pending > 0}
+                onClick={() => {
+                  match.applyBatch([{ type: "finish", payload: {} }]);
+                }}
+              >
+                Finish match
+              </Button>
+            ) : finishAccepted ? (
+              <p data-testid="rally-finished">Match finished</p>
+            ) : (
+              <p data-testid="rally-finish-pending">
+                Finish waiting for acceptance{match.error ? " — check the match error above." : "."}
+              </p>
+            )}
+          </section>
+        ) : null}
+      </TaskWorkspace>
     </main>
   );
 }

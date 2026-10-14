@@ -42,8 +42,8 @@ export default function ErrorPage({
           title="Something broke on our side"
           description={
             error.digest !== undefined
-              ? `You didn't lose anything. If this keeps happening, tell support the code ${error.digest}.`
-              : "You didn't lose anything — try again."
+              ? `We couldn't load this screen. Check the latest state before repeating an action. If this keeps happening, tell support the code ${error.digest}.`
+              : "We couldn't load this screen. Check the latest state before repeating an action."
           }
           actions={
             <>

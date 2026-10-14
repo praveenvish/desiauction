@@ -170,6 +170,10 @@ module.exports = {
      * `apps/web/src`. It does not exist in CI, which is exactly why the heap
      * crash only ever happened to a developer and never to the gate.
      *
+     * NEXT_DIST_DIR also names retained validation/rollback builds such as
+     * `.next-ui-refined`; exclude those generated directories with the same
+     * boundary, retaining traversal of every actual source module.
+     *
      * Measured on this tree: a heap crash before, 987 modules in seconds
      * after, with `apps/web/src` coverage unchanged at 532.
      */

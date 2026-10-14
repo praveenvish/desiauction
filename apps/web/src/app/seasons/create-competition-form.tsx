@@ -106,6 +106,13 @@ export function CreateCompetitionForm({
         label="How will teams be formed?"
         name="teamFormation"
         value={formation}
+        help={
+          formation === "auction"
+            ? "Players join the pool; owners build teams in the auction."
+            : formation === "organizer"
+              ? "You assign registered players to teams before scheduling matches."
+              : "Captains submit their squads; you review each team before it joins the season."
+        }
         onChange={(event) => {
           setFormation(event.target.value);
         }}

@@ -45,6 +45,8 @@ vi.mock("next/headers", () => ({
 }));
 vi.mock("next/cache", () => ({ revalidatePath: () => undefined, revalidateTag: () => undefined }));
 
+let recoverySnapshot: string | null = null;
+vi.mock("./engine-reads", () => ({ fetchEngineSnapshot: () => Promise.resolve(recoverySnapshot) }));
 const sent: Record<string, unknown>[] = [];
 vi.mock("./engine-client", () => ({
   sendEngineCommand: (input: Record<string, unknown>) => {
@@ -61,7 +63,7 @@ const { createCompetition } = await import("../competition/competitions");
 const { createOrg } = await import("../orgs/orgs");
 const { purgeOrg } = await import("../test-support/purge-org");
 const { assignAuctioneer } = await import("./auctioneers");
-const { submitAuctionCommand } = await import("./live-actions");
+const { submitAuctionCommand, auctionRecoveryContext } = await import("./live-actions");
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
@@ -73,6 +75,7 @@ const auctioneer = newId();
 let orgId = "";
 let slug = "";
 let paddleId = "";
+let currentAuctionId = "";
 const tokens = new Map<string, string>();
 
 async function sessionFor(personId: string): Promise<string> {
@@ -133,6 +136,7 @@ beforeAll(async () => {
     createdBy: owner,
   });
   const auctionId = newId();
+  currentAuctionId = auctionId;
   await db.insert(auctions).values({
     id: auctionId,
     orgId,
@@ -206,5 +210,46 @@ describe("P0-5 — an appointed auctioneer never bids with a team's paddle", () 
     });
     expect(ack.accepted).toBe(true);
     expect(sent[0]).toMatchObject({ type: "PlaceBid", conduct: true, manage: true });
+  });
+});
+
+describe("E09 authorised recovery read is current state, never a command receipt", () => {
+  it("returns only current actor, exact room and fresh engine version", async () => {
+    as(owner);
+    recoverySnapshot = JSON.stringify({
+      auctionId: currentAuctionId,
+      version: 7,
+      paddles: [{ purseRemaining: 1234 }],
+      privateToken: "must-not-leave",
+    });
+    expect(await auctionRecoveryContext(slug, currentAuctionId)).toEqual({
+      personId: owner,
+      auctionId: currentAuctionId,
+      version: 7,
+    });
+    expect(sent).toEqual([]);
+  });
+  it("allows the current appointed conductor but refuses another room", async () => {
+    as(auctioneer);
+    recoverySnapshot = JSON.stringify({ auctionId: currentAuctionId, version: 8 });
+    expect(await auctionRecoveryContext(slug, currentAuctionId)).toEqual({
+      personId: auctioneer,
+      auctionId: currentAuctionId,
+      version: 8,
+    });
+    expect(await auctionRecoveryContext(slug, newId())).toBeNull();
+    expect(sent).toEqual([]);
+  });
+  it.each([
+    null,
+    "{",
+    "null",
+    JSON.stringify({ auctionId: "different", version: 1 }),
+    JSON.stringify({ auctionId: "same", version: -1 }),
+  ])("unavailable or malformed state does not release recovery: %s", async (value) => {
+    as(owner);
+    recoverySnapshot = value;
+    expect(await auctionRecoveryContext(slug, currentAuctionId)).toBeNull();
+    expect(sent).toEqual([]);
   });
 });

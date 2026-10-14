@@ -1116,6 +1116,8 @@ p.admin-warning {
   }
 
   .admin-lede:has(> nav) + .admin-pagehead-end {
+    min-width: 0;
+    max-width: 100%;
     margin-inline-start: 0;
     justify-content: flex-start;
   }

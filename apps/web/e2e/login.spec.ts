@@ -33,6 +33,7 @@ test("full OTP login journey with dev inbox, then logout", async ({ page }) => {
   await expect(page.getByTestId("account-phone")).toHaveText(formatPhone(`+91${PHONE}`));
 
   await page.getByRole("button", { name: "Sign out" }).click();
+  await page.getByTestId("sign-out-confirm").click();
   await expect(page).toHaveURL(/\/login/);
 });
 

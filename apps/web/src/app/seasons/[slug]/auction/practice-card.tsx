@@ -19,12 +19,14 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import {
-  endPracticeAction,
-  runPracticeAgainAction,
-  startPracticeAction,
+  practiceIntentAction,
   type PracticeCard as PracticeCardView,
   type PracticeTeamState,
 } from "../../../../server/auction/practice-actions";
+
+import { useRoomPresentation } from "./use-room-presentation";
+import { useAuctionCommands } from "./use-auction-commands";
+import { PracticeRecovery } from "./practice-recovery";
 
 const STATE_WORDS: Record<PracticeTeamState, { label: string; tone: KitTone }> = {
   ready: { label: "Ready to bid", tone: "green" },
@@ -50,28 +52,50 @@ export function PracticeCard({ slug, card }: { slug: string; card: PracticeCardV
   const router = useRouter();
   const toast = useToast();
   const [perTeam, setPerTeam] = useState<PracticeSquadSize>(2);
-  const [busy, setBusy] = useState<"start" | "again" | "end" | null>(null);
-  const [confirm, setConfirm] = useState<"again" | "end" | null>(null);
+  const commands = useAuctionCommands(card.personId, card.realAuctionId ?? "no-real-auction", null);
+  const [confirm, setConfirm] = useState<{
+    kind: "again" | "end";
+    practiceId: string;
+    realAuctionId: string;
+    perTeam: PracticeSquadSize;
+  } | null>(null);
   const practice = card.practice;
+  const presentation = useRoomPresentation(
+    card.personId,
+    `${card.realAuctionId ?? "none"}:${practice?.id ?? "none"}`,
+  );
 
-  const run = async (
-    kind: "start" | "again" | "end",
-    act: () => Promise<{ ok: true } | { ok: false; error: string }>,
-    done: string,
-  ) => {
-    setBusy(kind);
-    try {
-      const result = await act();
-      if (!result.ok) {
-        toast({ title: result.error, tone: "danger" });
-        return;
-      }
-      setConfirm(null);
-      toast({ title: done, tone: "success" });
-      router.refresh();
-    } finally {
-      setBusy(null);
-    }
+  const run = async (kind: "start" | "again" | "end") => {
+    if (!card.realAuctionId) return;
+    const capturedRoom = presentation.capture();
+    const practiceId = kind === "start" ? null : (confirm?.practiceId ?? null);
+    const realAuctionId = kind === "start" ? card.realAuctionId : confirm?.realAuctionId;
+    if (!realAuctionId) return;
+    const size = kind === "start" ? perTeam : (confirm?.perTeam ?? perTeam);
+    const type =
+      kind === "start"
+        ? "StartPractice"
+        : kind === "again"
+          ? "RunPracticeAgain"
+          : "EndPracticeLifecycle";
+    const result = await commands.dispatchPractice(
+      kind,
+      type,
+      { realAuctionId, ...(practiceId ? { practiceId } : {}), perTeam: size },
+      (id, frozen) =>
+        practiceIntentAction(
+          slug,
+          kind,
+          String(frozen["realAuctionId"]),
+          typeof frozen["practiceId"] === "string" ? frozen["practiceId"] : null,
+          Number(frozen["perTeam"]),
+          id,
+        ),
+    );
+    if (commands.stopped || !presentation.current(capturedRoom)) return;
+    toast({ title: result.message, tone: result.kind === "accepted" ? "success" : "danger" });
+    if (result.kind === "accepted") setConfirm(null);
+    router.refresh();
   };
 
   const players = practiceLotCount(card.teamCount, perTeam);
@@ -99,6 +123,7 @@ export function PracticeCard({ slug, card }: { slug: string; card: PracticeCardV
                   key={size}
                   size="sm"
                   variant={perTeam === size ? "primary" : "secondary"}
+                  disabled={commands.blocked("StartPractice", {})}
                   aria-pressed={perTeam === size}
                   onClick={() => {
                     setPerTeam(size);
@@ -124,14 +149,11 @@ export function PracticeCard({ slug, card }: { slug: string; card: PracticeCardV
                 : ""}
             </p>
             <Button
-              onClick={() =>
-                void run(
-                  "start",
-                  () => startPracticeAction(slug, perTeam),
-                  "Practice ready — ask your owners to open their auction link",
-                )
-              }
-              loading={busy === "start"}
+              onClick={() => {
+                void run("start");
+              }}
+              loading={commands.pending("start")}
+              disabled={commands.blocked("StartPractice", {})}
               data-testid="practice-start"
             >
               Start practice
@@ -176,8 +198,15 @@ export function PracticeCard({ slug, card }: { slug: string; card: PracticeCardV
             <Button
               variant="secondary"
               onClick={() => {
-                setConfirm("again");
+                if (card.realAuctionId)
+                  setConfirm({
+                    kind: "again",
+                    practiceId: practice.id,
+                    realAuctionId: card.realAuctionId,
+                    perTeam: practice.perTeam,
+                  });
               }}
+              disabled={commands.blocked("RunPracticeAgain", { practiceId: practice.id })}
               data-testid="practice-again"
             >
               Run again
@@ -185,8 +214,15 @@ export function PracticeCard({ slug, card }: { slug: string; card: PracticeCardV
             <Button
               variant="ghost"
               onClick={() => {
-                setConfirm("end");
+                if (card.realAuctionId)
+                  setConfirm({
+                    kind: "end",
+                    practiceId: practice.id,
+                    realAuctionId: card.realAuctionId,
+                    perTeam: practice.perTeam,
+                  });
               }}
+              disabled={commands.blocked("EndPracticeLifecycle", { practiceId: practice.id })}
               data-testid="practice-end"
             >
               End practice
@@ -194,12 +230,24 @@ export function PracticeCard({ slug, card }: { slug: string; card: PracticeCardV
           </div>
         </div>
       )}
+      {commands.markers.some(
+        (marker) =>
+          marker.state !== "reviewed" &&
+          marker.auctionId === practice?.id &&
+          !marker.resources.includes("practice-lifecycle"),
+      ) ? (
+        <p role="status">
+          A practice bid or correction needs review in its auction room before you end or restart
+          it.
+        </p>
+      ) : null}
+      <PracticeRecovery commands={commands} slug={slug} />
       <Dialog
         open={confirm !== null}
         onClose={() => {
           setConfirm(null);
         }}
-        title={confirm === "again" ? "Run the practice again?" : "End the practice?"}
+        title={confirm?.kind === "again" ? "Run the practice again?" : "End the practice?"}
         footer={
           <>
             <Button
@@ -210,20 +258,26 @@ export function PracticeCard({ slug, card }: { slug: string; card: PracticeCardV
             >
               Cancel
             </Button>
-            {confirm === "again" ? (
+            {confirm?.kind === "again" ? (
               <Button
-                onClick={() =>
-                  void run("again", () => runPracticeAgainAction(slug), "A fresh practice is ready")
-                }
-                loading={busy === "again"}
+                onClick={() => {
+                  void run("again");
+                }}
+                loading={commands.pending("again")}
+                disabled={commands.blocked("RunPracticeAgain", { practiceId: confirm.practiceId })}
                 data-testid="confirm-practice-again"
               >
                 Run again
               </Button>
             ) : (
               <Button
-                onClick={() => void run("end", () => endPracticeAction(slug), "Practice ended")}
-                loading={busy === "end"}
+                onClick={() => {
+                  void run("end");
+                }}
+                loading={commands.pending("end")}
+                disabled={commands.blocked("EndPracticeLifecycle", {
+                  practiceId: confirm?.practiceId,
+                })}
                 data-testid="confirm-practice-end"
               >
                 End practice
@@ -233,7 +287,7 @@ export function PracticeCard({ slug, card }: { slug: string; card: PracticeCardV
         }
       >
         <p>
-          {confirm === "again"
+          {confirm?.kind === "again"
             ? "Everyone starts over with full purses and the same players. Owners stay where they are — their screens move to the new practice by themselves."
             : "Everyone in the practice moves to the real auction's waiting room. You can start another practice any time before the real auction."}
         </p>

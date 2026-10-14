@@ -1,6 +1,12 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { scoringSession, seedScoringFixture, readScoringFixture } from "./scoring-fixtures";
+import {
+  scoringSession,
+  seedScoringFixture,
+  readScoringFixture,
+  committedQueue,
+  persistedQueue,
+} from "./scoring-fixtures";
 async function capture(page: Page, name: string) {
   // A goal sting slides in with a transform; measuring mid-flight reads its
   // overshoot as page overflow. Let finite animations finish (bounded).
@@ -19,6 +25,57 @@ async function capture(page: Page, name: string) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: test.info().outputPath(`${name}.png`), fullPage: true });
 }
+test("an offline timed finish retains its queue and offers result navigation only after acceptance", async ({
+  page,
+  context,
+}) => {
+  const fixture = await seedScoringFixture({
+    sport: "basketball",
+    formatKey: "basketball_40",
+    publicDelaySeconds: 0,
+  });
+  await scoringSession(context, fixture.actorToken);
+  await page.goto(`/score/${fixture.fixtureId}/setup`);
+  await page.getByRole("button", { name: "Start match", exact: true }).click();
+  await page.getByRole("button", { name: "Start period 1", exact: true }).click();
+  await page.getByRole("button", { name: "+ 3 points", exact: true }).click();
+  for (let period = 1; period <= 4; period++) {
+    await page.getByRole("button", { name: `End period ${String(period)}`, exact: true }).click();
+    if (period < 4)
+      await page
+        .getByRole("button", { name: `Start period ${String(period + 1)}`, exact: true })
+        .click();
+  }
+  await expect(page.getByRole("status").filter({ hasText: /^Saved$/ })).toHaveText("Saved");
+  await page.goto("/score");
+  await page.getByRole("button", { name: "Get ready for match day", exact: true }).click();
+  await expect(page.getByText("✓ Works offline", { exact: true })).toBeVisible({ timeout: 30000 });
+  await page.goto(`/score/${fixture.fixtureId}`);
+  await expect(page.getByRole("button", { name: "Finish match", exact: true })).toBeEnabled();
+  await context.setOffline(true);
+  await page.getByRole("button", { name: "Finish match", exact: true }).click();
+  const queued = await committedQueue(page, fixture.fixtureId, ["finish"]);
+  await expect(page.getByText("Finish waiting for acceptance", { exact: true })).toBeVisible();
+  await expect(page.getByText("Match finished", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "View result", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Next match", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Watch live", exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("Finish waiting for acceptance", { exact: true })).toBeVisible();
+  expect((await persistedQueue(page, fixture.fixtureId)).map((item) => item.event.eventId)).toEqual(
+    queued,
+  );
+  await expect(page.getByRole("link", { name: "View result", exact: true })).toHaveCount(0);
+  await context.setOffline(false);
+  await expect(page.getByText("Match finished", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "View result", exact: true })).toBeVisible();
+  const terminal = await readScoringFixture(fixture.fixtureId);
+  expect(terminal.match?.phase).toBe("finished");
+  expect(
+    terminal.events.filter((event) => event.type === "finish").map((event) => event.eventId),
+  ).toEqual(queued);
+  expect(terminal.result).toBeTruthy();
+});
 for (const theme of ["daylight", "floodlight"] as const) {
   test(`Football two halves, red removal, offline goal, draw and shootout · ${theme}`, async ({
     page,
@@ -151,6 +208,10 @@ for (const theme of ["daylight", "floodlight"] as const) {
       await expect(page.getByText("Match finished", { exact: true })).toBeVisible();
       // The finish is queued like any entry; leave the pad only once it is sent.
       await expect(page.getByRole("status").filter({ hasText: /^Saved$/ })).toHaveText("Saved");
+      const terminal = await readScoringFixture(fixture.fixtureId);
+      expect(terminal.match?.phase).toBe("finished");
+      expect(terminal.events.filter((event) => event.type === "finish")).toHaveLength(1);
+      expect(terminal.result).toBeTruthy();
       await page.goto(`/c/${fixture.slug}/m/Match%201`);
       await expect(page.getByTestId("live-result")).toContainText(
         sport === "basketball" ? "3 points" : "1 goals",

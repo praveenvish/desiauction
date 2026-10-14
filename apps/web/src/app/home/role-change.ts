@@ -16,16 +16,30 @@
  * failure than a migration for a sentence.
  */
 
-export type RoleToken = "organizer" | "owner" | "auctioneer" | "player";
+export type RoleToken =
+  "organizer" | "owner" | "auctioneer" | "player" | "scorer" | "manager" | "finance" | "operator";
 
 /** The order the rail uses, so the sentence and the menu agree. */
-const ORDER: RoleToken[] = ["owner", "auctioneer", "organizer", "player"];
+const ORDER: RoleToken[] = [
+  "scorer",
+  "manager",
+  "owner",
+  "auctioneer",
+  "organizer",
+  "player",
+  "finance",
+  "operator",
+];
 
 const ANNOUNCEMENT: Record<RoleToken, { title: string; item: string }> = {
   owner: { title: "You're now a team owner", item: "My team" },
   auctioneer: { title: "You're now an auctioneer", item: "Auction nights" },
   organizer: { title: "You can now run tournaments", item: "Tournaments" },
   player: { title: "You're registered to play", item: "My profile" },
+  scorer: { title: "You have a scoring appointment", item: "Score" },
+  manager: { title: "You have a team-manager assignment", item: "Score" },
+  finance: { title: "You have a finance responsibility", item: "Money" },
+  operator: { title: "You have a platform assignment", item: "Platform admin" },
 };
 
 export interface RoleChange {
@@ -61,7 +75,15 @@ export function roleChangeFor(held: readonly RoleToken[], seen: string | null): 
     return null;
   }
   const before = new Set(seen.split(",").filter(Boolean));
-  const added = ORDER.filter((token) => held.includes(token) && !before.has(token));
+  const added = ORDER.filter(
+    (token) =>
+      held.includes(token) &&
+      !before.has(token) &&
+      !ORDER.some(
+        (previous) =>
+          before.has(previous) && ANNOUNCEMENT[previous].item === ANNOUNCEMENT[token].item,
+      ),
+  );
   const first = added[0];
   if (first === undefined) {
     return null;

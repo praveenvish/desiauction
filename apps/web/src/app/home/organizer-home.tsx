@@ -330,7 +330,7 @@ export async function OrganizerHome({
   // The scan used to be a sequential loop of composite reads; one batch now,
   // with the live board and the focus season's overview riding along.
   // Only managers are asked what is waiting on them.
-  const scanned = view.competitions.slice(0, ATTENTION_SCAN_LIMIT);
+  const scanned = managedSeasons.slice(0, ATTENTION_SCAN_LIMIT);
   const [liveBoard, focusOverview, scannedRows] = await Promise.all([
     liveRow === null
       ? Promise.resolve(null)
@@ -369,7 +369,7 @@ export async function OrganizerHome({
     })),
     ...scannedRows.flat().filter((row): row is AttentionRow => row !== null),
   ];
-  const unscanned = view.competitions.length - scanned.length;
+  const unscanned = managedSeasons.length - scanned.length;
 
   const seasonNeedingTeams =
     view.competitions.find((competition) => (dash.counts[competition.id]?.teams ?? 0) === 0) ??

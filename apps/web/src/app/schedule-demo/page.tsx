@@ -1,3 +1,4 @@
+import { START_CLUB_LOGIN } from "../../lib/start-intent";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -100,7 +101,7 @@ export default async function ScheduleDemoPage({
               questions as they come up.
             </p>
             <p>
-              <Link href="/login">Set up your tournament</Link>
+              <Link href={START_CLUB_LOGIN}>Set up your tournament</Link>
             </p>
             <p className="demo-footnote">
               Only want to write to a person?{" "}

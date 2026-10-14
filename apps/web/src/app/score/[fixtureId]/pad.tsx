@@ -3,7 +3,7 @@ import { bowlingStyleLabel } from "@desiauction/core";
 import { Component, useEffect, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { PlayerPortrait, Button, Dialog } from "@desiauction/ui";
+import { PlayerPortrait, Button, Dialog, TaskWorkspace } from "@desiauction/ui";
 import {
   publicLiveState,
   deriveResult,
@@ -295,593 +295,655 @@ export function Pad({
         <p>Sign in again to open this match.</p>
       </main>
     );
+  // Pending amendments may optimistically alter a ball whose original event is accepted.
+  // Until every pending event is reconciled, do not label that projected summary accepted.
+  const acceptedRecent =
+    match.ready && match.pending === 0
+      ? (inning?.overs
+          .flatMap((over) => over.balls)
+          .filter((ball) => match.accepted(ball.eventId))
+          .slice(-6)
+          .reverse() ?? [])
+      : [];
   return (
     <main className="pad" data-testid="pad" lang={language}>
-      <h1 className="pad-title">{setup.fixtureNumber} scoring</h1>
-      <header className="pad-top">
-        <span className="score-cap">Live</span>
-        <span data-testid="pad-sync" data-pending={match.pending} aria-live="polite">
-          {match.pending ? `${String(match.pending)} waiting` : copy.allSent}
-        </span>
-      </header>
-      {match.offline && (
-        <div className="pad-offline" data-testid="pad-offline-banner" role="status">
-          No signal · {match.pending} {copy.offlineSaved}
-        </div>
-      )}
-      <Button
-        variant="ghost"
-        data-testid="claim-force"
-        disabled={
-          match.offline ||
-          takingOver ||
-          match.pending > 0 ||
-          state.phase === "void" ||
-          state.finished
-        }
-        onClick={() => {
-          setTakeoverError(null);
-          setTakeover(true);
-        }}
-      >
-        Take over scoring
-      </Button>
-      {takeover && (
-        <Dialog
-          open
-          title="Take over scoring?"
-          onClose={() => {
-            if (!takingOver) setTakeover(false);
-          }}
-          footer={
-            <Button
-              disabled={takingOver || match.offline || match.pending > 0}
-              onClick={() => {
-                setTakingOver(true);
-                void match
-                  .takeOver()
-                  .then(() => {
-                    setTakeover(false);
-                  })
-                  .catch((error: unknown) => {
-                    setTakeoverError(
-                      error instanceof Error ? error.message : "Could not take over scoring.",
-                    );
-                  })
-                  .finally(() => {
-                    setTakingOver(false);
-                  });
-              }}
-            >
-              {takingOver ? "Checking match…" : "Confirm takeover"}
-            </Button>
-          }
-        >
-          <p>
-            This phone will become the scoring device. The current scorer must have been quiet for
-            two minutes unless you organise this match. Saved deliveries stay on their original
-            phone.
-          </p>
-          {takeoverError && <p role="alert">{takeoverError}</p>}
-        </Dialog>
-      )}
-      <section className="pad-score-card" aria-label="Match score">
-        <div>
-          <p className="score-cap">
-            {batting?.name ?? "Match"}
-            {inning?.target ? ` · Chasing ${String(inning.target)}` : ""}
-          </p>
-          <div className="pad-score-line">
-            <strong data-testid="pad-score">
-              {inning?.runs ?? 0}/{inning?.wickets ?? 0}
-            </strong>
-            <span data-testid="pad-overs">
-              ({inning ? `${String(inning.completedOvers)}.${String(inning.ballsInOver)}` : "0.0"})
-            </span>
+      <TaskWorkspace
+        className="pad-workspace"
+        label={`${setup.fixtureNumber} scoring`}
+        supportingLabel={copy.recentAccepted}
+        supporting={
+          <div className="pad-recent" data-testid="pad-recent">
+            <h2>{copy.recentAccepted}</h2>
+            {!match.ready ? (
+              <p>{copy.loadingHistory}</p>
+            ) : match.pending > 0 ? (
+              <p>{copy.awaitingAcceptance}</p>
+            ) : acceptedRecent.length > 0 ? (
+              <ol>
+                {acceptedRecent.map((ball) => (
+                  <li key={ball.eventId}>
+                    <span>
+                      {ball.over} · {names.players[ball.strikerId]?.name ?? "Player"}
+                    </span>
+                    <strong>{ball.wicket ? "W" : String(ball.total)}</strong>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p>{copy.noAccepted}</p>
+            )}
           </div>
-          <p data-testid="pad-need">{live.situation}</p>
+        }
+      >
+        <div className="pad-fixture-context">
+          <span>
+            {copy.fixture} {setup.fixtureNumber}
+          </span>
+          <strong>{setup.teams.map((team) => team.name).join(" · ")}</strong>
         </div>
-        {left !== null && (
-          <div className="pad-balls">
-            <svg viewBox="0 0 80 80" aria-hidden="true">
-              <circle cx="40" cy="40" r="34" />
-              <circle
-                cx="40"
-                cy="40"
-                r="34"
-                pathLength="100"
-                strokeDasharray={`${String(fraction * 100)} 100`}
-              />
-            </svg>
-            <strong>{left}</strong>
-            <small>balls left</small>
+        <h1 className="pad-title">{setup.fixtureNumber} scoring</h1>
+        <header className="pad-top">
+          <span className="score-cap" data-testid="pad-phase">
+            {!match.ready
+              ? copy.loadingHistory
+              : match.pending > 0 &&
+                  (state.phase === "void" || state.finished || state.phase === "interrupted")
+                ? copy.awaitingAcceptance
+                : state.phase === "void"
+                  ? copy.void
+                  : state.finished
+                    ? copy.finished
+                    : state.phase === "interrupted"
+                      ? copy.interrupted
+                      : copy.live}
+          </span>
+          <span data-testid="pad-sync" data-pending={match.pending} aria-live="polite">
+            {match.pending ? `${String(match.pending)} waiting` : copy.allSent}
+          </span>
+        </header>
+        {match.offline && (
+          <div className="pad-offline" data-testid="pad-offline-banner" role="status">
+            No signal · {match.pending} {copy.offlineSaved}
           </div>
         )}
-      </section>
-      {inning?.freeHitNext && (
-        <div className="pad-free-hit" data-testid="pad-free-hit">
-          {copy.freeHit}
-        </div>
-      )}
-      <section className="pad-batters" aria-label="Batters">
-        {[inning?.strikerId, inning?.nonStrikerId].map((id, index) => {
-          const player = id ? names.players[id] : undefined;
-          const line = id ? inning?.batters[id] : undefined;
-          return (
-            <div className={`pad-batter ${index === 0 ? "pad-striker" : ""}`} key={index}>
-              <PlayerPortrait
-                name={player?.name ?? "Player"}
-                seed={id ?? ""}
-                src={player?.photoUrl}
-                decorative
-                className="pad-portrait"
-              />
-              <div>
-                <strong>
-                  {index === 0 ? "★ " : ""}
-                  {player?.name ?? "Pick batter"}
-                </strong>
-                <small>
-                  {line?.runs ?? 0} ({line?.balls ?? 0})
-                </small>
-              </div>
-            </div>
-          );
-        })}
-        <button
-          className="pad-swap"
-          type="button"
-          aria-label="Swap strike"
-          disabled={!canScore}
+        <Button
+          variant="ghost"
+          data-testid="claim-force"
+          disabled={
+            match.offline ||
+            takingOver ||
+            match.pending > 0 ||
+            state.phase === "void" ||
+            state.finished
+          }
           onClick={() => {
-            match.apply("strike_swapped", {});
+            setTakeoverError(null);
+            setTakeover(true);
           }}
         >
-          ⇄
-        </button>
-      </section>
-      <section className="pad-bowler" aria-label={copy.nextBowler}>
-        <PlayerPortrait
-          name={bowler?.name ?? "Player"}
-          src={bowler?.photoUrl}
-          seed={inning?.bowlerId ?? ""}
-          decorative
-          className="pad-portrait"
-        />
-        <div>
-          <strong>{bowler?.name ?? copy.nextBowler}</strong>
-          <small>{bowlerStyle || "Style not set"}</small>
-        </div>
-        <span>{inning?.bowlerId ? (live.bowler?.figures ?? "") : ""}</span>
-      </section>
-      <div className="pad-over" role="group" aria-label="This over">
-        {inning?.overs.at(-1)?.balls.map((ball) => (
-          <button
-            type="button"
-            key={ball.eventId}
-            aria-label={`Edit delivery ${ball.over}`}
-            disabled={!match.ready || state.phase === "void"}
-            onClick={() => {
-              setEditing(ball);
-            }}
-          >
-            {ball.wicket
-              ? "W"
-              : ball.extras.wides
-                ? "Wd"
-                : ball.extras.noBall
-                  ? "Nb"
-                  : ball.total === 0
-                    ? "•"
-                    : ball.total}
-          </button>
-        ))}
-      </div>
-      <Button
-        variant="ghost"
-        disabled={!match.ready || state.phase === "void"}
-        onClick={() => {
-          setHistoryOpen(true);
-        }}
-      >
-        Edit an earlier delivery
-      </Button>
-      <div className="pad-controls">
-        <p className="pad-instruction">{modifier ? copy.nowRuns : copy.tapRuns}</p>
-        <div className="pad-modifiers">
-          {(["wide", "noBall", "bye", "legBye"] as const).map((key) => (
-            <button
-              type="button"
-              key={key}
-              data-testid={`pad-mod-${key === "noBall" ? "noball" : key === "legBye" ? "legbye" : key}`}
-              aria-pressed={modifier === key}
-              disabled={!canScore}
-              onClick={() => {
-                setModifier(modifier === key ? null : key);
-              }}
-            >
-              {copy[key]}
-            </button>
-          ))}
-        </div>
-        <div className="pad-run-grid">
-          {[0, 1, 2, 3, 4, 6, 5].map((value) => (
-            <button
-              type="button"
-              key={value}
-              data-testid={`pad-run-${String(value)}`}
-              className={value === 4 || value === 6 ? "pad-boundary" : ""}
-              disabled={!canScore}
-              aria-label={value === 0 ? "Dot ball" : String(value)}
-              onClick={() => {
-                run(value);
-              }}
-            >
-              {value === 0 ? "•" : value}
-            </button>
-          ))}
-          <button
-            type="button"
-            data-testid="pad-run-more"
-            disabled={!canScore}
-            onClick={() => {
-              setMore(true);
-            }}
-          >
-            7+
-          </button>
-        </div>
-        <div className="pad-bottom">
-          <button
-            type="button"
-            data-testid="pad-wicket"
-            disabled={!canScore}
-            onClick={() => {
-              setWicket(true);
-            }}
-            className="pad-wicket"
-          >
-            {copy.wicket}
-          </button>
-          <button
-            type="button"
-            data-testid="pad-undo"
-            disabled={!match.ready}
-            onClick={() => {
-              match.undo();
-              setToast(null);
-            }}
-          >
-            {copy.undo}
-          </button>
-          <button
-            type="button"
-            data-testid="pad-menu"
-            aria-label="Match options"
-            disabled={!match.ready || !state.format || state.phase === "void"}
-            onClick={() => {
-              setMenu(true);
-            }}
-          >
-            ⋯
-          </button>
-        </div>
-      </div>
-      {toast && (
-        <div role="status" className="pad-toast" data-testid="pad-toast">
-          {toast.label} saved
-          <button
-            type="button"
-            onClick={() => {
-              match.undo(toast.id);
-              setToast(null);
-            }}
-          >
-            {copy.undo}
-          </button>
-        </div>
-      )}
-      <SheetBoundary
-        onRetry={() => {
-          void match.whenDurable().then(() => {
-            location.reload();
-          });
-        }}
-      >
-        <div className="pad-modal">
+          Take over scoring
+        </Button>
+        {takeover && (
           <Dialog
-            open={historyOpen}
+            open
+            title="Take over scoring?"
             onClose={() => {
-              setHistoryOpen(false);
+              if (!takingOver) setTakeover(false);
             }}
-            title="Recorded deliveries"
-          >
-            <div className="scoring-menu-rows">
-              {state.innings.flatMap((recorded) =>
-                recorded.overs.flatMap((over) =>
-                  over.balls.map((ball) => (
-                    <Button
-                      key={ball.eventId}
-                      variant="ghost"
-                      onClick={() => {
-                        setHistoryOpen(false);
-                        setEditing(ball);
-                      }}
-                    >
-                      Innings {recorded.no} · {ball.over} ·{" "}
-                      {names.players[ball.strikerId]?.name ?? "Player"} · {ball.total} runs
-                      {ball.wicket ? " · wicket" : ""}
-                    </Button>
-                  )),
-                ),
-              )}
-            </div>
-          </Dialog>
-
-          {result && !finishDismissed && !menu && !handover && !editing && !revise && (
-            <FinishSheet
-              result={result}
-              names={names}
-              finished={state.finished}
-              pending={match.pending}
-              sharePath={sharePath}
-              nextMatch={nextMatch}
-              onBack={() => {
-                setFinishDismissed(true);
-              }}
-              onFinish={() => {
-                match.apply("finish", {});
-              }}
-            />
-          )}
-
-          {handover && (
-            <SheetBoundary
-              onRetry={() => {
-                void match.whenDurable().then(() => {
-                  location.reload();
-                });
-              }}
-            >
-              <HandoverSheet
-                fixtureId={fixtureId}
-                pending={match.pending}
-                onClose={() => {
-                  setHandover(false);
-                }}
-              />
-            </SheetBoundary>
-          )}
-          {menu && (
-            <MenuSheet
-              onHandover={() => {
-                setMenu(false);
-                setHandover(true);
-              }}
-              state={state}
-              names={names}
-              organiser={setup.organiser}
-              shotMode={shotMode}
-              onShotMode={(value) => {
-                localStorage.setItem(`ls1:shot-map:${fixtureId}`, value);
-                setShotMode(value);
-              }}
-              onTheme={changeTheme}
-              onClose={() => {
-                setMenu(false);
-              }}
-              onRevise={() => {
-                setMenu(false);
-                setRevise(true);
-              }}
-              onEvent={(entry) => {
-                if (match.applyBatch([entry])) setMenu(false);
-              }}
-            />
-          )}
-          {revise && (
-            <ReviseSheet
-              state={state}
-              onClose={() => {
-                setRevise(false);
-              }}
-              onSave={(payload) => {
-                if (match.apply("revise", payload)) setRevise(false);
-              }}
-            />
-          )}
-          {editing && (
-            <EditBallSheet
-              key={editing.eventId}
-              ball={editing}
-              state={state}
-              names={names}
-              onClose={() => {
-                setEditing(null);
-              }}
-              onSave={(payload) => {
-                if (match.apply("amend", { payload }, editing.eventId)) setEditing(null);
-              }}
-              onVoid={() => {
-                if (match.apply("void", {}, editing.eventId)) setEditing(null);
-              }}
-            />
-          )}
-
-          {wicket && wicketPayload && (
-            <WicketSheet
-              state={state}
-              payload={wicketPayload}
-              names={names}
-              preview={(entries) => match.preview(entries)}
-              onClose={() => {
-                setWicket(false);
-              }}
-              onConfirm={(entries) => {
-                try {
-                  if (match.applyBatch(entries)) {
-                    setWicket(false);
-                    setModifier(null);
-                  }
-                } catch {
-                  setWicket(false);
-                }
-              }}
-            />
-          )}
-          {!wicket && activeShot && (
-            <ShotSheet
-              hand={activeShot.hand}
-              name={names.players[activeShot.payload.strikerId]?.name ?? "Player"}
-              language={language}
-              onClose={closeShot}
-              onShot={(value) => {
-                match.apply(
-                  "amend",
-                  { payload: { ...activeShot.payload, shot: value } },
-                  activeShot.id,
-                );
-                setShot(null);
-              }}
-            />
-          )}
-          {!historyOpen &&
-            !menu &&
-            !handover &&
-            !revise &&
-            !editing &&
-            !wicket &&
-            !shot &&
-            !match.error &&
-            match.ready &&
-            (startInnings?.kind === "start_innings" ? (
-              <InningsStartSheet
-                key={`${String(state.attempt)}:${String(startInnings.inningsNo)}:${startInnings.battingTeamId}`}
-                state={state}
-                names={names}
-                onConfirm={(players) => {
-                  const payload = inningsStartPayload(
-                    match.preview([]),
-                    {
-                      attempt: state.attempt,
-                      inningsNo: startInnings.inningsNo,
-                      battingTeamId: startInnings.battingTeamId,
-                    },
-                    players,
-                  );
-                  return Boolean(match.apply("innings_started", payload));
-                }}
-              />
-            ) : pickBatter?.kind === "pick_new_batter" ? (
-              <BatterSheet
-                names={names}
-                suggestedId={pickBatter.suggestedId}
-                ids={
-                  inning
-                    ? (state.lineups[inning.battingTeamId]?.battingOrder.filter(
-                        (id) =>
-                          id !== inning.strikerId &&
-                          id !== inning.nonStrikerId &&
-                          !inning.outIds.includes(id) &&
-                          !inning.retiredHurt.includes(id) &&
-                          !inning.absentBatterIds.includes(id),
-                      ) ?? [])
-                    : []
-                }
-                onPick={(id) => {
-                  match.apply("new_batter", { registrationId: id, end: pickBatter.end });
-                }}
-              />
-            ) : pickBowler?.kind === "pick_bowler" ? (
-              <BowlerSheet
-                names={names}
-                matchupHint={inning?.strikerId ? (matchupHints[inning.strikerId] ?? null) : null}
-                action={pickBowler}
-                onPick={(id) => {
-                  match.apply("bowler_set", { bowlerId: id, midOver: false });
-                }}
-              />
-            ) : askStyle?.kind === "ask_style" ? (
-              <StyleAsk
-                key={`${askStyle.registrationId}:${askStyle.what}`}
-                action={askStyle}
-                profile={players.find((player) => player.id === askStyle.registrationId)}
-                name={names.players[askStyle.registrationId]?.name ?? "Player"}
-                onSkip={() => {
-                  localStorage.setItem(
-                    dismissalKey(fixtureId, askStyle.registrationId, askStyle.what),
-                    "1",
-                  );
-                  setDismissed(
-                    (previous) =>
-                      new Set([...previous, `${askStyle.registrationId}:${askStyle.what}`]),
-                  );
-                }}
-                onSave={(payload) => {
-                  match.apply("style_set", payload);
-                }}
-              />
-            ) : null)}
-          <Dialog
-            open={more}
-            onClose={() => {
-              setMore(false);
-            }}
-            title="Seven or more runs"
-            footer={
-              <>
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setMore(false);
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={() => {
-                    run(extraRuns);
-                  }}
-                >
-                  Save {extraRuns} runs
-                </Button>
-              </>
-            }
-          >
-            <label>
-              Runs off this delivery
-              <input
-                type="number"
-                min="7"
-                max="10"
-                step="1"
-                value={extraRuns}
-                onChange={(event) => {
-                  setExtraRuns(Math.min(10, Math.max(7, Math.trunc(Number(event.target.value)))));
-                }}
-              />
-            </label>
-          </Dialog>
-          <Dialog
-            open={Boolean(match.error)}
-            onClose={() => {
-              match.dismissError();
-            }}
-            title="Scoring entry refused"
             footer={
               <Button
+                disabled={takingOver || match.offline || match.pending > 0}
                 onClick={() => {
-                  match.dismissError();
+                  setTakingOver(true);
+                  void match
+                    .takeOver()
+                    .then(() => {
+                      setTakeover(false);
+                    })
+                    .catch((error: unknown) => {
+                      setTakeoverError(
+                        error instanceof Error ? error.message : "Could not take over scoring.",
+                      );
+                    })
+                    .finally(() => {
+                      setTakingOver(false);
+                    });
                 }}
               >
-                Close
+                {takingOver ? "Checking match…" : "Confirm takeover"}
               </Button>
             }
           >
-            <p role="alert">{match.error}</p>
+            <p>
+              This phone will become the scoring device. The current scorer must have been quiet for
+              two minutes unless you organise this match. Saved deliveries stay on their original
+              phone.
+            </p>
+            {takeoverError && <p role="alert">{takeoverError}</p>}
           </Dialog>
+        )}
+        <section className="pad-score-card" aria-label="Match score">
+          <div>
+            <p className="score-cap">
+              {batting?.name ?? "Match"}
+              {inning?.target ? ` · Chasing ${String(inning.target)}` : ""}
+            </p>
+            <div className="pad-score-line">
+              <strong data-testid="pad-score">
+                {inning?.runs ?? 0}/{inning?.wickets ?? 0}
+              </strong>
+              <span data-testid="pad-overs">
+                ({inning ? `${String(inning.completedOvers)}.${String(inning.ballsInOver)}` : "0.0"}
+                )
+              </span>
+            </div>
+            <p data-testid="pad-need">{live.situation}</p>
+          </div>
+          {left !== null && (
+            <div className="pad-balls">
+              <svg viewBox="0 0 80 80" aria-hidden="true">
+                <circle cx="40" cy="40" r="34" />
+                <circle
+                  cx="40"
+                  cy="40"
+                  r="34"
+                  pathLength="100"
+                  strokeDasharray={`${String(fraction * 100)} 100`}
+                />
+              </svg>
+              <strong>{left}</strong>
+              <small>balls left</small>
+            </div>
+          )}
+        </section>
+        {inning?.freeHitNext && (
+          <div className="pad-free-hit" data-testid="pad-free-hit">
+            {copy.freeHit}
+          </div>
+        )}
+        <section className="pad-batters" aria-label="Batters">
+          {[inning?.strikerId, inning?.nonStrikerId].map((id, index) => {
+            const player = id ? names.players[id] : undefined;
+            const line = id ? inning?.batters[id] : undefined;
+            return (
+              <div className={`pad-batter ${index === 0 ? "pad-striker" : ""}`} key={index}>
+                <PlayerPortrait
+                  name={player?.name ?? "Player"}
+                  seed={id ?? ""}
+                  src={player?.photoUrl}
+                  decorative
+                  className="pad-portrait"
+                />
+                <div>
+                  <strong>
+                    {index === 0 ? "★ " : ""}
+                    {player?.name ?? "Pick batter"}
+                  </strong>
+                  <small>
+                    {line?.runs ?? 0} ({line?.balls ?? 0})
+                  </small>
+                </div>
+              </div>
+            );
+          })}
+          <button
+            className="pad-swap"
+            type="button"
+            aria-label="Swap strike"
+            disabled={!canScore}
+            onClick={() => {
+              match.apply("strike_swapped", {});
+            }}
+          >
+            ⇄
+          </button>
+        </section>
+        <section className="pad-bowler" aria-label={copy.nextBowler}>
+          <PlayerPortrait
+            name={bowler?.name ?? "Player"}
+            src={bowler?.photoUrl}
+            seed={inning?.bowlerId ?? ""}
+            decorative
+            className="pad-portrait"
+          />
+          <div>
+            <strong>{bowler?.name ?? copy.nextBowler}</strong>
+            <small>{bowlerStyle || "Style not set"}</small>
+          </div>
+          <span>{inning?.bowlerId ? (live.bowler?.figures ?? "") : ""}</span>
+        </section>
+        <div className="pad-over" role="group" aria-label="This over">
+          {inning?.overs.at(-1)?.balls.map((ball) => (
+            <button
+              type="button"
+              key={ball.eventId}
+              aria-label={`Edit delivery ${ball.over}`}
+              disabled={!match.ready || state.phase === "void"}
+              onClick={() => {
+                setEditing(ball);
+              }}
+            >
+              {ball.wicket
+                ? "W"
+                : ball.extras.wides
+                  ? "Wd"
+                  : ball.extras.noBall
+                    ? "Nb"
+                    : ball.total === 0
+                      ? "•"
+                      : ball.total}
+            </button>
+          ))}
         </div>
-      </SheetBoundary>
+        <Button
+          variant="ghost"
+          disabled={!match.ready || state.phase === "void"}
+          onClick={() => {
+            setHistoryOpen(true);
+          }}
+        >
+          Edit an earlier delivery
+        </Button>
+        <div className="pad-controls">
+          <p className="pad-instruction">{modifier ? copy.nowRuns : copy.tapRuns}</p>
+          <div className="pad-modifiers">
+            {(["wide", "noBall", "bye", "legBye"] as const).map((key) => (
+              <button
+                type="button"
+                key={key}
+                data-testid={`pad-mod-${key === "noBall" ? "noball" : key === "legBye" ? "legbye" : key}`}
+                aria-pressed={modifier === key}
+                disabled={!canScore}
+                onClick={() => {
+                  setModifier(modifier === key ? null : key);
+                }}
+              >
+                {copy[key]}
+              </button>
+            ))}
+          </div>
+          <div className="pad-run-grid">
+            {[0, 1, 2, 3, 4, 6, 5].map((value) => (
+              <button
+                type="button"
+                key={value}
+                data-testid={`pad-run-${String(value)}`}
+                className={value === 4 || value === 6 ? "pad-boundary" : ""}
+                disabled={!canScore}
+                aria-label={value === 0 ? "Dot ball" : String(value)}
+                onClick={() => {
+                  run(value);
+                }}
+              >
+                {value === 0 ? "•" : value}
+              </button>
+            ))}
+            <button
+              type="button"
+              data-testid="pad-run-more"
+              disabled={!canScore}
+              onClick={() => {
+                setMore(true);
+              }}
+            >
+              7+
+            </button>
+          </div>
+          <div className="pad-bottom">
+            <button
+              type="button"
+              data-testid="pad-wicket"
+              disabled={!canScore}
+              onClick={() => {
+                setWicket(true);
+              }}
+              className="pad-wicket"
+            >
+              {copy.wicket}
+            </button>
+            <button
+              type="button"
+              data-testid="pad-undo"
+              disabled={!match.ready}
+              onClick={() => {
+                match.undo();
+                setToast(null);
+              }}
+            >
+              {copy.undo}
+            </button>
+            <button
+              type="button"
+              data-testid="pad-menu"
+              aria-label="Match options"
+              disabled={!match.ready || !state.format || state.phase === "void"}
+              onClick={() => {
+                setMenu(true);
+              }}
+            >
+              ⋯
+            </button>
+          </div>
+        </div>
+        {toast && (
+          <div role="status" className="pad-toast" data-testid="pad-toast">
+            {toast.label} ·{" "}
+            {match.accepted(toast.id) ? copy.deliveryAccepted : copy.awaitingAcceptance}
+            <button
+              type="button"
+              onClick={() => {
+                match.undo(toast.id);
+                setToast(null);
+              }}
+            >
+              {copy.undo}
+            </button>
+          </div>
+        )}
+        <SheetBoundary
+          onRetry={() => {
+            void match.whenDurable().then(() => {
+              location.reload();
+            });
+          }}
+        >
+          <div className="pad-modal">
+            <Dialog
+              open={historyOpen}
+              onClose={() => {
+                setHistoryOpen(false);
+              }}
+              title="Recorded deliveries"
+            >
+              <div className="scoring-menu-rows">
+                {state.innings.flatMap((recorded) =>
+                  recorded.overs.flatMap((over) =>
+                    over.balls.map((ball) => (
+                      <Button
+                        key={ball.eventId}
+                        variant="ghost"
+                        onClick={() => {
+                          setHistoryOpen(false);
+                          setEditing(ball);
+                        }}
+                      >
+                        Innings {recorded.no} · {ball.over} ·{" "}
+                        {names.players[ball.strikerId]?.name ?? "Player"} · {ball.total} runs
+                        {ball.wicket ? " · wicket" : ""}
+                      </Button>
+                    )),
+                  ),
+                )}
+              </div>
+            </Dialog>
+
+            {result && !finishDismissed && !menu && !handover && !editing && !revise && (
+              <FinishSheet
+                result={result}
+                names={names}
+                finished={state.finished}
+                pending={match.pending}
+                ready={match.ready}
+                error={match.error}
+                sharePath={sharePath}
+                nextMatch={nextMatch}
+                onBack={() => {
+                  setFinishDismissed(true);
+                }}
+                onFinish={() => {
+                  match.apply("finish", {});
+                }}
+              />
+            )}
+
+            {handover && (
+              <SheetBoundary
+                onRetry={() => {
+                  void match.whenDurable().then(() => {
+                    location.reload();
+                  });
+                }}
+              >
+                <HandoverSheet
+                  fixtureId={fixtureId}
+                  pending={match.pending}
+                  onClose={() => {
+                    setHandover(false);
+                  }}
+                />
+              </SheetBoundary>
+            )}
+            {menu && (
+              <MenuSheet
+                onHandover={() => {
+                  setMenu(false);
+                  setHandover(true);
+                }}
+                state={state}
+                names={names}
+                organiser={setup.organiser}
+                shotMode={shotMode}
+                onShotMode={(value) => {
+                  localStorage.setItem(`ls1:shot-map:${fixtureId}`, value);
+                  setShotMode(value);
+                }}
+                onTheme={changeTheme}
+                onClose={() => {
+                  setMenu(false);
+                }}
+                onRevise={() => {
+                  setMenu(false);
+                  setRevise(true);
+                }}
+                onEvent={(entry) => {
+                  if (match.applyBatch([entry])) setMenu(false);
+                }}
+              />
+            )}
+            {revise && (
+              <ReviseSheet
+                state={state}
+                onClose={() => {
+                  setRevise(false);
+                }}
+                onSave={(payload) => {
+                  if (match.apply("revise", payload)) setRevise(false);
+                }}
+              />
+            )}
+            {editing && (
+              <EditBallSheet
+                key={editing.eventId}
+                ball={editing}
+                state={state}
+                names={names}
+                onClose={() => {
+                  setEditing(null);
+                }}
+                onSave={(payload) => {
+                  if (match.apply("amend", { payload }, editing.eventId)) setEditing(null);
+                }}
+                onVoid={() => {
+                  if (match.apply("void", {}, editing.eventId)) setEditing(null);
+                }}
+              />
+            )}
+
+            {wicket && wicketPayload && (
+              <WicketSheet
+                state={state}
+                payload={wicketPayload}
+                names={names}
+                preview={(entries) => match.preview(entries)}
+                onClose={() => {
+                  setWicket(false);
+                }}
+                onConfirm={(entries) => {
+                  try {
+                    if (match.applyBatch(entries)) {
+                      setWicket(false);
+                      setModifier(null);
+                    }
+                  } catch {
+                    setWicket(false);
+                  }
+                }}
+              />
+            )}
+            {!wicket && activeShot && (
+              <ShotSheet
+                hand={activeShot.hand}
+                name={names.players[activeShot.payload.strikerId]?.name ?? "Player"}
+                language={language}
+                onClose={closeShot}
+                onShot={(value) => {
+                  match.apply(
+                    "amend",
+                    { payload: { ...activeShot.payload, shot: value } },
+                    activeShot.id,
+                  );
+                  setShot(null);
+                }}
+              />
+            )}
+            {!historyOpen &&
+              !menu &&
+              !handover &&
+              !revise &&
+              !editing &&
+              !wicket &&
+              !shot &&
+              !match.error &&
+              match.ready &&
+              (startInnings?.kind === "start_innings" ? (
+                <InningsStartSheet
+                  key={`${String(state.attempt)}:${String(startInnings.inningsNo)}:${startInnings.battingTeamId}`}
+                  state={state}
+                  names={names}
+                  onConfirm={(players) => {
+                    const payload = inningsStartPayload(
+                      match.preview([]),
+                      {
+                        attempt: state.attempt,
+                        inningsNo: startInnings.inningsNo,
+                        battingTeamId: startInnings.battingTeamId,
+                      },
+                      players,
+                    );
+                    return Boolean(match.apply("innings_started", payload));
+                  }}
+                />
+              ) : pickBatter?.kind === "pick_new_batter" ? (
+                <BatterSheet
+                  names={names}
+                  suggestedId={pickBatter.suggestedId}
+                  ids={
+                    inning
+                      ? (state.lineups[inning.battingTeamId]?.battingOrder.filter(
+                          (id) =>
+                            id !== inning.strikerId &&
+                            id !== inning.nonStrikerId &&
+                            !inning.outIds.includes(id) &&
+                            !inning.retiredHurt.includes(id) &&
+                            !inning.absentBatterIds.includes(id),
+                        ) ?? [])
+                      : []
+                  }
+                  onPick={(id) => {
+                    match.apply("new_batter", { registrationId: id, end: pickBatter.end });
+                  }}
+                />
+              ) : pickBowler?.kind === "pick_bowler" ? (
+                <BowlerSheet
+                  names={names}
+                  matchupHint={inning?.strikerId ? (matchupHints[inning.strikerId] ?? null) : null}
+                  action={pickBowler}
+                  onPick={(id) => {
+                    match.apply("bowler_set", { bowlerId: id, midOver: false });
+                  }}
+                />
+              ) : askStyle?.kind === "ask_style" ? (
+                <StyleAsk
+                  key={`${askStyle.registrationId}:${askStyle.what}`}
+                  action={askStyle}
+                  profile={players.find((player) => player.id === askStyle.registrationId)}
+                  name={names.players[askStyle.registrationId]?.name ?? "Player"}
+                  onSkip={() => {
+                    localStorage.setItem(
+                      dismissalKey(fixtureId, askStyle.registrationId, askStyle.what),
+                      "1",
+                    );
+                    setDismissed(
+                      (previous) =>
+                        new Set([...previous, `${askStyle.registrationId}:${askStyle.what}`]),
+                    );
+                  }}
+                  onSave={(payload) => {
+                    match.apply("style_set", payload);
+                  }}
+                />
+              ) : null)}
+            <Dialog
+              open={more}
+              onClose={() => {
+                setMore(false);
+              }}
+              title="Seven or more runs"
+              footer={
+                <>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setMore(false);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      run(extraRuns);
+                    }}
+                  >
+                    Save {extraRuns} runs
+                  </Button>
+                </>
+              }
+            >
+              <label>
+                Runs off this delivery
+                <input
+                  type="number"
+                  min="7"
+                  max="10"
+                  step="1"
+                  value={extraRuns}
+                  onChange={(event) => {
+                    setExtraRuns(Math.min(10, Math.max(7, Math.trunc(Number(event.target.value)))));
+                  }}
+                />
+              </label>
+            </Dialog>
+            <Dialog
+              open={Boolean(match.error)}
+              onClose={() => {
+                match.dismissError();
+              }}
+              title="Scoring entry refused"
+              footer={
+                <Button
+                  onClick={() => {
+                    match.dismissError();
+                  }}
+                >
+                  Close
+                </Button>
+              }
+            >
+              <p role="alert">{match.error}</p>
+            </Dialog>
+          </div>
+        </SheetBoundary>
+      </TaskWorkspace>
     </main>
   );
 }

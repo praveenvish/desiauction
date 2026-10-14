@@ -606,3 +606,32 @@
     justify-content: flex-start;
   }
 }
+
+/* Original financial work remains fully readable while its outcome is reviewed. */
+.money-recovery-record {
+  min-inline-size: 0;
+  padding-block: var(--space-4);
+  border-block-end: 1px solid var(--border-subtle);
+}
+.money-recovery-record h3 {
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.money-recovery-record dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: var(--space-3);
+}
+.money-recovery-record dl > div {
+  min-inline-size: 0;
+}
+.money-recovery-record dt {
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+.money-recovery-record dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

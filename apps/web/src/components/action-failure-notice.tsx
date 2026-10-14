@@ -5,37 +5,15 @@ import { useEffect, useRef, useState } from "react";
 
 import { lostRequest, type LostRequest } from "../lib/lost-request";
 
-/**
- * WHEN SOMETHING THE PERSON ASKED FOR NEVER CAME BACK, SAY SO.
- *
- * A server action that is lost — the network dropped, the server restarted,
- * the page is older than the deploy — REJECTS, and almost nothing in the
- * console catches that: the button stopped spinning (lib/release) and nothing
- * else happened. No message, no hint that the change did not land, and no
- * suggestion of the one thing that fixes a stale page, which is loading it
- * again.
- *
- * One notice for the whole product, because the failure is the same wherever
- * it happens. It names no action ("your bid", "your save") because it cannot
- * know which; it says what is known and what to do.
- *
- * IT GOES AWAY BY ITSELF when it has stopped being true. A dropped connection
- * is about one moment: the notice leaves after a while, and when the person
- * moves to another screen — otherwise it would still be saying "that didn't go
- * through" over the retry that did. A stale page stays stale on every screen
- * until it is reloaded, so that one waits to be answered.
- *
- * AT THE TOP, not the bottom: the bottom of a phone is where the live room
- * keeps its bid buttons, and a notice about one lost request must never sit
- * on top of the next bid.
- *
- * Self-contained on purpose — literal colours, inline styles, native buttons —
- * because it is mounted above every page's own providers and must not depend
- * on any of them having arrived.
+/** An unanswered request can have committed. Offer review before repetition.
+ * Reload restores the page; it does not establish the outcome of the lost work.
+ * This transient generic notice cannot replace an operation's durable recovery.
  */
 const COPY: Record<Exclude<LostRequest, null>, string> = {
-  network: "That didn't go through — the connection dropped. Check that it's back, then try again.",
-  "stale-page": "This page is out of date. Reload it, then try again.",
+  network:
+    "Connection dropped. The outcome is unconfirmed. Check the affected record before repeating this action.",
+  "stale-page":
+    "Reload this outdated page, then check the affected record before repeating an action.",
 };
 
 /** How long a dropped-connection notice stays before it leaves by itself. */

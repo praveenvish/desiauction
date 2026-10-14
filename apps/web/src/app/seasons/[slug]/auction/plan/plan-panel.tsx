@@ -22,6 +22,7 @@ import {
   type BadgeTone,
 } from "@desiauction/ui";
 import Link from "next/link";
+import { AuctionTaskContext } from "../auction-task-context";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
@@ -300,11 +301,15 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
             {status.label}
           </Badge>
         </div>
+        <AuctionTaskContext
+          task="Team owner"
+          scope={`${view.team.name} · ${view.competition.name}`}
+        />
         <p className="competitions-hint">
-          {/* After the night the hero names the team; the line need not. */}
-          {view.readOnly ? null : `${view.team.name} · ${view.competition.name}. `}
           Only you and this team&apos;s other owners can see it.{" "}
-          {view.readOnly ? "The auction is over." : "Add the players you want. A max is optional."}
+          {view.readOnly
+            ? "The auction is over."
+            : "Choose targets and optional maxima here; place bids in the owner room."}
         </p>
         {view.teams.length > 1 ? (
           <nav className="plan-teams" aria-label="Your teams">

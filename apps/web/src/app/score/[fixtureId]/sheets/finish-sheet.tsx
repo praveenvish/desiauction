@@ -6,6 +6,8 @@ export function FinishSheet({
   names,
   finished,
   pending,
+  ready,
+  error,
   sharePath,
   nextMatch,
   onFinish,
@@ -15,12 +17,15 @@ export function FinishSheet({
   names: NameBook;
   finished: boolean;
   pending: number;
+  ready: boolean;
+  error: string | null;
   sharePath: string;
   nextMatch: string | null;
   onFinish: () => void;
   onBack: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const accepted = finished && ready && pending === 0 && !error;
   const title = result.winnerTeamId
     ? `${names.teams[result.winnerTeamId]?.name ?? "Team"} won ${result.marginText}`
     : result.outcome === "tie"
@@ -30,7 +35,7 @@ export function FinishSheet({
     <Dialog
       open
       onClose={onBack}
-      title={finished ? "Result saved" : "Target reached"}
+      title={accepted ? "Result saved" : finished ? "Finish waiting to sync" : "Target reached"}
       footer={
         <>
           <Button variant="ghost" onClick={onBack}>
@@ -38,7 +43,7 @@ export function FinishSheet({
           </Button>
           {finished ? (
             <Button
-              disabled={pending > 0}
+              disabled={!accepted}
               onClick={() => {
                 const url = new URL(sharePath, location.origin).href;
                 const sharing = navigator as {
@@ -68,11 +73,24 @@ export function FinishSheet({
     >
       <div data-testid="finish-sheet">
         <p className="finish-result">{title}</p>
-        {finished && pending > 0 && <p role="status">Saved on this phone · waiting to sync</p>}
+        {finished && !accepted && (
+          <p role="status">
+            {error
+              ? "Finish has not been accepted. Return to the match to resolve the issue."
+              : "Finish is waiting for server acceptance. Keep this match open to sync."}
+          </p>
+        )}
         {nextMatch && (
           <ButtonLink data-testid="finish-next-match" href={nextMatch} variant="ghost">
-            Next match
+            {accepted ? "Next match" : "Leave this match · open next fixture"}
           </ButtonLink>
+        )}
+        {nextMatch && !accepted && (
+          <p>
+            {finished
+              ? "The finish is still waiting to sync. Return to this match to check acceptance."
+              : "This match has not been finished. You can return here to finish it."}
+          </p>
         )}
       </div>
     </Dialog>

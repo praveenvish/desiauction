@@ -11,14 +11,15 @@ import {
   newId,
   notificationTemplates,
   people,
+  type Db,
   type DbHandle,
 } from "@desiauction/db";
 import { composeFinanceMail } from "@desiauction/messaging/finance-delivery";
 import { EMAIL_TEMPLATES } from "@desiauction/messaging/email-template-defaults";
 import { defaultContent, type TemplateContent } from "@desiauction/messaging/email-templates";
 import { invalidateTemplates } from "@desiauction/messaging/template-store";
-import { and, eq, inArray } from "drizzle-orm";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { and, eq, inArray, sql } from "drizzle-orm";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { env } from "../../env";
 
@@ -37,6 +38,14 @@ vi.mock("../admin/authz", () => ({
     ),
 }));
 vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
+vi.mock("../db", () => ({
+  get db() {
+    return db;
+  },
+  get systemDb() {
+    return db;
+  },
+}));
 
 const {
   previewTemplateAction,
@@ -54,7 +63,55 @@ const { notifyEmailChanged } = await import("../auth/email-changed-notice");
 const { adminTemplateEditor, wordingSummaries } = await import("../admin/template-views");
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
-const db = handle.db;
+// Every real reader/writer uses the same real transaction. Its temporary empty
+// template view rolls back after each case, preserving prior publication history.
+let activeDb: Db = handle.db;
+const db: Db = new Proxy(handle.db, {
+  get(_target, property) {
+    const value: unknown = Reflect.get(activeDb, property);
+    return typeof value === "function" ? (value.bind(activeDb) as unknown) : value;
+  },
+});
+const rollback = new Error("template regression rollback");
+let finishCase: (() => void) | undefined;
+let pendingCase: Promise<void> | undefined;
+let retainedTemplates: (typeof notificationTemplates.$inferSelect)[] = [];
+
+beforeEach(async () => {
+  let ready: (() => void) | undefined;
+  let rejectReady: ((reason: unknown) => void) | undefined;
+  const started = new Promise<void>((resolve, reject) => {
+    ready = resolve;
+    rejectReady = reject;
+  });
+  const finished = new Promise<void>((resolve) => {
+    finishCase = resolve;
+  });
+  pendingCase = handle.db
+    .transaction(async (tx) => {
+      activeDb = tx;
+      await tx
+        .delete(notificationTemplates)
+        .where(
+          inArray(notificationTemplates.kind, [
+            "auction.unsold",
+            "security.email_changed",
+            "finance.document.issued",
+          ]),
+        );
+      invalidateTemplates();
+      ready?.();
+      await finished;
+      throw rollback;
+    })
+    .catch((error: unknown) => {
+      if (error !== rollback) {
+        rejectReady?.(error);
+        throw error;
+      }
+    });
+  await started;
+});
 const RUN = String(Date.now()).slice(-7);
 
 const admin = newId();
@@ -141,11 +198,21 @@ beforeAll(async () => {
     },
   ]);
   await clearTemplates();
+  retainedTemplates = await handle.db
+    .select()
+    .from(notificationTemplates)
+    .orderBy(notificationTemplates.id);
 });
 
 afterEach(async () => {
   operator = null;
-  await clearTemplates();
+  finishCase?.();
+  await pendingCase;
+  activeDb = handle.db;
+  invalidateTemplates();
+  expect(
+    await handle.db.select().from(notificationTemplates).orderBy(notificationTemplates.id),
+  ).toEqual(retainedTemplates);
 });
 
 afterAll(async () => {
@@ -496,25 +563,37 @@ describe("the database refuses what the code refuses", () => {
 
   it("one published version per kind and language", async () => {
     await db.insert(notificationTemplates).values(row(1, "published"));
-    await expect(db.insert(notificationTemplates).values(row(2, "published"))).rejects.toThrow();
+    await expect(
+      db.transaction((tx) => tx.insert(notificationTemplates).values(row(2, "published"))),
+    ).rejects.toThrow();
   });
 
   it("one draft, no duplicate version numbers, no unstamped publish, no unknown language", async () => {
     await db.insert(notificationTemplates).values(row(1, "draft"));
-    await expect(db.insert(notificationTemplates).values(row(2, "draft"))).rejects.toThrow();
-    await expect(db.insert(notificationTemplates).values(row(1, "archived"))).rejects.toThrow();
     await expect(
-      db.insert(notificationTemplates).values({ ...row(3, "draft"), status: "published" }),
+      db.transaction((tx) => tx.insert(notificationTemplates).values(row(2, "draft"))),
     ).rejects.toThrow();
     await expect(
-      handle.sql`insert into notification_templates (id, kind, language, version, status, content, created_by)
-        values (${newId()}, 'auction.unsold', 'fr', 9, 'draft', '{}', ${admin})`,
+      db.transaction((tx) => tx.insert(notificationTemplates).values(row(1, "archived"))),
     ).rejects.toThrow();
     await expect(
-      db
-        .update(people)
-        .set({ language: "fr" as "en" })
-        .where(eq(people.id, player)),
+      db.transaction((tx) =>
+        tx.insert(notificationTemplates).values({ ...row(3, "draft"), status: "published" }),
+      ),
+    ).rejects.toThrow();
+    await expect(
+      db.transaction((tx) =>
+        tx.execute(sql`insert into notification_templates (id, kind, language, version, status, content, created_by)
+        values (${newId()}, 'auction.unsold', 'fr', 9, 'draft', '{}', ${admin})`),
+      ),
+    ).rejects.toThrow();
+    await expect(
+      db.transaction((tx) =>
+        tx
+          .update(people)
+          .set({ language: "fr" as "en" })
+          .where(eq(people.id, player)),
+      ),
     ).rejects.toThrow();
   });
 });

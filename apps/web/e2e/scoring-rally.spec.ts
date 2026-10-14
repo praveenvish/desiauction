@@ -68,7 +68,7 @@ for (const theme of ["daylight", "floodlight"] as const) {
           await expect(page.getByTestId("rally-point-home")).toBeEnabled();
           await context.setOffline(true);
           await page.getByTestId("rally-point-home").click();
-          await expect(page.getByRole("status")).toContainText("1 saved entries");
+          await expect(page.getByRole("status")).toContainText("1 entries waiting to send");
           const savedIds = await committedQueue(page, fixture.fixtureId, ["rally"]);
           await expect(page.getByTestId("rally-home-points")).toHaveText("1");
           await page.goto(`/score/shell#${fixture.fixtureId}`);

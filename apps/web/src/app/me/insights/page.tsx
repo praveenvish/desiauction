@@ -1,3 +1,4 @@
+import { boundedInsightQuery, insightHref } from "../../../lib/insight-navigation";
 import { redirect } from "next/navigation";
 import {
   CricketInsights,
@@ -13,14 +14,18 @@ export default async function OwnInsightsPage({
 }: {
   searchParams: Promise<InsightSearch>;
 }) {
-  const session = await currentSession();
-  if (!session) redirect("/login?next=%2Fme%2Finsights");
-  const query = await searchParams;
+  const [rawQuery, session] = await Promise.all([searchParams, currentSession()]);
+  const query = boundedInsightQuery(rawQuery);
+  const destination = insightHref("/me/insights", query);
+  if (!session) redirect(`/login?${new URLSearchParams({ next: destination }).toString()}`);
   const insights = await ownCricketInsights(session.personId, insightFilters(query));
   return (
     <main>
+      <h1>My cricket insights</h1>
       <CricketInsights
         name={session.name ?? "My cricket insights"}
+        scope="self"
+        profileHref="/me"
         {...insights}
         basePath="/me/insights"
         query={query}

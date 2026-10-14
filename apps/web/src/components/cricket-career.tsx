@@ -57,7 +57,7 @@ export function CricketCareerSection({ career }: { career: CricketCareer }) {
         ))}
       </div>
       {group.matches === 0 ? (
-        <p>Your playing figures will appear after a scored match finishes.</p>
+        <p>Playing figures appear after a scored match finishes.</p>
       ) : (
         <>
           <h3>

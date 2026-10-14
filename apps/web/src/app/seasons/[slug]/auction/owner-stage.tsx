@@ -86,6 +86,7 @@ export function OwnerStage({
   rules,
   teams,
   myPaddleNumber,
+  bidScope,
   squadSigned,
   remainingMs,
   lotDurationMs,
@@ -111,6 +112,7 @@ export function OwnerStage({
   teams: readonly TeamIdentity[];
   /** Null for a viewer holding no paddle: the card and the price, no paddle. */
   myPaddleNumber: string | null;
+  bidScope: string;
   squadSigned: number;
   remainingMs: number | null;
   lotDurationMs: number;
@@ -189,6 +191,7 @@ export function OwnerStage({
       {stance !== null ? (
         <PaddleControl
           lotId={lot.lotId}
+          bidScope={bidScope}
           stance={stance}
           rules={rules}
           squadSigned={squadSigned}

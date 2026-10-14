@@ -63,6 +63,8 @@ import { env } from "../../env";
 import { logger } from "../logger";
 import { notifyIndexNow } from "../seo/indexnow";
 
+import { registrationWriteState } from "./registration-write-state";
+import { squadWriteState } from "./squad-write-state";
 import { currentSession } from "../auth/actions";
 import {
   playerProfileFor,
@@ -3416,4 +3418,25 @@ export async function exportRegistrationsAction(
     return { ok: false, error: "That team is not in this season." };
   }
   return { ok: true, csv, filename };
+}
+
+/** Team-only saved marks, under the same capability as the mark writer. */
+export async function squadWriteStateAction(slug: string, ids: string[], teamIds: string[]) {
+  const result = await inSeasonAs(slug, "team.manage", ({ db, competition }) =>
+    squadWriteState(db, competition.id, ids, teamIds),
+  );
+  if (!result.ok || result.value === null)
+    return { ok: false as const, error: "Saved squad state is not available." };
+  return { ok: true as const, ...result.value };
+}
+
+export async function registrationWriteStateAction(slug: string, ids: string[]) {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) return { ok: false as const, error: gate.error };
+  const rows = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    registrationWriteState(db, gate.competition.id, ids),
+  );
+  return rows === null
+    ? { ok: false as const, error: "Saved registration state is not available." }
+    : { ok: true as const, rows };
 }

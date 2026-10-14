@@ -239,6 +239,11 @@ export function LiveView({
           </span>
           <span>{state?.conditionsLine ?? ""}</span>
         </div>
+        {state ? (
+          <p className="live-visible-freshness">
+            Visible score updated {age} s ago · {state.trust.replaceAll("_", " ")}
+          </p>
+        ) : null}
         {placementPanel && state ? (
           <PlacementLiveScore panel={placementPanel} live={state} />
         ) : timedPanel && state && state.family !== "placement" ? (

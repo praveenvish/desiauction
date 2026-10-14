@@ -698,6 +698,7 @@ test("the first over and sheets in floodlight remain accessible with touch targe
 test("C43 captain brief, sponsor, transparent stings, qualified STAT and big-screen board", async ({
   page,
   browser,
+  browserName,
 }) => {
   test.setTimeout(240000);
   const fixture = await seedScoringFixture({ publicDelaySeconds: 0 });
@@ -710,6 +711,10 @@ test("C43 captain brief, sponsor, transparent stings, qualified STAT and big-scr
   await page.goto(`/seasons/${fixture.slug}/brief/${fixture.fixtureId}`);
   await expect(page.getByText("Available on Pro seasons", { exact: true })).toBeVisible();
   await expect(page.locator(".brief-player")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Back to this match", exact: true })).toHaveAttribute(
+    "href",
+    `/seasons/${fixture.slug}/fixtures?match=${fixture.fixtureId}`,
+  );
   await capturePublicMatch(page, "brief-locked");
   await completeAwaySample(page, fixture);
   const next = await followupScoringFixture(fixture, 2);
@@ -739,6 +744,10 @@ test("C43 captain brief, sponsor, transparent stings, qualified STAT and big-scr
   await expect(
     page.locator(".brief-player").filter({ hasText: "Away player 1" }).first(),
   ).toContainText("Slowest against Right Arm Medium");
+  await expect(page.getByRole("link", { name: "Back to this match", exact: true })).toHaveAttribute(
+    "href",
+    `/seasons/${fixture.slug}/fixtures?match=${next.fixtureId}`,
+  );
   await capturePublicMatch(page, "brief-entitled");
   const viewerContext = await browser.newContext({
     viewport: { width: 1920, height: 1080 },
@@ -767,7 +776,8 @@ test("C43 captain brief, sponsor, transparent stings, qualified STAT and big-scr
     const stingStarted = Date.now();
     await viewer.screenshot({
       path: test.info().outputPath("overlay-four-1920.png"),
-      omitBackground: true,
+      // Firefox does not implement alpha screenshots; CSS transparency is asserted above.
+      omitBackground: browserName !== "firefox",
     });
     await expect(viewer.locator(".overlay-sting")).toHaveCount(0);
     expect(Date.now() - stingStarted).toBeGreaterThanOrEqual(3000);
@@ -798,7 +808,8 @@ test("C43 captain brief, sponsor, transparent stings, qualified STAT and big-scr
       );
       await viewer.screenshot({
         path: test.info().outputPath(`overlay-stat-${theme}-1920.png`),
-        omitBackground: true,
+        // Firefox does not implement alpha screenshots; CSS transparency is asserted above.
+        omitBackground: browserName !== "firefox",
       });
     }
     await viewer.clock.install();

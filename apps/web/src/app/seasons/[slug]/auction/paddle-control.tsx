@@ -1,8 +1,8 @@
 "use client";
 
-import { IconHand } from "@desiauction/ui";
+import { IconHand, VisuallyHidden } from "@desiauction/ui";
 import type { PlanState } from "@desiauction/core";
-import { useEffect, useReducer } from "react";
+import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 
 import { activeJump, jumpReducer, type BlockReason, type OwnerStance } from "./owner-state";
 
@@ -26,6 +26,8 @@ import { useMoney } from "../../../../components/money-unit";
 // A free-text amount is deliberately NOT here: the engine rejects off-ladder
 // amounts, so offering the field only invites a rejection mid-lot.
 
+const GESTURE_NOTICE = "Press canceled. Check the amount and press again.";
+
 /** The big button's words when the paddle is locked. */
 const LOCKED_LABEL: Record<BlockReason, string> = {
   paused: "Bidding paused",
@@ -37,6 +39,7 @@ const LOCKED_LABEL: Record<BlockReason, string> = {
 
 export function PaddleControl({
   lotId,
+  bidScope,
   stance,
   rules,
   squadSigned,
@@ -46,6 +49,8 @@ export function PaddleControl({
   plan = null,
 }: {
   lotId: string;
+  /** Authenticated room and held paddle, never inferred from a displayed amount. */
+  bidScope: string;
   /** Where the owner stands on this lot (`ownerStanceOf`) — shared with the state line. */
   stance: OwnerStance;
   rules: AuctionRules;
@@ -73,6 +78,103 @@ export function PaddleControl({
   const locked = reason !== null;
   const bidsDisabled = readOnly || busy || locked;
   const amount = chosen ?? raise;
+  type Gesture = {
+    scope: string;
+    lotId: string;
+    amount: number | undefined;
+    disabled: boolean;
+    canceled: boolean;
+    activated: boolean;
+    released: boolean;
+    ambiguous: boolean;
+  };
+  const bidButton = useRef<HTMLButtonElement | null>(null);
+  const pointerGestures = useRef(new Map<number, Gesture>());
+  const keyGestures = useRef(new Map<string, Gesture>());
+  const keyboardActivation = useRef<Gesture | null>(null);
+  const [gestureNotice, setGestureNotice] = useState("");
+  const newGesture = (): Gesture => ({
+    scope: bidScope,
+    lotId,
+    amount,
+    disabled: bidsDisabled,
+    canceled: false,
+    activated: false,
+    released: false,
+    ambiguous: false,
+  });
+  const cancelGestures = () => {
+    for (const pending of pointerGestures.current.values()) pending.canceled = true;
+    for (const pending of keyGestures.current.values()) pending.canceled = true;
+  };
+  // Independent physical inputs retain their identities; cancellation is monotonic.
+  useLayoutEffect(() => {
+    const pendingGestures = [...keyGestures.current.values(), ...pointerGestures.current.values()];
+    for (const pending of pendingGestures) {
+      if (
+        pending.scope !== bidScope ||
+        pending.lotId !== lotId ||
+        pending.amount !== amount ||
+        pending.disabled !== bidsDisabled
+      )
+        pending.canceled = true;
+    }
+  }, [bidScope, lotId, amount, bidsDisabled]);
+  useEffect(() => {
+    const blur = () => {
+      for (const pending of pointerGestures.current.values()) pending.canceled = true;
+      for (const pending of keyGestures.current.values()) pending.canceled = true;
+    };
+    const keys = keyGestures.current;
+    const pointers = pointerGestures.current;
+    const timers = new Set<number>();
+    const finishPointer = (event: PointerEvent) => {
+      const id = event.pointerId;
+      const pending = pointers.get(id);
+      if (!pending) return;
+      pending.released = true;
+      if (
+        event.type === "pointercancel" ||
+        !(event.target instanceof Node) ||
+        !bidButton.current?.contains(event.target)
+      )
+        pending.canceled = true;
+      // Native button click follows release. Retire only this completed identity.
+      const timer = window.setTimeout(() => {
+        timers.delete(timer);
+        if (pointers.get(id) === pending) pointers.delete(id);
+      }, 0);
+      timers.add(timer);
+    };
+    const finishKey = (event: KeyboardEvent) => {
+      const key = event.key;
+      const pending = keys.get(key);
+      if (!pending) return;
+      pending.released = true;
+      if (!(event.target instanceof Node) || !bidButton.current?.contains(event.target))
+        pending.canceled = true;
+      const timer = window.setTimeout(() => {
+        timers.delete(timer);
+        if (keys.get(key) === pending) keys.delete(key);
+        if (keyboardActivation.current === pending) keyboardActivation.current = null;
+      }, 0);
+      timers.add(timer);
+    };
+    window.addEventListener("keyup", finishKey);
+    window.addEventListener("pointerup", finishPointer);
+    window.addEventListener("pointercancel", finishPointer);
+    window.addEventListener("blur", blur);
+    return () => {
+      window.removeEventListener("blur", blur);
+      window.removeEventListener("keyup", finishKey);
+      window.removeEventListener("pointerup", finishPointer);
+      window.removeEventListener("pointercancel", finishPointer);
+      for (const timer of timers) window.clearTimeout(timer);
+      pointers.clear();
+      keyboardActivation.current = null;
+      keys.clear();
+    };
+  }, []);
   const label = readOnly
     ? "Reconnecting…"
     : reason !== null
@@ -147,12 +249,104 @@ export function PaddleControl({
       <button
         type="button"
         className="owner-bid"
+        ref={bidButton}
         disabled={bidsDisabled || amount === undefined}
         aria-describedby={locked ? "paddle-blocked" : undefined}
-        onClick={() => {
-          if (amount !== undefined) {
-            onBid(amount);
+        onMouseDown={(event) => {
+          if (event.button !== 0 || bidsDisabled || amount === undefined) return;
+          // Keep native click, but avoid a browser's mouse-focus default blurring Bid.
+          event.preventDefault();
+          event.currentTarget.focus({ preventScroll: true });
+        }}
+        onPointerDown={(event) => {
+          const pending = newGesture();
+          pending.canceled = event.button !== 0 || !event.isPrimary;
+          if (pointerGestures.current.size > 0) {
+            pending.ambiguous = true;
+            for (const other of pointerGestures.current.values()) other.ambiguous = true;
           }
+          pointerGestures.current.set(event.pointerId, pending);
+          if (!pending.canceled) setGestureNotice("");
+        }}
+        onPointerUp={(event) => {
+          const pending = pointerGestures.current.get(event.pointerId);
+          if (pending) pending.released = true;
+        }}
+        onPointerCancel={(event) => {
+          const pending = pointerGestures.current.get(event.pointerId);
+          if (pending) pending.canceled = true;
+        }}
+        onLostPointerCapture={(event) => {
+          const pending = pointerGestures.current.get(event.pointerId);
+          if (pending && !pending.released) pending.canceled = true;
+        }}
+        onBlur={cancelGestures}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          if (event.repeat) {
+            event.preventDefault();
+            return;
+          }
+          const pending = newGesture();
+          keyGestures.current.set(event.key, pending);
+          setGestureNotice("");
+          keyboardActivation.current = pending;
+        }}
+        onKeyUp={(event) => {
+          const pending = keyGestures.current.get(event.key);
+          if (!pending) return;
+          pending.released = true;
+          keyboardActivation.current = pending;
+          // Window-level release cleanup follows native click, including outside focus.
+        }}
+        onClick={(event) => {
+          const native = event.nativeEvent;
+          const nativePointerId = "pointerId" in native ? native.pointerId : undefined;
+          const hasPointerIdentity = typeof nativePointerId === "number" && nativePointerId >= 0;
+          const fromPointer = hasPointerIdentity || event.detail > 0;
+          const fallback = [...pointerGestures.current.entries()];
+          const pointerEntry = hasPointerIdentity
+            ? pointerGestures.current.get(nativePointerId)
+            : fallback.length === 1 && fallback[0]?.[1].released && !fallback[0][1].ambiguous
+              ? fallback[0][1]
+              : undefined;
+          const pending = fromPointer ? pointerEntry : keyboardActivation.current;
+          const unattributedPointer = fromPointer && !pending;
+          const unfinishedKey = !fromPointer && !pending && keyGestures.current.size > 0;
+          if (unattributedPointer) {
+            for (const other of pointerGestures.current.values()) other.canceled = true;
+          }
+          const changed =
+            pending !== null &&
+            pending !== undefined &&
+            (pending.canceled ||
+              pending.activated ||
+              pending.scope !== bidScope ||
+              pending.lotId !== lotId ||
+              pending.amount !== amount ||
+              pending.disabled !== bidsDisabled);
+          if (pending) {
+            if (fromPointer) {
+              if (hasPointerIdentity) pointerGestures.current.delete(nativePointerId);
+              else if (fallback[0]) pointerGestures.current.delete(fallback[0][0]);
+            } else {
+              if (keyboardActivation.current) keyboardActivation.current.activated = true;
+              keyboardActivation.current = null;
+            }
+          }
+          if (
+            changed ||
+            unattributedPointer ||
+            unfinishedKey ||
+            bidsDisabled ||
+            amount === undefined
+          ) {
+            event.preventDefault();
+            setGestureNotice(GESTURE_NOTICE);
+            return;
+          }
+          setGestureNotice("");
+          onBid(amount);
         }}
         data-testid="bid-next"
         data-amount={amount === undefined ? undefined : String(amount)}
@@ -160,6 +354,17 @@ export function PaddleControl({
         {bidsDisabled ? null : <IconHand size={22} weight="fill" />}
         <span>{busy && !locked && !readOnly ? "Sending your bid…" : label}</span>
       </button>
+
+      <VisuallyHidden role="status" data-testid="bid-gesture-status">
+        {gestureNotice}
+      </VisuallyHidden>
+      <p
+        className="owner-budget owner-gesture-notice"
+        data-visible={gestureNotice ? "true" : undefined}
+        aria-hidden="true"
+      >
+        {GESTURE_NOTICE}
+      </p>
 
       {chosen !== null && raise !== undefined ? (
         <button

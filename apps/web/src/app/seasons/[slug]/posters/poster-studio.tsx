@@ -21,7 +21,14 @@ import {
   SectionCard,
   Select,
 } from "@desiauction/ui";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type CSSProperties,
+} from "react";
 
 import { useMoney } from "../../../../components/money-unit";
 import { withViewTransition } from "../../../../lib/view-transition";
@@ -420,7 +427,7 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
                     by our own route at a fixed size, and next/image would
                     re-encode a PNG that is already exactly what the user is
                     about to download. */}
-                <StillPreview key={previewSrc} src={previewSrc} />
+                <StillPreview key={previewSrc} src={previewSrc} size={size} />
               </div>
             ) : (
               // Keyed by the URL: a new poster is a new panel, so its loading
@@ -504,7 +511,8 @@ function PreviewTabs({
  * and the image just never painted, which read as a poster stuck loading. So a
  * failure asks the route again and shows its sentence.
  */
-function StillPreview({ src }: { src: string }) {
+function StillPreview({ src, size }: { src: string; size: PosterSize }) {
+  const { width, height } = POSTER_SIZES[size];
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
   const [reason, setReason] = useState<string | null>(null);
   const onError = () => {
@@ -527,6 +535,9 @@ function StillPreview({ src }: { src: string }) {
     <>
       <img
         src={src}
+        width={width}
+        height={height}
+        style={{ "--ps-preview-ratio": String(width / height) } as CSSProperties}
         alt="Poster preview"
         className="poster-preview-image"
         data-state={state}

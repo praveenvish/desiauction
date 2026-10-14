@@ -1,7 +1,16 @@
-import { ButtonLink, IconAlert, IconCheck, Pill, type KitTone } from "@desiauction/ui";
+import {
+  ButtonLink,
+  SectionCard,
+  IconUsers,
+  IconAlert,
+  IconCheck,
+  Pill,
+  type KitTone,
+} from "@desiauction/ui";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { PageTitle } from "../../../../components/shell/page-title";
 import { auctionDashboard } from "../../../../server/auction/actions";
 import { competitionView, registrationDashboard } from "../../../../server/competition/actions";
 import { fixtureDashboard, venuesView } from "../../../../server/competition/fixture-actions";
@@ -60,10 +69,27 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
   ) {
     return (
       <main className="registrations-dash">
-        <h1>Season readiness</h1>
-        <p>Review the teams and players, then build the match schedule.</p>
-        <ButtonLink href={`/seasons/${slug}/teams`}>Review teams</ButtonLink>
-        <ButtonLink href={`/seasons/${slug}/fixtures`}>Build the schedule</ButtonLink>
+        <PageTitle title="Season readiness" subtitle={view.competition.name} />
+        <SectionCard
+          title="Prepare your teams, then schedule matches"
+          description={
+            view.competition.teamFormation === "team_entry"
+              ? "Review captain sign-ups and check the approved squads before creating matches."
+              : "Assign players to teams and check each squad before creating matches."
+          }
+          icon={<IconUsers />}
+        >
+          <p>
+            This season forms teams without an auction. Review your current teams first; match
+            scheduling is available in Matches.
+          </p>
+          <div className="rd-path-actions">
+            <ButtonLink href={`/seasons/${slug}/teams`}>Review teams</ButtonLink>
+            <ButtonLink href={`/seasons/${slug}/fixtures`} variant="secondary">
+              Open match schedule
+            </ButtonLink>
+          </div>
+        </SectionCard>
       </main>
     );
   }

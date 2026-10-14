@@ -440,3 +440,142 @@
   border: 1px solid var(--border-subtle);
   border-radius: 22px 22px 0 0;
 }
+
+/* UI-R1: the baseline retains its exact phone control layout. No domain state
+   or queue changes accompany the treatment; only a new document chooses it. */
+.pad-workspace,
+.pad-workspace > section {
+  display: block;
+}
+.pad-workspace > aside,
+.pad-fixture-context {
+  display: none;
+}
+[data-ui-treatment="refined"] .pad-fixture-context {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  overflow-wrap: anywhere;
+}
+[data-ui-treatment="refined"] .pad-fixture-context strong {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+[data-ui-treatment="refined"] .pad-top {
+  margin-bottom: var(--space-3);
+}
+[data-ui-treatment="refined"] .pad-score-card {
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-inline-start: var(--space-1) solid var(--accent-line);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+}
+[data-ui-treatment="refined"] .pad-score-card > div:first-child {
+  min-width: 0;
+}
+[data-ui-treatment="refined"] .pad-score-card .score-cap {
+  overflow-wrap: anywhere;
+}
+.pad-recent {
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+.pad-recent h2 {
+  margin: 0 0 var(--space-4);
+  font-family: var(--font-text);
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+  color: var(--text-heading);
+}
+.pad-recent ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pad-recent li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-subtle);
+  overflow-wrap: anywhere;
+}
+.pad-recent li:last-child {
+  border-bottom: 0;
+}
+.pad-recent strong {
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+@media (min-width: 1024px) {
+  [data-ui-treatment="refined"] .pad {
+    max-width: 1080px;
+    padding: var(--space-8);
+  }
+  [data-ui-treatment="refined"] .pad-workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr);
+    gap: var(--space-8);
+  }
+  [data-ui-treatment="refined"] .pad-workspace > aside {
+    display: grid;
+  }
+}
+[data-ui-treatment="refined"] .pad-score-line {
+  flex-wrap: wrap;
+}
+[data-ui-treatment="refined"] .pad-toast {
+  position: static;
+  transform: none;
+  max-width: none;
+  margin-top: var(--space-3);
+}
+/* Keep the complete routine action group in the standard phone viewport.
+   Empty history reserves no space; populated history retains 44px targets. */
+@media (max-width: 1023px) {
+  [data-ui-treatment="refined"] .pad-fixture-context {
+    gap: 2px;
+    margin-bottom: var(--space-2);
+  }
+  [data-ui-treatment="refined"] .pad-top {
+    margin-bottom: var(--space-2);
+  }
+  [data-ui-treatment="refined"] .pad-score-card {
+    padding: var(--space-3);
+  }
+  [data-ui-treatment="refined"] .pad-score-card p {
+    margin-bottom: 6px;
+  }
+  [data-ui-treatment="refined"] .pad-batters {
+    margin: 16px 0 12px;
+  }
+  [data-ui-treatment="refined"] .pad-bowler {
+    padding-block: var(--space-2);
+  }
+  [data-ui-treatment="refined"] .pad-over {
+    min-height: 44px;
+    padding-block: var(--space-1);
+  }
+  [data-ui-treatment="refined"] .pad-over:empty {
+    min-height: 0;
+    padding: 0;
+  }
+  [data-ui-treatment="refined"] .pad-instruction {
+    margin-bottom: var(--space-2);
+  }
+  [data-ui-treatment="refined"] .pad-modifiers {
+    margin-bottom: var(--space-2);
+  }
+  [data-ui-treatment="refined"] .pad-run-grid {
+    gap: var(--space-2);
+  }
+}

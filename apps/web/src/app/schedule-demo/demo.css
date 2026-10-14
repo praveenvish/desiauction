@@ -101,6 +101,7 @@
    asserted by a computed-style test instead — the UX-1 audit's finding was
    that every real defect hid in exactly this kind of verification gap. */
 .demo-slot {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -1,8 +1,10 @@
 "use client";
 
+import { START_CLUB_LOGIN } from "../../lib/start-intent";
+
 import { Button, Field, Select } from "@desiauction/ui";
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
 
 import { DEMAND_SPORTS } from "../../content/demand-sports";
 import { requestDemoAction } from "../../server/marketing/actions";
@@ -34,6 +36,22 @@ import styles from "./demo-request-form.module.css";
 export function DemoRequestForm({ source }: { source: string }) {
   const [state, formAction, pending] = useActionState(requestDemoAction, {});
   const founding = source === "founding-25";
+  const viewed = useRef<string | null>(null);
+  const responseShown = useRef(false);
+
+  useEffect(() => {
+    if (viewed.current !== source) {
+      viewed.current = source;
+      track("demo.form_viewed", { source });
+    }
+  }, [source]);
+
+  useEffect(() => {
+    if (state.success === true && !responseShown.current) {
+      responseShown.current = true;
+      track("demo.response_shown", { source });
+    }
+  }, [source, state.success]);
 
   if (state.success === true && founding) {
     return (
@@ -48,7 +66,7 @@ export function DemoRequestForm({ source }: { source: string }) {
         </p>
         <p className={styles["doneBody"]}>
           Meanwhile, set up your season:{" "}
-          <Link href="/login" className={styles["pickLink"]}>
+          <Link href={START_CLUB_LOGIN} className={styles["pickLink"]}>
             Start your auction
           </Link>{" "}
           — everything you build carries over.
@@ -82,7 +100,7 @@ export function DemoRequestForm({ source }: { source: string }) {
         ) : null}
         <p className={styles["doneBody"]}>
           Not waiting?{" "}
-          <Link href="/login" className={styles["pickLink"]}>
+          <Link href={START_CLUB_LOGIN} className={styles["pickLink"]}>
             Start your auction now
           </Link>{" "}
           — every tournament gets the full platform, free, during beta.
