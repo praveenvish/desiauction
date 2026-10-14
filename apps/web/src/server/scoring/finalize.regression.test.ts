@@ -1269,34 +1269,59 @@ describe("FIN-1 through the append application boundary", () => {
     ).toHaveLength(2);
   });
 
-  it("runs the dedicated runtime RLS proof against actual finalized player lines", async () => {
+  it("runs the dedicated runtime RLS proof once with finalized lines, with and without a membership sample", async () => {
     if (!env.APP_DATABASE_URL) throw new Error("C35 requires the app-role proof");
     const id = await setup();
     await ready(id);
     await append(id, [event("finish", {})]);
-    const { stdout } = await promisify(execFile)(
-      process.execPath,
-      [
-        "--env-file-if-exists=../../.env.local",
-        "node_modules/tsx/dist/cli.mjs",
-        "scripts/verify-rls.ts",
-      ],
-      {
-        env: {
-          NODE_ENV: env.NODE_ENV,
-          DATABASE_URL: env.DATABASE_URL,
-          APP_DATABASE_URL: env.APP_DATABASE_URL,
+    const runProof = async () => {
+      const { stdout } = await promisify(execFile)(
+        process.execPath,
+        [
+          "--env-file-if-exists=../../.env.local",
+          "node_modules/tsx/dist/cli.mjs",
+          "scripts/verify-rls.ts",
+        ],
+        {
+          env: {
+            NODE_ENV: env.NODE_ENV,
+            DATABASE_URL: env.DATABASE_URL,
+            APP_DATABASE_URL: env.APP_DATABASE_URL,
+          },
+          timeout: 30000,
+          maxBuffer: 1024 * 1024,
         },
-        timeout: 30000,
-        maxBuffer: 1024 * 1024,
-      },
-    );
-    expect(stdout).toContain(
-      "match_player_lines: tenant and person-only reads match their exact owner counts",
-    );
-    expect(stdout).toContain("match_player_lines: unrelated person sees zero rows");
-    expect(stdout).toContain("match_player_lines: person-only UPDATE and DELETE affect zero rows");
-    expect(stdout).toContain("RLS VERIFICATION PASSED");
+      );
+      return stdout;
+    };
+    const assertLinesProof = (stdout: string) => {
+      for (const message of [
+        "match_player_lines: tenant and person-only reads match their exact owner counts",
+        "match_player_lines: unrelated person sees zero rows",
+        "match_player_lines: person-only UPDATE and DELETE affect zero rows",
+      ]) {
+        expect(stdout.split(message)).toHaveLength(2);
+      }
+      expect(stdout).toContain("RLS VERIFICATION PASSED");
+    };
+    const [membershipSample] = await owner.db.select().from(orgMembers).limit(1);
+    const withoutFixtureMembership = await runProof();
+    assertLinesProof(withoutFixtureMembership);
+    if (!membershipSample) {
+      expect(withoutFixtureMembership).toContain(
+        "no organization membership sample — membership-based proof skipped",
+      );
+    }
+    await owner.db.insert(orgMembers).values({ orgId, personId: actor });
+    try {
+      const withMembership = await runProof();
+      expect(withMembership).toContain("load-bearing proof (org");
+      assertLinesProof(withMembership);
+    } finally {
+      await owner.db
+        .delete(orgMembers)
+        .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.personId, actor)));
+    }
   });
 
   it("dispatches result and award notices once, changes winners, and resolves private links only for the recipient", async () => {

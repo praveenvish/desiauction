@@ -70,7 +70,7 @@ async function main(): Promise<void> {
     select m.org_id as "orgId", m.person_id as "personId"
     from org_members m limit 1`;
   if (subject === undefined) {
-    console.log("\nno organization data present — live-data proof skipped (seed first)");
+    console.log("\nno organization membership sample — membership-based proof skipped");
   } else {
     const orgTables = await owner.sql<{ relname: string }[]>`
       select c.relname from pg_class c
@@ -85,6 +85,8 @@ async function main(): Promise<void> {
       `\nload-bearing proof (org ${subject.orgId}) across ${String(orgTables.length)} org-scoped tables:`,
     );
     for (const { relname } of orgTables) {
+      // Player-owned lines exist even when there is no organization membership sample.
+      if (relname === "match_player_lines") continue;
       if (PARTICIPANT_SCOPED.has(relname)) {
         await participantProof(relname);
         continue;
@@ -132,6 +134,7 @@ async function main(): Promise<void> {
     }
   }
 
+  await playerLinesProof();
   report();
 }
 

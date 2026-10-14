@@ -68,6 +68,7 @@ export async function prepareScoring(db: Db, fixtureId: string, actorId: string)
     state.innings.length > 0;
   const panel = publicFamilyPanel(state);
   const hasRally = panel?.family === "rally" && panel.panel.rubbers.length > 0;
+  const hasRaid = panel?.family === "raid" && panel.panel.half > 0;
   const hasTimed = panel?.family === "timed" && panel.panel.period > 0;
   const hasPlacement = panel?.family === "placement" && panel.panel.round > 0;
   const terminal = [
@@ -81,7 +82,7 @@ export async function prepareScoring(db: Db, fixtureId: string, actorId: string)
   return {
     ...history,
     preparation:
-      !hasInnings && !hasRally && !hasTimed && !hasPlacement && !terminal
+      !hasInnings && !hasRally && !hasRaid && !hasTimed && !hasPlacement && !terminal
         ? ("unstarted" as const)
         : ("started" as const),
     bootstrap: {

@@ -260,10 +260,14 @@ describe("P2 — a decision lands only on the state it was made about", () => {
 
 describe("P2 — an import cannot change role or band once the auction has opened", () => {
   it("refuses the whole file, as the single-row edit does", async () => {
-    const phone = `9${RUN}777`;
+    // Separate clock digits so a repeated suffix cannot become a placeholder phone.
+    const phone = `98${RUN.slice(0, 3)}6${RUN.slice(3)}7`;
     const first = parseRegistrationCsv(`name,phone,role\nRole Changer,${phone},batter`);
     expect(first.errors).toEqual([]);
-    await commitRegistrationImport(db, comp.id, orgId, owner, first.rows);
+    expect(first.rows[0]?.phone).toBe(`+91${phone}`);
+    expect(await commitRegistrationImport(db, comp.id, orgId, owner, first.rows)).toMatchObject({
+      imported: 1,
+    });
     const [person] = await db
       .select({ id: people.id })
       .from(people)
