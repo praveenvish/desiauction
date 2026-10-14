@@ -90,74 +90,85 @@ async function selectedPublicEntry(
 } | null> {
   const [identity] = await gated(reader, fixtureId, proof);
   if (!identity) return null;
-  // Recheck access in the projection statement, so revocation between reads cannot disclose it.
-  const [row] = await reader
-    .select({
-      state: matchLiveState.state,
-      stamps: liveHistoryStamps,
-      trust: matches.trustLevel,
-      phase: matches.phase,
-      rules: competitions.scoringRules,
-      sport: competitions.sport,
-    })
-    .from(fixtures)
-    .innerJoin(matches, eq(matches.fixtureId, fixtures.id))
-    .innerJoin(competitions, eq(competitions.id, fixtures.competitionId))
-    .innerJoin(
-      matchLiveState,
-      and(
-        eq(matchLiveState.fixtureId, fixtures.id),
-        eq(matchLiveState.orgId, fixtures.orgId),
-        eq(matchLiveState.competitionId, fixtures.competitionId),
-      ),
-    )
-    .where(scoringPublicAccess(fixtureId, proof))
-    .limit(1);
-  if (!row) return null;
-  const engine = scoringEngine(row.sport);
-  if (!engine) return null;
-  const stored = row.state as StoredLiveState;
-  const delay = parseSeasonScoringRules(row.rules).publicDelaySeconds;
-  const stamps = Array.isArray(row.stamps) ? row.stamps : [];
-  const index = delayedHistoryIndex(stamps, row.trust, delay, now.getTime());
-  let selected:
-    | {
-        state: PublicLiveState;
-        scorecard?: PublicScorecard;
-        charts?: PublicCharts;
-        resultDetails?: PublicResultDetails;
-        overlay?: OverlayProjection;
+  // F05: one REPEATABLE READ snapshot for the timestamps and the released
+  // entry, so a write that rotates the ring between them cannot shift the
+  // index onto a newer, unreleased entry.
+  const read = await reader.transaction(
+    async (tx) => {
+      // Recheck access in the projection statement, so revocation between reads cannot disclose it.
+      const [row] = await tx
+        .select({
+          state: matchLiveState.state,
+          stamps: liveHistoryStamps,
+          trust: matches.trustLevel,
+          phase: matches.phase,
+          rules: competitions.scoringRules,
+          sport: competitions.sport,
+        })
+        .from(fixtures)
+        .innerJoin(matches, eq(matches.fixtureId, fixtures.id))
+        .innerJoin(competitions, eq(competitions.id, fixtures.competitionId))
+        .innerJoin(
+          matchLiveState,
+          and(
+            eq(matchLiveState.fixtureId, fixtures.id),
+            eq(matchLiveState.orgId, fixtures.orgId),
+            eq(matchLiveState.competitionId, fixtures.competitionId),
+          ),
+        )
+        .where(scoringPublicAccess(fixtureId, proof))
+        .limit(1);
+      if (!row) return null;
+      const engine = scoringEngine(row.sport);
+      if (!engine) return null;
+      const stored = row.state as StoredLiveState;
+      const delay = parseSeasonScoringRules(row.rules).publicDelaySeconds;
+      const stamps = Array.isArray(row.stamps) ? row.stamps : [];
+      const index = delayedHistoryIndex(stamps, row.trust, delay, now.getTime());
+      let selected:
+        | {
+            state: PublicLiveState;
+            scorecard?: PublicScorecard;
+            charts?: PublicCharts;
+            resultDetails?: PublicResultDetails;
+            overlay?: OverlayProjection;
+          }
+        | undefined;
+      if (index === "current")
+        selected = {
+          state: stored,
+          ...(stored.scorecard ? { scorecard: stored.scorecard } : {}),
+          ...(stored.charts ? { charts: stored.charts } : {}),
+          ...(stored.resultDetails ? { resultDetails: stored.resultDetails } : {}),
+          ...(stored.overlay ? { overlay: stored.overlay } : {}),
+        };
+      else if (index !== undefined) {
+        // Rechecks access in the same statement, so a revocation between the two
+        // reads still discloses nothing.
+        const [entry] = await tx
+          .select({ entry: liveHistoryEntry(index) })
+          .from(fixtures)
+          .innerJoin(matches, eq(matches.fixtureId, fixtures.id))
+          .innerJoin(competitions, eq(competitions.id, fixtures.competitionId))
+          .innerJoin(
+            matchLiveState,
+            and(
+              eq(matchLiveState.fixtureId, fixtures.id),
+              eq(matchLiveState.orgId, fixtures.orgId),
+              eq(matchLiveState.competitionId, fixtures.competitionId),
+            ),
+          )
+          .where(scoringPublicAccess(fixtureId, proof))
+          .limit(1);
+        if (!entry) return null;
+        selected = isLiveHistoryEntry(entry.entry) ? entry.entry : undefined;
       }
-    | undefined;
-  if (index === "current")
-    selected = {
-      state: stored,
-      ...(stored.scorecard ? { scorecard: stored.scorecard } : {}),
-      ...(stored.charts ? { charts: stored.charts } : {}),
-      ...(stored.resultDetails ? { resultDetails: stored.resultDetails } : {}),
-      ...(stored.overlay ? { overlay: stored.overlay } : {}),
-    };
-  else if (index !== undefined) {
-    // Rechecks access in the same statement, so a revocation between the two
-    // reads still discloses nothing.
-    const [entry] = await reader
-      .select({ entry: liveHistoryEntry(index) })
-      .from(fixtures)
-      .innerJoin(matches, eq(matches.fixtureId, fixtures.id))
-      .innerJoin(competitions, eq(competitions.id, fixtures.competitionId))
-      .innerJoin(
-        matchLiveState,
-        and(
-          eq(matchLiveState.fixtureId, fixtures.id),
-          eq(matchLiveState.orgId, fixtures.orgId),
-          eq(matchLiveState.competitionId, fixtures.competitionId),
-        ),
-      )
-      .where(scoringPublicAccess(fixtureId, proof))
-      .limit(1);
-    if (!entry) return null;
-    selected = isLiveHistoryEntry(entry.entry) ? entry.entry : undefined;
-  }
+      return { row, engine, delay, selected };
+    },
+    { isolationLevel: "repeatable read", accessMode: "read only" },
+  );
+  if (!read) return null;
+  const { row, engine, delay, selected } = read;
   const projected = selected ? publicLiveProjection(selected.state, engine.family) : null;
   return selected && projected
     ? {
