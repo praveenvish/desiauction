@@ -2,6 +2,7 @@ import { seasonAwardComputation, persistSeasonAwards } from "../insights/season"
 import { batterInsights } from "../insights/batter";
 import { eligibleSeasonScorers } from "../insights/scorers";
 import { claimScoringGuest } from "./guest-claim";
+import { answerGuestClaimOffer, openGuestClaimOffers } from "./guest-claim-offers";
 import { cricketCareerFor } from "../player/career-stats";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -1803,6 +1804,51 @@ for (const branch of ["new_phone", "existing_account"] as const) {
       // Recover a committed claim even when its request never dispatched notices.
       await recoverGuestClaimInvites(owner.db, reminderBoundariesFor(app), [id]);
       await recoverableGuestClaimDispatch(orgId, reg(0), reminderBoundariesFor(app));
+      if (branch === "existing_account") {
+        // F09: an account holder is asked, never attached on a scorer's word.
+        const unmoved = await owner.db
+          .select({ personId: registrations.personId })
+          .from(registrations)
+          .where(eq(registrations.id, reg(0)));
+        expect(unmoved[0]?.personId).toBe(guestId);
+        const offered = await owner.db
+          .select()
+          .from(auditLog)
+          .where(
+            and(
+              eq(auditLog.scopeType, "person"),
+              eq(auditLog.scopeId, holder),
+              eq(auditLog.action, "player.claim_offered"),
+            ),
+          );
+        expect(offered).toHaveLength(1);
+        expect(JSON.stringify(offered)).not.toContain(phone);
+        const boundaries = reminderBoundariesFor(app);
+        const offers = await openGuestClaimOffers(holder, boundaries);
+        expect(offers).toEqual([
+          expect.objectContaining({ noticeId: offered[0]?.id, playedAs: "Guest Player" }),
+        ]);
+        // A second claim by the scorer does not stack a second offer.
+        await withTenantDb(app, { personId: actor, orgId }, (db) =>
+          claimScoringGuest(db, id, actor, { registrationId: reg(0), phone }),
+        );
+        await recoverableGuestClaimDispatch(orgId, reg(0), boundaries);
+        expect(await openGuestClaimOffers(holder, boundaries)).toHaveLength(1);
+        // Somebody else cannot answer it.
+        expect(
+          await answerGuestClaimOffer(players[1] ?? "", offered[0]?.id, true, boundaries),
+        ).toEqual({ ok: false, reason: "gone" });
+        expect(await answerGuestClaimOffer(holder, offered[0]?.id, true, boundaries)).toEqual({
+          ok: true,
+          accepted: true,
+        });
+        expect(await openGuestClaimOffers(holder, boundaries)).toHaveLength(0);
+        expect(await answerGuestClaimOffer(holder, offered[0]?.id, true, boundaries)).toEqual({
+          ok: false,
+          reason: "gone",
+        });
+        await recoverGuestClaimInvites(owner.db, boundaries, [id]);
+      }
       const [registration] = await owner.db
         .select()
         .from(registrations)
@@ -1853,9 +1899,10 @@ for (const branch of ["new_phone", "existing_account"] as const) {
             eq(auditLog.action, "player.claim_invited"),
           ),
         );
+      // The holder who accepted is not then told what they just did.
       expect(
         notices.filter((row) => row.subject === `player.claim_invite:${reg(0)}:${holder}`),
-      ).toHaveLength(1);
+      ).toHaveLength(branch === "new_phone" ? 1 : 0);
       expect(JSON.stringify(notices)).not.toContain(phone);
       const audit = await owner.db
         .select()
@@ -1876,7 +1923,12 @@ for (const branch of ["new_phone", "existing_account"] as const) {
       await owner.db.update(people).set(original).where(eq(people.id, guestId));
       await owner.db
         .delete(messageOutbox)
-        .where(and(eq(messageOutbox.orgId, orgId), eq(messageOutbox.kind, "player.claim_invite")));
+        .where(
+          and(
+            eq(messageOutbox.orgId, orgId),
+            inArray(messageOutbox.kind, ["player.claim_invite", "player.claim_offer"]),
+          ),
+        );
     }
   });
 }

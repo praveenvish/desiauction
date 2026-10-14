@@ -246,6 +246,34 @@ describe("scorer home and setup", () => {
       .where(eq(teamManagers.personId, guestOwner));
     expect(await within(guestOwner, (db) => scoringSetup(db, id, guestOwner, now))).toBeNull();
   });
+  it("lets a team's manager add guests to their own side only", async () => {
+    const id = await fixture();
+    const managerRow = newId();
+    await owner.db.insert(teamManagers).values({
+      id: managerRow,
+      orgId,
+      competitionId: season,
+      teamId: home,
+      personId: stranger,
+      role: "manager",
+      source: "organizer",
+      createdBy: actor,
+    });
+    try {
+      expect(
+        await within(stranger, (db) =>
+          addScoringGuest(db, id, stranger, { teamId: away, name: "Opposition guest" }),
+        ),
+      ).toMatchObject({ ok: false, error: "wrong_team" });
+      expect(
+        await within(stranger, (db) =>
+          addScoringGuest(db, id, stranger, { teamId: home, name: "Own side guest" }),
+        ),
+      ).toMatchObject({ ok: true });
+    } finally {
+      await owner.db.delete(teamManagers).where(eq(teamManagers.id, managerRow));
+    }
+  });
   it("adds a pre-start guest without match/claim/events and refuses unauthorized, wrong-team and closed fixtures", async () => {
     const id = await fixture();
     await appoint(id);

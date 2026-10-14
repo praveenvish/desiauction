@@ -9,6 +9,7 @@ export type SecurityAction =
   | "match.award_won"
   | "match.confirm_requested"
   | "player.claim_invited"
+  | "player.claim_offered"
   | "match.quiet"
   | "auth.login.otp"
   /** A correct code or passkey for a SUSPENDED account (0103): no session issued. */

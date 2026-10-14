@@ -81,7 +81,17 @@ export async function claimScoringGuest(db: Db, fixtureId: string, actorId: stri
     actorId,
     phone: phone.phone,
     source: "scorer_guest_claim",
+    linkHeld: false,
   });
+  if (!attached.ok && attached.reason === "held")
+    return offerToHolder(db, {
+      orgId: fixture.orgId,
+      competitionId: fixture.competitionId,
+      fixtureId,
+      registrationId: guest.id,
+      holderId: attached.holderId,
+      actorId,
+    });
   if (!attached.ok)
     return {
       ok: false as const,
@@ -107,4 +117,72 @@ export async function claimScoringGuest(db: Db, fixtureId: string, actorId: stri
   });
   // The season’s shown name and every registration-keyed fact stay unchanged.
   return { ok: true as const, registrationId: guest.id };
+}
+
+/**
+ * The scorer's claim when an account already holds the number: an offer the
+ * account holder accepts from /me/claims (`acceptGuestClaimOffer`). Nothing
+ * moves until they do.
+ */
+async function offerToHolder(
+  db: Db,
+  input: {
+    orgId: string;
+    competitionId: string;
+    fixtureId: string;
+    registrationId: string;
+    holderId: string;
+    actorId: string;
+  },
+) {
+  // A number that already signs in to an account is never attached on a
+  // scorer's word: the account holder gets an offer and decides (F09). The
+  // scorer sees the same answer either way — whether a number has an account
+  // is not theirs to learn (0075).
+  const [already] = await db
+    .select({ id: registrations.id })
+    .from(registrations)
+    .where(
+      and(
+        eq(registrations.competitionId, input.competitionId),
+        eq(registrations.personId, input.holderId),
+      ),
+    )
+    .limit(1);
+  if (already)
+    return {
+      ok: false as const,
+      error: "already_in_season",
+      message: "This number is already registered in this season.",
+    };
+  const [pending] = await db
+    .select({ id: auditLog.id })
+    .from(auditLog)
+    .where(
+      and(
+        eq(auditLog.scopeType, "org"),
+        eq(auditLog.scopeId, input.orgId),
+        eq(auditLog.subject, input.registrationId),
+        eq(auditLog.action, "registration.guest_claim_offered"),
+        sql`${auditLog.meta}->>'personId' = ${input.holderId}`,
+        sql`not exists (select 1 from audit_log answer where answer.scope_type = 'org' and answer.scope_id = ${auditLog.scopeId} and answer.subject = ${auditLog.id} and answer.action in ('registration.guest_claim_offer_accepted', 'registration.guest_claim_offer_declined'))`,
+      ),
+    )
+    .limit(1);
+  if (!pending)
+    await db.insert(auditLog).values({
+      id: newId(),
+      actor: input.actorId,
+      action: "registration.guest_claim_offered",
+      scopeType: "org",
+      scopeId: input.orgId,
+      subject: input.registrationId,
+      meta: {
+        personId: input.holderId,
+        registrationId: input.registrationId,
+        fixtureId: input.fixtureId,
+        competitionId: input.competitionId,
+      },
+    });
+  return { ok: true as const, registrationId: input.registrationId };
 }

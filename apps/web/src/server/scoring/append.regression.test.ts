@@ -31,6 +31,7 @@ import { appendScoringEvents, persistedMatchEvent, type ClientEvent } from "./ap
 import { matchAgeDate, scoringNames, type StoredLiveState } from "./live-state";
 import { startScoredMatch } from "./start";
 import { addScoringGuest, GuestRefusal } from "./guests";
+import { claimScoring } from "./claim";
 
 const owner = createDb(env.DATABASE_URL);
 const app = env.APP_DATABASE_URL ? createDb(env.APP_DATABASE_URL) : owner;
@@ -388,22 +389,18 @@ describe("API-1 append events", () => {
       sport: "cricket",
       createdBy: organiser,
     });
-    await owner.db
-      .insert(teams)
-      .values({
-        id: elsewhereTeam,
-        orgId,
-        competitionId: elsewhere,
-        name: "Other",
-        createdBy: organiser,
-      });
-    await owner.db
-      .insert(people)
-      .values({
-        id: outsider,
-        name: "Other Season Player",
-        email: `append-${outsider}@example.test`,
-      });
+    await owner.db.insert(teams).values({
+      id: elsewhereTeam,
+      orgId,
+      competitionId: elsewhere,
+      name: "Other",
+      createdBy: organiser,
+    });
+    await owner.db.insert(people).values({
+      id: outsider,
+      name: "Other Season Player",
+      email: `append-${outsider}@example.test`,
+    });
     await owner.db.insert(registrations).values({
       id: outsiderRegistration,
       personId: outsider,
@@ -474,6 +471,53 @@ describe("API-1 append events", () => {
       lastSeq: 300,
       acks: [{ status: "duplicate" }],
     });
+  });
+  it("after finish only the scorer who finished or an organiser corrects, and nobody forces the claim", async () => {
+    const id = await setup();
+    const style = event("style_set", { registrationId: reg(0), battingHand: "right" });
+    const walkover = event("walkover", { winnerTeamId: home, reason: "Opponent absent" });
+    expect((await append(id, [style, walkover, event("finish", {})])).ok).toBe(true);
+    const later = new Date(now.getTime() + 10 * 60_000);
+    expect(
+      await within(other, (db) =>
+        claimScoring(db, id, other, { deviceId: "other-device", mode: "force" }, later),
+      ),
+    ).toMatchObject({ ok: false, error: "claim_held" });
+    // However the claim moved (a handover), the new holder did not finish it.
+    await owner.db
+      .update(matches)
+      .set({ scorerPersonId: other, scorerDeviceId: "other-device" })
+      .where(eq(matches.fixtureId, id));
+    expect(
+      await append(id, [event("void", {}, style.eventId)], other, "other-device", later),
+    ).toMatchObject({ ok: true, acks: [{ status: "rejected", reason: "already_finished" }] });
+    expect(
+      await within(organiser, (db) =>
+        claimScoring(db, id, organiser, { deviceId: "organiser-device", mode: "force" }, later),
+      ),
+    ).toMatchObject({ ok: true });
+    expect(
+      await append(id, [event("void", {}, style.eventId)], organiser, "organiser-device", later),
+    ).toMatchObject({ ok: true, acks: [{ status: "stored" }] });
+    await owner.db
+      .update(matches)
+      .set({ scorerPersonId: actor, scorerDeviceId: deviceId })
+      .where(eq(matches.fixtureId, id));
+    expect(
+      await append(
+        id,
+        [
+          event(
+            "amend",
+            { payload: { winnerTeamId: away, reason: "Corrected winner" } },
+            walkover.eventId,
+          ),
+        ],
+        actor,
+        deviceId,
+        later,
+      ),
+    ).toMatchObject({ ok: true, acks: [{ status: "stored" }] });
   });
   it("accepts finished corrections within the window, refuses expired edits and restricts final edits to organisers", async () => {
     const id = await setup();

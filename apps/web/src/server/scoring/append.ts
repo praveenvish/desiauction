@@ -31,7 +31,7 @@ import {
   type DbHandle,
   type Db,
 } from "@desiauction/db";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 import { finalizeScoredMatch, revalidateScoredMatch, type FinalizationEffect } from "./finalize";
 import { authorityKind } from "./authority";
@@ -179,6 +179,20 @@ export async function appendScoringEvents(
   if (!authority) return { ok: false, error: "forbidden", message: "You cannot score this match." };
   if (input.events.some((event) => event.type === "match_voided") && authority !== "a")
     return { ok: false, error: "forbidden", message: "Only an organiser can void the match." };
+  // F09: once finished, a correction comes from the scorer who finished the
+  // match or from an organiser — never from whoever holds the claim since.
+  let correctsFinished = authority === "a";
+  if (!correctsFinished && match.finishedAt !== null) {
+    const [finisher] = await db
+      .select({ actor: matchEvents.actorPersonId })
+      .from(matchEvents)
+      .where(
+        and(eq(matchEvents.fixtureId, fixtureId), lte(matchEvents.receivedAt, match.finishedAt)),
+      )
+      .orderBy(desc(matchEvents.seq))
+      .limit(1);
+    correctsFinished = finisher?.actor === actorId;
+  }
   const emptyStart =
     match.scorerPersonId === null &&
     match.lastSeq === 0 &&
@@ -263,7 +277,7 @@ export async function appendScoringEvents(
     let refusal: RejectReason | null = null;
     if (correction && (match.finishedAt !== null || match.phase === "final")) {
       if (
-        match.phase === "final"
+        !correctsFinished || match.phase === "final"
           ? authority !== "a"
           : match.finishedAt === null ||
             now.getTime() - match.finishedAt.getTime() > rules.editWindowHours * 3_600_000

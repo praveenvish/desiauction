@@ -38,12 +38,15 @@ export function createServer(env: Env, read: Reader, ready: () => Promise<boolea
         request.socket.remoteAddress,
         env.TRUSTED_PROXY_COUNT,
       );
-      if ((counts.get(ip) ?? 0) >= 20) {
+      // No trustworthy address: skip the per-client cap rather than lumping
+      // every such client under one "" key (client-address.ts); the per-room
+      // cap still holds.
+      if (ip !== "" && (counts.get(ip) ?? 0) >= 20) {
         socket.destroy();
         return;
       }
       wss.handleUpgrade(request, socket, head, (ws) => {
-        counts.set(ip, (counts.get(ip) ?? 0) + 1);
+        if (ip !== "") counts.set(ip, (counts.get(ip) ?? 0) + 1);
         alive.add(ws);
         let leave: (() => void) | undefined;
         const deadline = setTimeout(() => {
@@ -80,9 +83,11 @@ export function createServer(env: Env, read: Reader, ready: () => Promise<boolea
         ws.on("close", () => {
           clearTimeout(deadline);
           leave?.();
-          const n = (counts.get(ip) ?? 1) - 1;
-          if (n) counts.set(ip, n);
-          else counts.delete(ip);
+          if (ip !== "") {
+            const n = (counts.get(ip) ?? 1) - 1;
+            if (n) counts.set(ip, n);
+            else counts.delete(ip);
+          }
         });
       });
     } catch {

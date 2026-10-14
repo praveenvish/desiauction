@@ -462,6 +462,8 @@ function expectations(allTables: string[]): Expectation[] {
     "matches",
     "match_confirmations",
     "team_entries",
+    "team_managers",
+    "fixture_officials",
     "match_events",
     "match_live_state",
     "match_player_lines",

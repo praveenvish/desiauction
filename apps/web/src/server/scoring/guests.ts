@@ -4,6 +4,7 @@ import { z } from "zod";
 import { assignTeam, transition } from "../competition/registration-aggregate";
 import { addClubOnlyPlayer } from "../competition/registrations";
 import { authorityKind } from "./authority";
+import { representedTeams } from "./trust-ledger";
 
 export class GuestRefusal extends Error {
   constructor(
@@ -34,7 +35,8 @@ export async function addScoringGuest(db: Db, fixtureId: string, actorId: string
       error: "not_ready",
       message: "This match is not open for players.",
     };
-  if (!(await authorityKind(db, actorId, fixture)))
+  const authority = await authorityKind(db, actorId, fixture);
+  if (!authority)
     return {
       ok: false as const,
       error: "forbidden",
@@ -45,6 +47,17 @@ export async function addScoringGuest(db: Db, fixtureId: string, actorId: string
       ok: false as const,
       error: "wrong_team",
       message: "Choose a team playing this match.",
+    };
+  // F09: a team's manager (or their handed-over scorer) fills their own side,
+  // never the opposition's.
+  if (
+    authority === "d" &&
+    !(await representedTeams(db, fixture, actorId)).includes(input.data.teamId)
+  )
+    return {
+      ok: false as const,
+      error: "wrong_team",
+      message: "You can add guests only to your own team.",
     };
   const [team] = await db
     .select({ id: teams.id })

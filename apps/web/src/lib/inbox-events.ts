@@ -25,6 +25,7 @@ const PERSON_EVENT_LABELS = {
   "match.result_published": "Your match result is ready",
   "match.award_won": "You received a match award",
   "player.claim_invited": "Sign in to see your match stats",
+  "player.claim_offered": "A scorer thinks you played as their guest — is it you?",
   "match.confirm_requested": "Please confirm the match result",
   "match.quiet": "Scoring has gone quiet — check on your live match",
   "auth.login.otp": "Signed in with a one-time code",

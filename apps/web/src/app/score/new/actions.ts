@@ -2,9 +2,23 @@
 import { currentSession } from "../../../server/auth/actions";
 import { fixtures, people, registrations, withTenantDb } from "@desiauction/db";
 import { eq, sql } from "drizzle-orm";
+import { ZodError } from "zod";
 import { dbHandle } from "../../../server/db";
 import { scoringOrgIds } from "../../../server/scoring/home";
-import { createQuickMatch, reuseQuickPlayer } from "../../../server/scoring/quick-match";
+import { logger } from "../../../server/logger";
+import {
+  createQuickMatch,
+  QuickMatchRefusal,
+  reuseQuickPlayer,
+} from "../../../server/scoring/quick-match";
+
+/** F09: only a written refusal reaches the browser; anything else is logged. */
+function refusalMessage(error: unknown, fallback: string): string {
+  if (error instanceof QuickMatchRefusal) return error.message;
+  if (error instanceof ZodError) return "Check the match details.";
+  logger().error({ err: error }, "score.quick_match_failed");
+  return fallback;
+}
 export async function createQuickMatchAction(input: unknown) {
   const session = await currentSession();
   if (!session) return { ok: false as const, message: "Sign in to create a match." };
@@ -14,7 +28,7 @@ export async function createQuickMatchAction(input: unknown) {
   } catch (error) {
     return {
       ok: false as const,
-      message: error instanceof Error ? error.message : "This match could not be created.",
+      message: refusalMessage(error, "This match could not be created."),
     };
   }
 }
@@ -42,7 +56,7 @@ export async function reuseQuickPlayerAction(
             !["published", "in_progress"].includes(fixture.status) ||
             ![fixture.homeTeamId, fixture.awayTeamId].includes(teamId)
           )
-            throw new Error("Choose a team playing this match.");
+            throw new QuickMatchRefusal("Choose a team playing this match.");
           const registrationId = await reuseQuickPlayer(
             db,
             orgId,
@@ -67,7 +81,7 @@ export async function reuseQuickPlayerAction(
   } catch (error) {
     return {
       ok: false as const,
-      message: error instanceof Error ? error.message : "This player could not be added.",
+      message: refusalMessage(error, "This player could not be added."),
     };
   }
 }

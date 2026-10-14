@@ -63,6 +63,7 @@ const MANAGEABLE = new Set([
   "match.award",
   "match.confirm_request",
   "player.claim_invite",
+  "player.claim_offer",
   "season.champion",
   "review.platform_ask",
   "review.season_ask",

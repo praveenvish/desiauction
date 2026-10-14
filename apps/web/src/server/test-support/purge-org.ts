@@ -180,6 +180,8 @@ export async function purgeOrg(db: Db, orgId: string): Promise<void> {
           "match.confirm_notice_dispatched",
           "player.claim_invited",
           "player.claim_notice_dispatched",
+          "player.claim_offered",
+          "player.claim_offer_dispatched",
         ]),
         sql`${auditLog.meta}->>'orgId' = ${orgId}`,
       ),

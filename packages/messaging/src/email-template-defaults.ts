@@ -1874,6 +1874,46 @@ const PLAYER_CLAIM_INVITE: EmailTemplateSpec = {
   },
 };
 
+const PLAYER_CLAIM_OFFER: EmailTemplateSpec = {
+  locked: [],
+  kind: "player.claim_offer",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: DEFAULT_VARIANT,
+  variables: [],
+  actions: [{ id: "claims", description: "The recipient’s open guest-player offers." }],
+  defaults: {
+    en: one(
+      layout({
+        subject: "Did you play this match?",
+        preheader: "A scorer says a guest player in their match was you.",
+        heading: "Is this you?",
+        paragraphs: [
+          "A scorer entered your mobile number for a guest player in a match they scored. If it was you, accept and the match stats join your career. If not, say so and nothing changes.",
+        ],
+        actions: { claims: "Check and decide" },
+        footnote:
+          "You received this because a scorer entered your mobile number for a guest player.",
+      }),
+    ),
+    hi: one(
+      layout({
+        subject: "क्या आपने यह मैच खेला था?",
+        preheader: "एक स्कोरर के अनुसार उनके मैच का एक अतिथि खिलाड़ी आप थे।",
+        heading: "क्या यह आप हैं?",
+        paragraphs: [
+          "एक स्कोरर ने अपने मैच के एक अतिथि खिलाड़ी के लिए आपका मोबाइल नंबर दर्ज किया है। अगर वह आप थे, तो स्वीकार करें और मैच के आँकड़े आपके करियर में जुड़ जाएँगे। अगर नहीं, तो बता दें — कुछ नहीं बदलेगा।",
+        ],
+        actions: { claims: "देखें और तय करें" },
+        footnote:
+          "एक स्कोरर ने अतिथि खिलाड़ी के लिए आपका मोबाइल नंबर दर्ज किया है, इसलिए आपको यह संदेश मिला है।",
+      }),
+    ),
+  },
+};
+
 const TOSS_REMINDER: EmailTemplateSpec = {
   locked: [],
   kind: "match.toss_reminder",
@@ -3688,6 +3728,7 @@ export const EMAIL_TEMPLATES: Readonly<Record<EmailNotificationKind, EmailTempla
   "match.result": matchNoticeTemplate("match.result"),
   "match.confirm_request": matchNoticeTemplate("match.confirm_request"),
   "player.claim_invite": PLAYER_CLAIM_INVITE,
+  "player.claim_offer": PLAYER_CLAIM_OFFER,
   "match.award": matchNoticeTemplate("match.award"),
   "season.champion": SEASON_CHAMPION,
   "finance.document.issued": FINANCE,

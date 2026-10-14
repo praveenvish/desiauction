@@ -536,14 +536,35 @@ describe("API-8 scheduled scoring maintenance", () => {
   });
   it("repairs a lagging revision with a system audit and the actual correction actor, regardless of current holder", async () => {
     const { id, outcome } = await finished();
+    // After finish only the finishing scorer or an organiser corrects (F09), so
+    // the other person corrects here as an organiser of the club.
+    const organiserGrant = newId();
+    await owner.db.insert(grants).values({
+      id: organiserGrant,
+      personId: other,
+      scopeType: "org",
+      scopeId: orgId,
+      capabilitySet: "org:owner",
+      grantedBy: actor,
+    });
     await owner.db.update(matches).set({ scorerPersonId: other }).where(eq(matches.fixtureId, id));
-    expect(
-      await append(
-        id,
-        [event("amend", { payload: { winnerTeamId: away, reason: "Corrected" } }, outcome.eventId)],
-        other,
-      ),
-    ).toMatchObject({ ok: true });
+    try {
+      expect(
+        await append(
+          id,
+          [
+            event(
+              "amend",
+              { payload: { winnerTeamId: away, reason: "Corrected" } },
+              outcome.eventId,
+            ),
+          ],
+          other,
+        ),
+      ).toMatchObject({ ok: true, acks: [{ status: "stored" }] });
+    } finally {
+      await owner.db.delete(grants).where(eq(grants.id, organiserGrant));
+    }
     await owner.db.update(matches).set({ scorerPersonId: actor }).where(eq(matches.fixtureId, id));
     await owner.db
       .delete(auditLog)

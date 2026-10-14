@@ -312,3 +312,6 @@ revoke all on match_confirmations from desiauction_engine, desiauction_runner;
 -- LS-1: team entries belong to the web tenant boundary.
 revoke all on team_entries from desiauction_engine, desiauction_runner;
 revoke all on ball_facts from desiauction_engine, desiauction_runner;
+
+-- LS-1 (0125): team managers and match officials are web-tier scoring data.
+revoke all on team_managers, fixture_officials from desiauction_engine, desiauction_runner;

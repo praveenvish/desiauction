@@ -55,6 +55,47 @@ it("health/readiness, exact origin/path, socket cap, gated snapshot and 1KiB cei
   }
 }, 15000);
 
+it("skips the per-client cap when no trustworthy address exists, instead of lumping clients", async () => {
+  const proxied = parseEnv({
+    SYSTEM_DATABASE_URL: "postgres://desiauction_system:test@127.0.0.1:15437/ls1_c29_clean",
+    LIVE_ALLOWED_ORIGINS: "https://allowed.test",
+    TRUSTED_PROXY_COUNT: "1",
+  });
+  const app = createServer(
+    proxied,
+    () => Promise.resolve({ allowed: true, live: state() }),
+    () => Promise.resolve(true),
+  );
+  const clients: WebSocket[] = [];
+  try {
+    const address = await app.server.listen({ host: "127.0.0.1", port: 0 });
+    const target = address.replace("http:", "ws:") + "/live/ws";
+    // No X-Forwarded-For behind a declared proxy: 21 sockets all open.
+    for (let i = 0; i < 21; i++) {
+      const ws = new WebSocket(target, { origin: "https://allowed.test" });
+      clients.push(ws);
+      await once(ws, "open");
+    }
+    // A forwarded client is still held to its own 20.
+    for (let i = 0; i < 20; i++) {
+      const ws = new WebSocket(target, {
+        origin: "https://allowed.test",
+        headers: { "x-forwarded-for": "203.0.113.7" },
+      });
+      clients.push(ws);
+      await once(ws, "open");
+    }
+    const excess = new WebSocket(target, {
+      origin: "https://allowed.test",
+      headers: { "x-forwarded-for": "203.0.113.7" },
+    });
+    await expect(once(excess, "open")).rejects.toThrow();
+  } finally {
+    for (const client of clients) client.terminate();
+    await app.server.close();
+  }
+}, 15000);
+
 it("placement sockets preserve all squads, release only selected snapshots and close on revoked public access", async () => {
   const live: PublicPlacementState = {
     ...state(),

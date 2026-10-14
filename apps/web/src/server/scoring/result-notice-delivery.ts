@@ -519,6 +519,85 @@ async function notifyGuestClaim(
   return true;
 }
 
+/**
+ * An account holder is offered a guest registration a scorer tied to their
+ * number (F09). The registration has NOT moved; the notice opens /me/claims,
+ * where they accept or say it is not them.
+ */
+async function notifyGuestClaimOffer(
+  db: Db,
+  input: { orgId: string; registrationId: string; personId: string; offerId: string },
+  now = new Date(),
+) {
+  const key = `player.claim_offer:${input.offerId}:${input.personId}`;
+  const [existing] = await db
+    .select({ id: auditLog.id })
+    .from(auditLog)
+    .where(
+      and(
+        eq(auditLog.scopeType, "person"),
+        eq(auditLog.scopeId, input.personId),
+        eq(auditLog.subject, key),
+      ),
+    );
+  if (existing) return false;
+  const [person] = await db
+    .select({ email: people.email, language: people.language })
+    .from(people)
+    .where(eq(people.id, input.personId));
+  const inbox = await notificationGate(db, {
+    kind: "player.claim_offer",
+    channel: "in_app",
+    recipient: { personId: input.personId, contact: "" },
+    orgId: input.orgId,
+    now,
+  });
+  // Written either way: /me/claims finds open offers through this row, so a
+  // muted inbox still leaves the offer answerable.
+  await db.insert(auditLog).values({
+    id: newId(),
+    actor: input.personId,
+    action: inbox.send ? "player.claim_offered" : "player.claim_offer_dispatched",
+    scopeType: "person",
+    scopeId: input.personId,
+    subject: key,
+    meta: { orgId: input.orgId, registrationId: input.registrationId, offerId: input.offerId },
+    at: now,
+  });
+  const email = await notificationGate(db, {
+    kind: "player.claim_offer",
+    channel: "email",
+    recipient: { personId: input.personId, contact: person?.email ?? "" },
+    orgId: input.orgId,
+    now,
+  });
+  if (email.send && person?.email) {
+    const mail = await renderNotificationEmail(
+      "player.claim_offer",
+      person.language === "hi" ? "hi" : "en",
+      {},
+      { action: { id: "claims", url: new URL("/me/claims", env.PUBLIC_BASE_URL).href } },
+      db,
+    );
+    await enqueueMail(
+      [
+        {
+          ...mail,
+          kind: "player.claim_offer",
+          personId: input.personId,
+          orgId: input.orgId,
+          dedupeKey: `email:${key}`,
+        },
+      ],
+      db,
+    );
+  }
+  return true;
+}
+
+/** A claim that attached, and one that became an offer: both owe a notice. */
+const GUEST_CLAIM_ANCHORS = ["registration.guest_claimed", "registration.guest_claim_offered"];
+
 export async function recoverableGuestClaimDispatch(
   orgId: string,
   registrationId: string,
@@ -535,7 +614,7 @@ export async function recoverableGuestClaimDispatch(
             eq(auditLog.scopeType, "org"),
             eq(auditLog.scopeId, orgId),
             eq(auditLog.subject, registrationId),
-            eq(auditLog.action, "registration.guest_claimed"),
+            inArray(auditLog.action, GUEST_CLAIM_ANCHORS),
             sql`not exists (select 1 from audit_log receipt where receipt.action = 'registration.guest_claim_notice_dispatched' and receipt.scope_type = 'org' and receipt.scope_id = ${auditLog.scopeId} and receipt.subject = ${auditLog.id})`,
           ),
         ),
@@ -546,7 +625,13 @@ export async function recoverableGuestClaimDispatch(
       if (typeof personId !== "string" || !/^[0-9A-HJKMNP-TV-Z]{26}$/.test(personId))
         throw new Error("Invalid guest claim receipt");
       await boundaries.inOrg(personId, orgId, async (db) => {
-        await notifyGuestClaim(db, { orgId, registrationId, personId }, now);
+        if (anchor.action === "registration.guest_claim_offered")
+          await notifyGuestClaimOffer(
+            db,
+            { orgId, registrationId, personId, offerId: anchor.id },
+            now,
+          );
+        else await notifyGuestClaim(db, { orgId, registrationId, personId }, now);
         const [receipt] = await db
           .select({ id: auditLog.id })
           .from(auditLog)
@@ -588,7 +673,7 @@ export async function recoverGuestClaimInvites(
     .where(
       and(
         eq(auditLog.scopeType, "org"),
-        eq(auditLog.action, "registration.guest_claimed"),
+        inArray(auditLog.action, GUEST_CLAIM_ANCHORS),
         sql`not exists (select 1 from audit_log receipt where receipt.action = 'registration.guest_claim_notice_dispatched' and receipt.scope_type = 'org' and receipt.scope_id = ${auditLog.scopeId} and receipt.subject = ${auditLog.id})`,
         ...(fixtureIds
           ? [inArray(sql<string>`${auditLog.meta}->>'fixtureId'`, [...fixtureIds])]

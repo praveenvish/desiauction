@@ -51,6 +51,20 @@ export async function claimScoring(
       .where(eq(people.id, match.scorerPersonId));
     holder = { name: person?.name ?? "Current scorer" };
   }
+  // F09: a finished match is corrected by its scorer or an organiser; nobody
+  // else takes it over by force.
+  if (
+    input.data.mode === "force" &&
+    authority !== "a" &&
+    (match.finishedAt !== null || match.phase === "final" || match.phase === "void")
+  )
+    return {
+      ok: false as const,
+      error: "claim_held",
+      message: "This match is finished. Corrections go through the organiser.",
+      holder,
+      lastSeq: match.lastSeq,
+    };
   if (match.scorerPersonId !== null && match.scorerPersonId !== actorId) {
     let permitted = input.data.mode === "force" && authority === "a";
     if (input.data.mode === "force" && !permitted) {

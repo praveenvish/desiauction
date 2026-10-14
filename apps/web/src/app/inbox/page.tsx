@@ -244,16 +244,20 @@ export default async function InboxPage({
                               : `/inbox?matchNotice=${matchNoticeId}`,
                         },
                       }
-                    : requestId !== null
-                      ? { subject: { name: "Live match", href: `/inbox?reminder=${requestId}` } }
-                      : competition !== undefined
-                        ? {
-                            subject: {
-                              name: competition.name,
-                              ...(competition.publicPage ? { href: `/c/${competition.slug}` } : {}),
-                            },
-                          }
-                        : {}),
+                    : event.action === "player.claim_offered"
+                      ? { subject: { name: "Answer", href: "/me/claims" } }
+                      : requestId !== null
+                        ? { subject: { name: "Live match", href: `/inbox?reminder=${requestId}` } }
+                        : competition !== undefined
+                          ? {
+                              subject: {
+                                name: competition.name,
+                                ...(competition.publicPage
+                                  ? { href: `/c/${competition.slug}` }
+                                  : {}),
+                              },
+                            }
+                          : {}),
                 };
               })}
             />

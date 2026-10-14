@@ -458,6 +458,17 @@ const ENTRIES = [
     inboxKeys: ["player.claim_invited"],
   },
   {
+    key: "player.claim_offer",
+    label: "Is this you?",
+    description:
+      "A scorer tied a guest player to your mobile number. Nothing moves until you accept.",
+    audience: "player",
+    category: "transactional",
+    topic: "registration",
+    channels: ["in_app", "email"],
+    inboxKeys: ["player.claim_offered"],
+  },
+  {
     key: "match.confirm_request",
     label: "Confirm a match result",
     description: "The opposing team asks you to confirm the recorded result.",

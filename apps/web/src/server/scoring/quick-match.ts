@@ -19,6 +19,9 @@ import { z } from "zod";
 import { dbHandle } from "../db";
 import { scoringDay } from "./home";
 
+/** A refusal whose message is written for the person creating the match. */
+export class QuickMatchRefusal extends Error {}
+
 const teamName = z.string().trim().min(1).max(120);
 export const quickMatchInput = z.object({
   sport: z.enum(["cricket", "box_cricket"]),
@@ -41,7 +44,7 @@ export async function ensurePersonalOrg(db: Db, personId: string, mintedId: stri
     .select({ name: people.name })
     .from(people)
     .where(eq(people.id, personId));
-  if (!person) throw new Error("Sign in to create a match.");
+  if (!person) throw new QuickMatchRefusal("Sign in to create a match.");
   await db.insert(organizations).values({
     id: mintedId,
     kind: "personal",
@@ -98,7 +101,8 @@ async function annualTeam(
       ),
     );
   const ids = [...new Set(identities.map((row) => row.id))];
-  if (ids.length > 1) throw new Error("This team has more than one identity. Choose another name.");
+  if (ids.length > 1)
+    throw new QuickMatchRefusal("This team has more than one identity. Choose another name.");
   if (existing) return existing.id;
   const franchiseId = ids[0] ?? newId();
   if (!ids.length)
@@ -119,10 +123,11 @@ export async function createQuickFixture(
   now = new Date(),
 ) {
   const input = quickMatchInput.parse(raw);
-  if (input.homeName === input.awayName) throw new Error("Choose two different team names.");
+  if (input.homeName === input.awayName)
+    throw new QuickMatchRefusal("Choose two different team names.");
   const format = formatByKey(input.formatKey);
   if (!format || (input.sport === "box_cricket") !== input.formatKey.startsWith("box"))
-    throw new Error("Choose a format for this sport.");
+    throw new QuickMatchRefusal("Choose a format for this sport.");
   await db.execute(sql`select pg_advisory_xact_lock(hashtext('quick-match'), hashtext(${orgId}))`);
   const [org] = await db
     .select()
@@ -134,7 +139,7 @@ export async function createQuickFixture(
         eq(organizations.kind, "personal"),
       ),
     );
-  if (!org) throw new Error("This match space is not yours.");
+  if (!org) throw new QuickMatchRefusal("This match space is not yours.");
   const year = scoringDay(now).slice(0, 4),
     name = `Friendlies ${year}`;
   const seasons = await db
@@ -147,7 +152,7 @@ export async function createQuickFixture(
         eq(competitions.name, name),
       ),
     );
-  if (seasons.length > 1) throw new Error("This year has more than one match season.");
+  if (seasons.length > 1) throw new QuickMatchRefusal("This year has more than one match season.");
   const competitionId = seasons[0]?.id ?? newId();
   if (!seasons.length) {
     await db.insert(competitions).values({
@@ -259,7 +264,8 @@ export async function reuseQuickPlayer(
     .select()
     .from(registrations)
     .where(and(eq(registrations.id, previousRegistrationId), eq(registrations.orgId, orgId)));
-  if (!org || !team || !previous) throw new Error("Choose one of your previous players.");
+  if (!org || !team || !previous)
+    throw new QuickMatchRefusal("Choose one of your previous players.");
   const [existing] = await db
     .select()
     .from(registrations)
@@ -271,7 +277,7 @@ export async function reuseQuickPlayer(
     );
   if (existing) {
     if (existing.teamId !== teamId || existing.status !== "approved")
-      throw new Error("This player is already assigned elsewhere in this season.");
+      throw new QuickMatchRefusal("This player is already assigned elsewhere in this season.");
     return existing.id;
   }
   const id = newId();

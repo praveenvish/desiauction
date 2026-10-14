@@ -225,12 +225,20 @@ describe("LS-1 managers, officials and season rules", () => {
       select c.relname,c.relrowsecurity,c.relforcerowsecurity,p.policyname
       from pg_class c join pg_policies p on p.tablename=c.relname and p.schemaname='public'
       where c.relnamespace='public'::regnamespace and c.relname in ('team_managers','fixture_officials')`);
-    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.policyname).sort()).toEqual([
+      "fixture_officials_tenant",
+      "team_managers_person_read",
+      "team_managers_tenant",
+    ]);
     for (const row of rows)
-      expect(row).toMatchObject({
-        relrowsecurity: true,
-        relforcerowsecurity: true,
-        policyname: `${row.relname}_tenant`,
-      });
+      expect(row).toMatchObject({ relrowsecurity: true, relforcerowsecurity: true });
+  });
+  it("lets a manager read their rows from any tenant but write only inside the club (0125)", async () => {
+    const policies = await owner.db.execute<{ policyname: string; cmd: string; qual: string }>(sql`
+      select policyname, cmd, qual from pg_policies
+      where schemaname = 'public' and tablename = 'team_managers'`);
+    const byName = new Map(policies.map((row) => [row.policyname, row]));
+    expect(byName.get("team_managers_person_read")?.cmd).toBe("SELECT");
+    expect(byName.get("team_managers_tenant")?.qual).not.toContain("person_id");
   });
 });
