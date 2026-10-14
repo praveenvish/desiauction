@@ -625,7 +625,7 @@ const SECTION_LABELS: [RegExp, string][] = [
   [/\/reviews$/, "Reviews"],
   [/\/awards$/, "Season awards"],
   [/\/brief\/[^/]+$/, "Captain’s brief"],
-  [/^\/me\/insights$/, "My insights"],
+  [/^\/me\/insights$/, "My cricket insights"],
   [/\/insights$/, "Player insights"],
   [/\/standings$/, "Table"],
   [/\/auction\/ledger$/, "Ledger"],

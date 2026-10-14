@@ -135,7 +135,7 @@ export function RaidSetup({ setup, actorId }: { setup: RaidScoringSetup; actorId
     }
   }
   return (
-    <main className="score-home raid-setup family-setup" data-testid="raid-setup family-setup">
+    <main className="score-home raid-setup family-setup" data-testid="raid-setup">
       <p className="score-cap">{setup.fixtureNumber} · Match setup</p>
       <h1>{setup.teams.map((team) => team.name).join(" vs ")}</h1>
       <p>

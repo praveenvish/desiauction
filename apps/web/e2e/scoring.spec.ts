@@ -629,7 +629,7 @@ test("a full T10 match: twenty legal overs, corrections, public viewer and resul
   await expect(career.locator(".career-recent")).toContainText(/Self-scored|Confirmed|Verified/);
   await expect(viewer.getByRole("heading", { name: /Before DesiAuction/ })).toHaveCount(0);
   await capturePublicMatch(viewer, "career");
-  await viewer.getByRole("link", { name: "Player insights", exact: true }).click();
+  await viewer.getByRole("link", { name: "Explore cricket insights", exact: true }).click();
   await expect(viewer.getByRole("heading", { name: "Player insights", exact: true })).toBeVisible();
   await expect(viewer.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
   await capturePublicMatch(viewer, "insights-batting");

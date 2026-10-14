@@ -21,7 +21,7 @@ export default async function OwnInsightsPage({
   const insights = await ownCricketInsights(session.personId, insightFilters(query));
   return (
     <main>
-      <h1>My cricket insights</h1>
+      {/* The shell names this page ("My cricket insights"): one h1. */}
       <CricketInsights
         name={session.name ?? "My cricket insights"}
         scope="self"
