@@ -103,13 +103,11 @@ async function typedFixture() {
 }
 
 beforeAll(async () => {
-  await db
-    .insert(people)
-    .values({
-      id: organiser,
-      name: "Release Organiser",
-      email: `release-${organiser}@example.test`,
-    });
+  await db.insert(people).values({
+    id: organiser,
+    name: "Release Organiser",
+    email: `release-${organiser}@example.test`,
+  });
   await db
     .insert(organizations)
     .values({ id: orgId, name: "Release club", slug: `release-${orgId}`, createdBy: organiser });
