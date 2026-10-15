@@ -185,9 +185,12 @@ it("C53 app-role frozen football roles, appearance, clean-sheet/card points, rec
     .update(registrations)
     .set({ role: "forward" })
     .where(eq(registrations.id, reg(0)));
+  // Events are timestamped as they are created, and the timed engine refuses
+  // one stamped before its predecessor: the kick-off must be made first.
+  const kickOff = event("period_started", { period: 1 });
   const goal = event("score", { teamId: home, points: 1, scorerId: reg(0), assistId: reg(1) });
   await append(id, [
-    event("period_started", { period: 1 }),
+    kickOff,
     goal,
     event("sub", { teamId: home, outId: reg(1), inId: reg(7) }),
     event("card", { playerId: reg(0), colour: "red" }),
