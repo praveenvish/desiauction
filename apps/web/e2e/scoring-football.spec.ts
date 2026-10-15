@@ -97,6 +97,8 @@ for (const theme of ["daylight", "floodlight"] as const) {
     await page.getByRole("button", { name: "Start match", exact: true }).click();
     await expect(page.getByTestId("timed-pad")).toBeVisible();
     await page.getByRole("button", { name: "Start period 1", exact: true }).click();
+    // The viewer's server render must see the started period: wait until it is sent.
+    await expect(page.getByRole("status").filter({ hasText: /^Saved$/ })).toHaveText("Saved");
     const watcher = await browser.newContext({ viewport: { width: 390, height: 844 } });
     try {
       const viewer = await watcher.newPage();
