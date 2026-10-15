@@ -2,6 +2,7 @@ import type { ElementType, HTMLAttributes, ReactNode } from "react";
 
 import styles from "./app-shell.module.css";
 import { BrandGlyph } from "./icons";
+import { OpaqueContent } from "./opaque-content";
 
 /**
  * The Console shell (PX-1 01 §1 S2, 04 §6). Pure presentational: navigation
@@ -132,9 +133,11 @@ export function AppShell({
   const brand = (
     <Link href={wordmarkHref} className={styles["wordmark"]}>
       <span className={styles["wordmark-glyph"]} aria-hidden>
-        {glyph}
+        <OpaqueContent>{glyph}</OpaqueContent>
       </span>
-      <span className={styles["wordmark-text"]}>{barWordmark}</span>
+      <span className={styles["wordmark-text"]}>
+        <OpaqueContent>{barWordmark}</OpaqueContent>
+      </span>
     </Link>
   );
   /**
@@ -146,10 +149,12 @@ export function AppShell({
   const railBrand = (
     <Link href={wordmarkHref} className={styles["wordmark"]}>
       <span className={styles["wordmark-glyph"]} aria-hidden>
-        {glyph}
+        <OpaqueContent>{glyph}</OpaqueContent>
       </span>
       <span className={styles["wordmark-stack"]}>
-        <span className={styles["wordmark-text"]}>{wordmark}</span>
+        <span className={styles["wordmark-text"]}>
+          <OpaqueContent>{wordmark}</OpaqueContent>
+        </span>
         {/* aria-hidden: the wordmark above already names the product, so a
             reader announcing "DesiAuction, Bid dot Build dot Win" on every page
             is repeating the brand at the cost of the reader's time. It is a
@@ -188,7 +193,9 @@ export function AppShell({
           </NavigationGroup>
         ))}
         {railFooter !== undefined ? (
-          <div className={styles["rail-footer"]}>{railFooter}</div>
+          <div className={styles["rail-footer"]}>
+            <OpaqueContent>{railFooter}</OpaqueContent>
+          </div>
         ) : null}
       </NavigationRail>
       {/* `data-tabs`: with a section strip, the phone lets the active tab name
@@ -205,7 +212,7 @@ export function AppShell({
               {pageTitle !== undefined ? (
                 <div className={styles["identity-title"]}>
                   <h1 className={styles["page-title"]} {...pageTitleAttrs}>
-                    {pageTitle}
+                    <OpaqueContent>{pageTitle}</OpaqueContent>
                   </h1>
                   {titleStatus}
                 </div>
@@ -213,7 +220,9 @@ export function AppShell({
               {/* One slot, two possible answers: the trail where the surface
                   has ancestors, its lede where it does not. */}
               {breadcrumb !== undefined ? (
-                <div className={styles["identity-trail"]}>{breadcrumb}</div>
+                <div className={styles["identity-trail"]}>
+                  <OpaqueContent>{breadcrumb}</OpaqueContent>
+                </div>
               ) : subtitle !== undefined ? (
                 <p className={styles["identity-lede"]}>{subtitle}</p>
               ) : null}
@@ -222,20 +231,24 @@ export function AppShell({
                 competing with the title for a 390px bar. */}
             {pageAction !== undefined ? (
               <div className={styles["page-action"]} data-page-action>
-                {pageAction}
+                <OpaqueContent>{pageAction}</OpaqueContent>
               </div>
             ) : null}
-            <div className={styles["top-actions"]}>{topActions}</div>
+            <div className={styles["top-actions"]}>
+              <OpaqueContent>{topActions}</OpaqueContent>
+            </div>
           </div>
         </header>
         {tabs !== undefined ? (
           <div className={styles["tabbar"]}>
-            <div className={styles["tabbar-inner"]}>{tabs}</div>
+            <div className={styles["tabbar-inner"]}>
+              <OpaqueContent>{tabs}</OpaqueContent>
+            </div>
           </div>
         ) : null}
         {/* Pages own their <main> landmark; this is the skip-link target. */}
         <div id="main-content" className={styles["content"]} tabIndex={-1}>
-          {children}
+          <OpaqueContent>{children}</OpaqueContent>
         </div>
       </div>
       {/* "Primary", not "Sections". This is the SAME navigation as the desktop
@@ -259,7 +272,7 @@ export function AppShell({
             aria-current={item.active === true ? "page" : undefined}
           >
             <span className={styles["tab-icon"]}>
-              {item.icon}
+              <OpaqueContent>{item.icon}</OpaqueContent>
               {/* The live dot rides the ICON here, not a "Live" pill: the pill
                   is as wide as the whole column. Same fact, same accent, the
                   width the bar has. */}
@@ -318,7 +331,9 @@ export function NavigationItem({ item, linkComponent: Link = "a" }: NavigationIt
           .join(" ")}
         aria-current={item.active === true ? "page" : undefined}
       >
-        <span className={styles["rail-icon"]}>{item.icon}</span>
+        <span className={styles["rail-icon"]}>
+          <OpaqueContent>{item.icon}</OpaqueContent>
+        </span>
         <span className={styles["rail-label"]}>{item.label}</span>
         {item.live === true ? (
           <span className={styles["rail-live"]}>

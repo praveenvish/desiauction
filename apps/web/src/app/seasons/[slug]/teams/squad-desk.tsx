@@ -17,6 +17,7 @@ import {
   markRegistrationAction,
   registrationDetailAction,
   squadCandidatesAction,
+  squadWriteStateAction,
   type SquadCandidate,
 } from "../../../../server/competition/actions";
 import type { PlayerDeskContext } from "../../../../server/competition/player-desk";
@@ -24,6 +25,13 @@ import type { TeamRosterRow } from "../../../../server/competition/team-workspac
 import type { Row } from "../_players/labels";
 import { PlayerSheet } from "../_players/player-sheet";
 import { useMutate } from "../_players/use-mutate";
+import {
+  acquireWrite,
+  changeWrite,
+  refineWrite,
+  releaseWrite,
+  useWriteStatus,
+} from "../_players/use-write-scope";
 import { useRoster } from "../_players/use-roster";
 import "../_players/players-desk.css";
 
@@ -63,7 +71,9 @@ export function SquadPreSign({
   roster,
   locked,
   settlesAtOpen,
+  formation,
 }: {
+  formation: "auction" | "organizer" | "team_entry";
   slug: string;
   teamId: string;
   teamName: string;
@@ -88,6 +98,9 @@ export function SquadPreSign({
     setPending({});
   }
 
+  const scopeStatus = useWriteStatus(slug, "", teamId);
+  const [writing, setWriting] = useState(false);
+  const [unknown, setUnknown] = useState(false);
   const candidates = useSquadCandidates(slug, roster);
 
   const members = useMemo(() => {
@@ -126,6 +139,28 @@ export function SquadPreSign({
     marks: { isIcon?: boolean; isCaptain?: boolean; isRetained?: boolean; teamId?: string | null },
     success: string,
   ) => {
+    // A team move can displace a captain too. Bootstrap fresh source/destination facts
+    // under a short season lease, then narrow to exactly the coupled team groups.
+    const lease = acquireWrite(slug, [id], [teamId], [], true);
+    if (!lease) return;
+    setWriting(true);
+    let affectedIds: string[];
+    let affectedTeams: string[];
+    try {
+      const initial = await squadWriteStateAction(slug, [id], [teamId]);
+      if (!initial.ok) throw new Error("Read refused");
+      affectedIds = initial.rows.map((row) => row.id);
+      affectedTeams = initial.teams;
+      refineWrite(slug, lease, affectedIds, affectedTeams, affectedTeams);
+    } catch {
+      setWriting(false);
+      releaseWrite(slug, lease);
+      toast({
+        title: "Couldn't check the squad before saving. No change was sent.",
+        tone: "danger",
+      });
+      return;
+    }
     const before = pending;
     const optimistic: Record<string, Partial<Record<Slot, boolean>> & { name?: string }> = {
       ...pending,
@@ -139,9 +174,44 @@ export function SquadPreSign({
       }
     }
     setPending(optimistic);
-    const result = await markRegistrationAction(slug, id, marks);
-    if (!result.ok) {
+    let result: Awaited<ReturnType<typeof markRegistrationAction>>;
+    try {
+      result = await markRegistrationAction(slug, id, marks);
+    } catch {
       setPending(before);
+      setWriting(false);
+      setUnknown(true);
+      changeWrite(slug, lease, "unconfirmed");
+      toast({
+        title:
+          "Couldn't confirm the change. Refresh the squad to check its saved state before retrying.",
+        tone: "danger",
+      });
+      return;
+    }
+    if (!result.ok) setPending(before);
+    changeWrite(slug, lease, "checking");
+    try {
+      const observed = await squadWriteStateAction(slug, affectedIds, affectedTeams);
+      if (!observed.ok) throw new Error("Read refused");
+      const checked: typeof pending = {};
+      for (const item of observed.rows)
+        checked[item.id] = {
+          isCaptain: item.teamId === teamId && item.isCaptain,
+          isIcon: item.teamId === teamId && item.isIcon,
+          isRetained: item.teamId === teamId && item.isRetained,
+        };
+      setPending(checked);
+    } catch {
+      setWriting(false);
+      setUnknown(true);
+      changeWrite(slug, lease, "unconfirmed");
+      toast({ title: "Couldn't check the saved squad. Reload before retrying.", tone: "danger" });
+      return;
+    }
+    setWriting(false);
+    releaseWrite(slug, lease);
+    if (!result.ok) {
       toast({ title: result.error ?? "That didn't save.", tone: "danger" });
       return;
     }
@@ -168,14 +238,15 @@ export function SquadPreSign({
     const others = (["isCaptain", "isIcon", "isRetained"] as const).filter(
       (mark) => mark !== slot && member[mark],
     );
-    // The last mark going means the player was only on this team BECAUSE of
+    const returnToPool = formation === "auction" && others.length === 0 && !locked;
+    // In auction formation, the last mark going means the player was only on this team BECAUSE of
     // it: before the auction they go back to the pool rather than staying on
     // the team by hand, which would leave them in both.
     void write(
       member.id,
       member.name,
-      { [slot]: false, ...(others.length === 0 && !locked ? { teamId: null } : {}) },
-      others.length === 0 && !locked
+      { [slot]: false, ...(returnToPool ? { teamId: null } : {}) },
+      returnToPool
         ? `${member.name} is back in the auction pool`
         : `${member.name} is no longer ${SLOT[slot].title === "Icons" ? "an Icon" : SLOT[slot].title.toLowerCase()}`,
     );
@@ -184,80 +255,98 @@ export function SquadPreSign({
   return (
     <section
       className="pd-presign"
-      aria-label="Squad before the auction"
+      aria-label={formation === "auction" ? "Squad before the auction" : "Squad roles and marks"}
       data-testid="squad-presign"
       data-busy={refreshing ? "true" : undefined}
     >
-      {(["isCaptain", "isIcon", "isRetained"] as const).map((slot) => {
-        const holders = members.filter((member) => member[slot]);
-        const frozen = locked && slot !== "isCaptain";
-        return (
-          <div key={slot} className="pd-presign-slot" data-testid={`presign-${slot}`}>
-            <h3>
-              <span>{SLOT[slot].title}</span>
-              {slot !== "isCaptain" && holders.length > 0 ? (
-                <span className="pd-quiet">{holders.length}</span>
-              ) : null}
-            </h3>
-            {holders.length === 0 ? <p className="pd-quiet">{SLOT[slot].empty}</p> : null}
-            <ul className="pd-presign-list">
-              {holders.map((member) => (
-                <li key={member.id} className="pd-presign-person">
-                  <PlayerImage
-                    name={member.name}
-                    seed={member.id}
-                    src={member.photoUrl}
-                    size="sm"
-                    shape="round"
-                    teamColor={teamColor ?? undefined}
-                    decorative
-                  />
-                  <span>{member.name}</span>
-                  {!frozen ? (
-                    <button
-                      type="button"
-                      className="pd-link"
-                      onClick={() => {
-                        remove(slot, member);
-                      }}
-                      aria-label={`Remove ${member.name} as ${SLOT[slot].title}`}
-                    >
-                      Remove
-                    </button>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-            {frozen ? (
-              <p className="pd-setting-hint">Locked — the auction has started.</p>
-            ) : SLOT[slot].one && holders.length > 0 ? (
-              <PlayerPicker
-                label={`Change ${teamName}'s captain`}
-                placeholder="Change captain…"
-                candidates={candidates}
-                teamId={teamId}
-                exclude={holders.map((holder) => holder.id)}
-                onPick={(candidate) => {
-                  add(slot, candidate);
-                }}
-                onlyOnTeam={locked}
-              />
-            ) : (
-              <PlayerPicker
-                label={`${SLOT[slot].add} for ${teamName}`}
-                placeholder={`${SLOT[slot].add}…`}
-                candidates={candidates}
-                teamId={teamId}
-                exclude={holders.map((holder) => holder.id)}
-                onPick={(candidate) => {
-                  add(slot, candidate);
-                }}
-                onlyOnTeam={locked}
-              />
-            )}
-          </div>
-        );
-      })}
+      {unknown || scopeStatus === "unconfirmed" ? (
+        <p role="alert">
+          Couldn't confirm the saved squad. Reloading replaces local edits with the saved record.{" "}
+          <button
+            type="button"
+            className="pd-link"
+            onClick={() => {
+              window.location.reload();
+            }}
+          >
+            Reload saved record
+          </button>
+        </p>
+      ) : writing || scopeStatus ? (
+        <p role="status">Checking squad changes…</p>
+      ) : null}
+      <fieldset className="pd-write-fields" disabled={writing || unknown || scopeStatus !== null}>
+        {(["isCaptain", "isIcon", "isRetained"] as const).map((slot) => {
+          const holders = members.filter((member) => member[slot]);
+          const frozen = locked && slot !== "isCaptain";
+          return (
+            <div key={slot} className="pd-presign-slot" data-testid={`presign-${slot}`}>
+              <h3>
+                <span>{SLOT[slot].title}</span>
+                {slot !== "isCaptain" && holders.length > 0 ? (
+                  <span className="pd-quiet">{holders.length}</span>
+                ) : null}
+              </h3>
+              {holders.length === 0 ? <p className="pd-quiet">{SLOT[slot].empty}</p> : null}
+              <ul className="pd-presign-list">
+                {holders.map((member) => (
+                  <li key={member.id} className="pd-presign-person">
+                    <PlayerImage
+                      name={member.name}
+                      seed={member.id}
+                      src={member.photoUrl}
+                      size="sm"
+                      shape="round"
+                      teamColor={teamColor ?? undefined}
+                      decorative
+                    />
+                    <span>{member.name}</span>
+                    {!frozen ? (
+                      <button
+                        type="button"
+                        className="pd-link"
+                        onClick={() => {
+                          remove(slot, member);
+                        }}
+                        aria-label={`Remove ${member.name} as ${SLOT[slot].title}`}
+                      >
+                        Remove
+                      </button>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+              {frozen ? (
+                <p className="pd-setting-hint">Locked — the auction has started.</p>
+              ) : SLOT[slot].one && holders.length > 0 ? (
+                <PlayerPicker
+                  label={`Change ${teamName}'s captain`}
+                  placeholder="Change captain…"
+                  candidates={candidates}
+                  teamId={teamId}
+                  exclude={holders.map((holder) => holder.id)}
+                  onPick={(candidate) => {
+                    add(slot, candidate);
+                  }}
+                  onlyOnTeam={locked}
+                />
+              ) : (
+                <PlayerPicker
+                  label={`${SLOT[slot].add} for ${teamName}`}
+                  placeholder={`${SLOT[slot].add}…`}
+                  candidates={candidates}
+                  teamId={teamId}
+                  exclude={holders.map((holder) => holder.id)}
+                  onPick={(candidate) => {
+                    add(slot, candidate);
+                  }}
+                  onlyOnTeam={locked}
+                />
+              )}
+            </div>
+          );
+        })}
+      </fieldset>
       {settlesAtOpen ? (
         <p className="pd-setting-hint pd-presign-note" data-testid="presign-settles-at-open">
           The auction is set up, and these still count: when it opens, anyone marked here is taken
@@ -594,8 +683,8 @@ export function RosterSheetHost({
   const toast = useToast();
   const [loaded, setLoaded] = useState<{ row: Row; desk: PlayerDeskContext } | null>(null);
   const rows = useMemo(() => (loaded === null ? [] : [loaded.row]), [loaded]);
-  const roster = useRoster(rows);
-  const mutate = useMutate(roster);
+  const roster = useRoster(rows, slug);
+  const mutate = useMutate(roster, slug);
 
   useEffect(() => {
     let live = true;

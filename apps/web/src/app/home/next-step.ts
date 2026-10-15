@@ -6,8 +6,8 @@
  * home now opens on a single answer, chosen here from facts the page already
  * loaded, in a fixed order of urgency:
  *
- *   1. an auction this person is IN is live right now;
- *   2. an auction this person RUNS is live right now;
+ *   1. an auction this person RUNS is live right now;
+ *   2. a match held by this scorer, then their live owner room;
  *   3. a season they run is waiting on them (the attention scan's first row);
  *   4. their team's auction is coming up — prepare the plan;
  *   5. as a player, their newest entry is waiting on the organizer;
@@ -16,6 +16,8 @@
  * Pure and ordered on purpose: which banner a person sees is a product
  * decision, and a decision belongs where a test can pin it.
  */
+
+import { rankHomeTasks, type HomeTask } from "../../lib/home-tasks";
 
 export interface NextStepLink {
   label: string;
@@ -39,6 +41,7 @@ export interface NextStep {
 }
 
 export interface NextStepInput {
+  tasks?: readonly HomeTask[];
   /** The team this person owns (server/roles currentTeam). */
   ownedTeam: {
     /** Opens the owner's own squad (`/teams?team=`) rather than the grid. */
@@ -80,6 +83,37 @@ function attentionVerb(href: string): string {
 }
 
 export function chooseNextStep(input: NextStepInput): NextStep | null {
+  const proposed = rankHomeTasks(
+    (input.tasks ?? []).filter(
+      (task) => !(task.kind === "confirm" && ["completed", "resolved"].includes(task.state)),
+    ),
+  )[0];
+  const fromTask = (task: HomeTask): NextStep => ({
+    key: task.id,
+    eyebrow: task.context,
+    title: task.title,
+    why: task.explanation,
+    cta: { label: task.action, href: task.href },
+    tone:
+      task.priority.endsWith("live") || task.priority === "score-held"
+        ? "live"
+        : ["waiting", "result"].includes(task.priority)
+          ? "calm"
+          : "action",
+  });
+  if (proposed && ["conduct-live", "score-held", "owner-live", "today"].includes(proposed.priority))
+    return fromTask(proposed);
+  const night = input.conducting ?? null;
+  if (night !== null && night.auctionStatus !== null && LIVE.has(night.auctionStatus)) {
+    return {
+      key: "auctioneer-live",
+      eyebrow: `Live now · ${night.competitionName}`,
+      title: "You're running the auction — the room is waiting",
+      why: "Open the cockpit to put the next lot on the block.",
+      cta: { label: "Open the cockpit", href: `/seasons/${night.competitionSlug}/auction/cockpit` },
+      tone: "live",
+    };
+  }
   const team = input.ownedTeam;
   if (team !== null && LIVE.has(team.auctionStatus)) {
     return {
@@ -89,17 +123,6 @@ export function chooseNextStep(input: NextStepInput): NextStep | null {
       why: "Bidding is open. Your plan and purse are waiting for you in the room.",
       cta: { label: "Enter auction room", href: `/seasons/${team.competitionSlug}/auction/live` },
       then: "your squad and receipts appear here when the hammer falls",
-      tone: "live",
-    };
-  }
-  const night = input.conducting ?? null;
-  if (night !== null && night.auctionStatus !== null && LIVE.has(night.auctionStatus)) {
-    return {
-      key: "auctioneer-live",
-      eyebrow: `Live now · ${night.competitionName}`,
-      title: "You're running the auction — the room is waiting",
-      why: "Open the cockpit to put the next lot on the block.",
-      cta: { label: "Open the cockpit", href: `/seasons/${night.competitionSlug}/auction/cockpit` },
       tone: "live",
     };
   }
@@ -130,6 +153,7 @@ export function chooseNextStep(input: NextStepInput): NextStep | null {
       tone: "action",
     };
   }
+  if (proposed) return fromTask(proposed);
   if (night !== null && (night.auctionStatus === null || UPCOMING.has(night.auctionStatus))) {
     /*
      * Not set up yet is WAITING, not work. The banner used to pair "the

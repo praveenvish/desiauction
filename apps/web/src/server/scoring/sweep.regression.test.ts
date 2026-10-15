@@ -31,6 +31,7 @@ import { reviewMatchTrust } from "./trust-review";
 import { confirmationToken } from "./confirmation-token";
 import { confirmMatch } from "./confirmation";
 import { dispatchConfirmationNotices } from "./result-notice-delivery";
+import { confirmationHomeTask } from "./confirmation-home";
 import { resolveConfirmationNoticeLink } from "./confirmation-notice-link";
 import { reminderBoundariesFor } from "./reminder-boundaries";
 import { overlappingPlay, playWindow } from "./trust-facts";
@@ -720,6 +721,14 @@ describe("API-8 scheduled scoring maintenance", () => {
         ),
       );
     if (!notice) throw new Error("missing confirmation notice");
+    expect(await confirmationHomeTask(actor, notice.id, boundaries, now)).toBeNull();
+    expect(await confirmationHomeTask(other, notice.id, boundaries, now)).toMatchObject({
+      state: "ready",
+      scope: { orgId, competitionId, fixtureId: id, teamId: away },
+    });
+    expect(
+      await confirmationHomeTask(other, notice.id, boundaries, after(7 * 24 * 3600000)),
+    ).toBeNull();
     expect(await resolveConfirmationNoticeLink(actor, notice.id, boundaries, now)).toBeNull();
     expect(await resolveConfirmationNoticeLink(other, notice.id, boundaries, now)).toBe(
       `/match/confirm/${token}`,
@@ -741,10 +750,16 @@ describe("API-8 scheduled scoring maintenance", () => {
       );
     expect(await confirm(actor, "confirmed")).toMatchObject({ ok: false });
     expect(await confirm(other, "confirmed")).toMatchObject({ ok: true, trust: "confirmed" });
+    expect(await confirmationHomeTask(other, notice.id, boundaries, now)).toMatchObject({
+      state: "completed",
+    });
     expect(await confirm(other, "disputed", "Recorded score differs from our notes")).toMatchObject(
       { ok: true, trust: "flagged" },
     );
     expect(await confirm(other, "confirmed")).toMatchObject({ ok: true, trust: "flagged" });
+    expect(await confirmationHomeTask(other, notice.id, boundaries, now)).toMatchObject({
+      state: "waiting",
+    });
     expect(
       await withTenantDb(app, { personId: actor, orgId }, (db) =>
         reviewMatchTrust(
@@ -763,9 +778,15 @@ describe("API-8 scheduled scoring maintenance", () => {
         ),
       ),
     ).toMatchObject({ ok: true, trust: "verified" });
+    expect(await confirmationHomeTask(other, notice.id, boundaries, now)).toMatchObject({
+      state: "resolved",
+    });
     expect(await confirm(other, "disputed", "Recorded score differs from our notes")).toMatchObject(
       { ok: true, trust: "flagged" },
     );
+    expect(await confirmationHomeTask(other, notice.id, boundaries, now)).toMatchObject({
+      state: "waiting",
+    });
     const rows = await owner.db
       .select()
       .from(matchConfirmations)
@@ -783,6 +804,7 @@ describe("API-8 scheduled scoring maintenance", () => {
       .set({ revokedAt: now })
       .where(eq(teamManagers.id, managerId));
     expect(await confirm(other, "confirmed")).toMatchObject({ ok: false });
+    expect(await confirmationHomeTask(other, notice.id, boundaries, now)).toBeNull();
     expect(await resolveConfirmationNoticeLink(other, notice.id, boundaries, now)).toBeNull();
     const send = vi.fn(() => Promise.resolve("sent" as const));
     await drainOutbox({ db: app.db, personIds: [other], now, mailer: { send } });
@@ -796,6 +818,79 @@ describe("API-8 scheduled scoring maintenance", () => {
       )[0]?.status,
     ).toBe("suppressed");
     await owner.db.delete(teamManagers).where(eq(teamManagers.id, managerId));
+  });
+  it("projects another eligible manager's response as the addressed team's completed obligation", async () => {
+    const { id } = await finished("finished");
+    const [match] = await owner.db.select().from(matches).where(eq(matches.fixtureId, id));
+    if (!match) throw new Error("missing match");
+    const authorityRows = await owner.db
+      .select()
+      .from(auditLog)
+      .where(and(eq(auditLog.subject, id), eq(auditLog.action, "match.trust.scoring_authority")));
+    for (const row of authorityRows) {
+      if (!row.meta || typeof row.meta !== "object") throw new Error("authority evidence");
+      await owner.db
+        .update(auditLog)
+        .set({ meta: { ...row.meta, authority: "d", representedTeamIds: [home] } })
+        .where(eq(auditLog.id, row.id));
+    }
+    const respondingManager = players[0];
+    if (!respondingManager) throw new Error("responding manager");
+    const managerIds = [newId(), newId()];
+    await owner.db.insert(teamManagers).values(
+      [respondingManager, other].map((personId, index) => ({
+        id: managerIds[index] ?? newId(),
+        orgId,
+        competitionId,
+        teamId: away,
+        personId,
+        role: "captain" as const,
+        source: "organizer" as const,
+        createdBy: actor,
+      })),
+    );
+    try {
+      const boundaries = reminderBoundariesFor(app);
+      await dispatchConfirmationNotices(orgId, id, boundaries, now);
+      const [notice] = await owner.db
+        .select()
+        .from(auditLog)
+        .where(
+          and(
+            eq(auditLog.scopeId, other),
+            eq(auditLog.action, "match.confirm_requested"),
+            eq(
+              auditLog.subject,
+              `match.confirm_request:${id}:${String(match.attempt)}:${String(match.lastSeq)}:${away}:${other}`,
+            ),
+          ),
+        );
+      if (!notice) throw new Error("recipient notice");
+      expect(await confirmationHomeTask(other, notice.id, boundaries, now)).toMatchObject({
+        state: "ready",
+      });
+      const token = confirmationToken(
+        { fixtureId: id, teamId: away, attempt: match.attempt, lastSeq: match.lastSeq },
+        now,
+      );
+      expect(
+        await withTenantDb(app, { personId: respondingManager, orgId }, (db) =>
+          confirmMatch(db, respondingManager, token, "confirmed", "", now),
+        ),
+      ).toMatchObject({ ok: true });
+      expect(await confirmationHomeTask(other, notice.id, boundaries, now)).toMatchObject({
+        state: "completed",
+        scope: { teamId: away },
+      });
+      expect(await resolveConfirmationNoticeLink(other, notice.id, boundaries, now)).toBe(
+        `/match/confirm/${token}`,
+      );
+      // Recipient ownership remains distinct even when that actor fulfilled the team request.
+      expect(await confirmationHomeTask(respondingManager, notice.id, boundaries, now)).toBeNull();
+    } finally {
+      for (const managerId of managerIds)
+        await owner.db.delete(teamManagers).where(eq(teamManagers.id, managerId));
+    }
   });
   it("automatically confirms exactly at 48 hours with complete pace receipts but no inferred scorer authority", async () => {
     const { id } = await finished("finished");

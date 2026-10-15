@@ -1,0 +1,64 @@
+# E14 consolidated local engineering evidence
+
+13 October 2026 · **BUILD-PASS**; focused Astra final engineering review approved · External acceptance PENDING · No release authorized
+
+## Exact final compatible pair
+
+A `.next-ui-e14-stable-safe` / `bUOMUS8yFHKHNjJ4XM_UT`; B `.next-ui-e14-stable-compatible` / `-p4rT5Oslc_kDtyPEd5yE`. Both compiled from source SHA `8faca1c1c14c12cbafd56e134556959be9acc26940df57c359b140268a011d81`,2842inputs. Each137production routes/unchanged budgets/922bound files/compiler structurally verified and restored PASS. Both retain every unconditional financial/account/auction/scoring/pagination/opaque-shell safety correction. Source inputs are identical; baseline/refined runtime assignment is not a fabricated source difference.
+
+Bindings are `e14-stable-{safe,compatible}-build/binding.json` under ignored `apps/web/e2e-artifacts/ls1/resume-20261013/`. All1844bound files remained exact after the final measurement. Framework action352ID sets/worker route sets/layers equal, with one private compile/runtime key. Actual retained inline actions execute across the pair. Key material/cookies/databases/builds/raw evidence are not committed.
+
+The original whole-worktree build binding remains intact. Two later **nonshipping** harness files changed: `e2e/ui-auction-fixtures.ts` (optional worker blocking only for image interception), `e2e/ui-remaining-views.spec.ts` (actual key duration, bounded image phases/readiness). No production import/configuration changed; focused Astra approved reuse of these exact artifacts with a separate delta audit. Final frozen harness source SHA `af18af5917310b87d2be7ca9a45d4820bcb4d3eb57c1e867135df24fe1a54650` matches before/after the metric. See `e14-harness-only-delta.json`, `e14-final-source-assets-after.json` and preserved actual harnesses in `e14-final-harnesses`. Do not claim the old whole-worktree snapshot matches the later harness.
+
+## Verified fixes
+
+- Owner invitation unsuccessful action returns303to the same authoritative invitation with a generic unconfirmed-outcome notice. Success redirect unchanged; no automatic replay, grants/writers/schema changes or definitive failure inference. Actual revoked invitation, expired session, engine unavailability and normal single acceptance are proven.
+- Long season names wrap on narrow tournament views; poster controls wrap and retain44px targets; ledger outcomes retain full rows/text. The existing ledger scroller is a labelled focusable region with actual keyboard reachability.
+- Poster preview reserves the actual renderer's known width/height/ratio before PNG completion. Real delayed portrait/square/story replies retain the same frame, actual decoded dimensions and completed image. Bitmap typography/content/export rules unchanged.
+- Notification template regression isolation uses real transactions/savepoints and rollback. All14cases compare all retained template rows with their original snapshot. Published history is preserved; no blanket cleanup. This fixes a test assumption that version1was unused, not a production version writer.
+
+## Consolidated gates
+
+`e14-consolidated/source.log`:full lint/type/unit/format/dependency2660modules11119edges/motion PASS. Current focused source/harness strict lint/type and whole formatting/dependency refresh PASS. Initial test-only lint/project/working-directory failures retained and corrected without rule disabling.
+
+`e14-consolidated-after-isolation`:full real integration PASS, all4packages uncached: web338files/3473tests, engine75, live4, runner5, **3557tests total**. Grants PASS; posture16files/82tests PASS. `e14-rls-refreshed.log` confirms current app role's load-bearing policies including finalized player lines and unrelated-person denial. Earlier six template failures remain recorded in `e14-consolidated/integration.log`; the refresh supersedes them only after actual completion. Source suites and security results are not browser or participant evidence.
+
+## Actual browser and inventory scope
+
+This is the **consolidated applicable precompiled browser gate**, assembled from named actual runs plus explicitly unchanged inherited scope, not a claim that every Playwright spec was rerun indiscriminately. Legacy blanket-cleanup suites were not executed unchanged. Exact-owned copies omit their global destructive setup/teardown; receipts retained after managed services stop.
+
+- `e14-critical-chromium`:18actual account/erasure/nonstaff/privacy, venue/scheduling/export/tournament, public navigation/search/tools, guest registration/inbox recipient journeys. Its original build is recorded in the receipt; these unchanged capabilities are inherited, not fresh final-pair execution.
+- `e14-identity-token-boundaries`:13actual phone/email/onboarding/intent/session, team-invitation valid/member/switch-account/expired/revoked/unknown, opposing-manager confirmation/dispute and actual handover/old-device refusal.
+- `e14-private-inventory-populated`:33populated routes×two document themes×four widths=264observations. Eight failing views from three layout causes remain failures. Final affected proof closes those repaired views and the canonical `/seasons` alias; it does not relabel the whole sweep a clean run.
+- `e14-public-inventory`:32routes/template representatives×eight theme/width states=256geometry/axe observations with no geometry/axe failures. Its final metadata locator failure is retained. `e14-public-inventory-metadata-refreshed`:40fresh loads close metadata/missing-content/error collection, including combined robots directives. Case studies are actually empty: index/unknown404are proven; no invented valid story. Signed demo states inherit actual E12 booking14and64theme/width proof.
+- `e14-stable-native`:Chromium2 actual tests,24affected layout states and real delayed PNGs. `e14-stable-cross-native-refreshed`:all three browser projects' ordinary native test PASS (**72affected theme/width observations**); Chromium/Firefox delayed-image tests PASS. `e14-webkit-poster-frame`:WebKit portrait/square/story delayed-real-image PASS. Axe0/reflow/44px controls/full outcome and actual keyboard scroll are asserted. Six320captures reviewed; ledger tall capture was resized by the viewer, so not every row's visual legibility is claimed. Existing header/bitmap name ellipses remain disclosed; full subject heading wraps.
+- Native WebKit instantaneous key assertion failed. Bounded actual Tab/program-focus evidence proves native scrolling; a real100ms press with unchanged scroll assertion passes, no synthetic scrolling. WebKit held-image proof also waited on global font settlement dependent on the held resource; recorded phases narrow that wait. The image-only proof measures actual frame before completion without global settlement; normal text/reflow checks retain fonts/transitions. Workers blocked only in controlled image interception. All earlier failed runs preserved, no product override or timeout increase.
+- `e14-critical-webkit`/`e14-critical-firefox`:supported actual C43accepted60-ball sample/statistics/sponsor/board/private token/geometry proof, inherited from its recorded unchanged scoring/broadcast source. Current exact-pair scoring recovery is fresh below. Match C43 exercises match board/overlay only; auction board/overlay/embed evidence is inherited scoped E09/E13 evidence and source/integration boundaries, not a direct C43 execution. Firefox's supported opaque screenshot preserves computed transparency assertion; no physical projector/OBS claim.
+- E13 current193admin/63sole-capability/17operator/15publishing and controlled16error observations are scoped in E13-EVIDENCE. In-frame mail axe remains unavailable, not passed. E12 public19/finance7/protected20/booking14/64theme-width and final96load proof are unchanged inherited scope.
+
+[E14-ROUTE-REGISTER.md](E14-ROUTE-REGISTER.md) accounts for every141source entry, named family/state, current receipt, inherited scope and performance boundary. Parallel slots are observed through parent navigation. Historical E04–E11 scoped documents survive; older temporary raw receipts are unavailable and are not relabelled current. There is no new sustained auction/scoring run solely for these presentation changes.
+
+## Exact-pair pending-work and assets
+
+`e14-scoped-compatible-recovery`:6actual journeys PASS;21switches,16explicit recovery targets and5enumerated startup-only switches. Original unanswered payment/refund/waiver identities/details/exact review/logout, offline finish+second tab/original ID/exact one acceptance, real accepted bid with lost answer/purse/paused/Undo→Hold recovery and retained inline owner acceptance/refusal are asserted. All target canonical snapshots across seven tables unchanged during switches. Both static sets950fetch/hash/MIME/cache records per selected A/B server PASS. Actual old action bodies are neither rewritten nor remapped.
+
+A prior global snapshot run failed: unrelated `LotClosingSoon`/system actor from the preceding native image fixture changed during a financial switch. Read-only event/fixture provenance retained. Astra approved declaring the exact season/organization **before** snapshots, preserving all related canonical rows and complete global before/after/deltas. Any target change still fails. New run recorded one unrelated `LotUnsold`/system actor from the separately recorded WebKit image fixture; provenance/global snapshots retained. No fixture deletion, timer pause, production behavior change or retrospective target exclusion. Bootstrap-only switches prove startup/assets, not pending preservation.
+
+`e14-scoped-cross-owner`:WebKit revoked/session-expired and all three Firefox cases PASS; WebKit engine-unavailable snapshot failed on a redirect execution-context race. Its load-state-only diagnostic still failed, preserved. `e14-scoped-cross-owner-content`:fresh actual WebKit engine-unavailable case PASS after waiting for the visible new recovery notice, with refusal counts/one original request/no replay/current authority and target digests unchanged. No error suppression or production change.
+
+The compatibility server is a local rehearsal fixture: both immutable static sets retained by exact registered URL/byte hashes, normal Next HTML/RSC/actions/session gates unchanged. It does not establish a deployed platform's key continuity, cache or cohort configuration. Those prerequisites remain in [ROLLBACK.md](ROLLBACK.md) and external acceptance.
+
+## Complete matched affected loading
+
+`e14-stable-layout-route-performance`:one complete36load/9cell comparison on the exact pair. Tournament, actual poster and ledger routes,three observations/build,fresh server/context each entry,adjacentAB/BA/AB/opposite starts,cold then same-server settled-warm,spawn-through-first-load separately retained. All36raw observations and18warm guards retained before assertions. Original preload promise observer preserves invocation/identity/arguments/result/rejection; production configuration unchanged. Readiness never preloads the measured route. HTTP quiet100ms/max2000ms includes browser and server requests; abort does not erase server work. Waiting/startup/environment costs retained.
+
+**PASS:**all nine cold/warm/startup cells within10%;maximum candidate increase8.40282232%,standardCLS0.01184856<0.1,errors[]/failures[],all entries qualified. Full60sec host admission qualified under the frozen criteria; no replacements,trimming,pooling,optional stopping or threshold relaxation. Three-observation maximum-like local percentile, not fieldp95/general repeatability.
+
+Earlier complete36load comparison failed tournamentcold+12.671% and reproducible posterCLS~0.312–0.319593; allraw retained. Actual real-PNG2×2→302×377growth and known-ratio counterfactual supported the frame repair. Width/height attributes alone did not repair CSSauto sizing. The new pair passes; no cause for every earlier timing failure or host-noise explanation is claimed. Earlier owner-only12loads are a distinct scoped receipt, not this complete result.
+
+All owned browsers/servers/samplers stopped. Exact new fixtures retained; no cleanup or default database access. No push/merge/deployment. Human/device/physical zoom/manualAT/mail-client/participant/field/CRO acceptance remains PENDING in [EXTERNAL-ACCEPTANCE.md](EXTERNAL-ACCEPTANCE.md).
+
+
+## Final review and checkpoint
+
+Focused Astra approved E14 local engineering BUILD-PASS after these actual final receipts and route/state reconciliation, with the broadcast scope precision above. Mixed failures remain failures; focused passes close only their named cases. All E00–E14 local engineering packages are complete; every external acceptance item remains PENDING. Verified changes are committed locally under user authorization, never pushed or deployed. Verified source/test checkpoint is local commit `a580b623`; the documentation closure follows separately.

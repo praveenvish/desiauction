@@ -43,7 +43,7 @@ import {
   revokeOwnerInviteAction,
 } from "../../../../../server/auction/owner-actions";
 import { submitAuctionCommand } from "../../../../../server/auction/live-actions";
-import { endPracticeAction } from "../../../../../server/auction/practice-actions";
+import { practiceIntentAction } from "../../../../../server/auction/practice-actions";
 import { PageStatus } from "../../../../../components/shell/page-status";
 import { AuctionAnnouncer } from "../auction-announcer";
 import { BroadcastLinks } from "../broadcast-links";
@@ -54,6 +54,11 @@ import { useLiveFeed } from "../live-experience";
 import { StatusRibbon } from "../status-ribbon";
 import { useAuctionSocket } from "../use-auction-socket";
 import { useCeremonySound } from "../use-ceremony-sound";
+import { useRoomPresentation } from "../use-room-presentation";
+import { PracticeRecovery } from "../practice-recovery";
+import { useAuctionCommands } from "../use-auction-commands";
+import type { CommandLease } from "../command-runtime";
+import { CommandRecovery } from "../command-recovery";
 import { useHydrated } from "../../../../../lib/use-hydrated";
 import { useMoney } from "../../../../../components/money-unit";
 import { formatCount } from "../../../../../lib/plural";
@@ -62,10 +67,6 @@ import { formatCount } from "../../../../../lib/plural";
 // resume, open ANY queued lot (order control = skip/bring-forward, doc 41),
 // withdraw, freeze, requeue, gavel, compensating undo, recover — every button
 // SUBMITS A COMMAND. This component decides nothing; the engine acks decide.
-
-function commandId(): string {
-  return crypto.randomUUID();
-}
 
 /**
  * "Priya Sharma · +91 93301 00281 · accepted 28 Jul 2026, 7:12 pm".
@@ -113,6 +114,19 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
    * correct numbers the whole time.
    */
   const feed = useLiveFeed(view.resolved, snapshot);
+  const commands = useAuctionCommands(
+    view.viewer.personId,
+    view.auctionId,
+    snapshot?.auctionId === view.auctionId ? snapshot.version : null,
+    view.practice?.realAuctionId ?? view.auctionId,
+  );
+  const practiceCommands = useAuctionCommands(
+    view.viewer.personId,
+    view.practice?.realAuctionId ?? view.auctionId,
+    null,
+  );
+  const presentation = useRoomPresentation(view.viewer.personId, view.auctionId);
+  const sweep = useRef(false);
   // The conductor hears the room too: opt-in, off by default (doc 11 sound).
   useCeremonySound({ ceremony, remainingMs, lotId: snapshot?.currentLot?.lotId ?? null });
   /**
@@ -142,28 +156,34 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
    * `setPending` is a setState. Nothing here can go stale.
    */
   const send = useCallback(
-    async (key: string, type: string, payload: Record<string, unknown>, done?: string) => {
-      // The same repair as the live room's `send`: a REJECTED request (offline
-      // handset, server restart, proxy) skipped `setPending(null)` entirely, so
-      // the control it names — including the gavel — stayed disabled for the rest
-      // of the session with nothing said. See live-panel.tsx for the full note.
-      setPending(key);
-      let ack;
-      try {
-        ack = await submitAuctionCommand(slug, commandId(), type, payload, view.auctionId);
-      } catch {
-        // See live-panel.tsx: a rejected promise means the answer is missing, not
-        // that the command failed, so the message says only that and sends the
-        // conductor to server truth rather than asserting an outcome.
+    async (
+      key: string,
+      type: string,
+      payload: Record<string, unknown>,
+      done?: string,
+      lease?: CommandLease,
+    ) => {
+      if (stale || offline) {
         toast({
-          title:
-            "Lost the connection before the auction answered — check the bid feed before acting again.",
+          title: "Wait for the auction to reconnect before sending an action.",
           tone: "danger",
         });
         return false;
-      } finally {
-        setPending(null);
       }
+      const outcome = await commands.dispatch(
+        key,
+        type,
+        payload,
+        (id, immutable) => submitAuctionCommand(slug, id, type, immutable, view.auctionId),
+        undefined,
+        lease,
+      );
+      if (commands.stopped) return false;
+      if (outcome.kind === "unknown" || outcome.kind === "not-started") {
+        toast({ title: outcome.message, tone: "danger" });
+        return false;
+      }
+      const ack = outcome.ack;
       if (ack.accepted) {
         if (done !== undefined) {
           toast({ title: done, tone: "success" });
@@ -178,7 +198,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
       }
       return false;
     },
-    [slug, router, toast, view.auctionId],
+    [slug, router, toast, view.auctionId, commands, stale, offline],
   );
 
   /**
@@ -190,30 +210,47 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
    * how many made it back, rather than a toast per row.
    */
   const requeueAllUnsold = async (lotIds: readonly string[]) => {
+    if (
+      sweep.current ||
+      commands.markers.some(
+        (marker) =>
+          marker.type === "RequeueLot" &&
+          marker.state !== "reviewed" &&
+          marker.state !== "accepted",
+      )
+    )
+      return;
+    sweep.current = true;
     setPending("requeue-all");
+    const targets = [...lotIds];
+    const acknowledged: string[] = [];
     let requeued = 0;
     let refusal: string | null = null;
     try {
-      for (const lotId of lotIds) {
-        const ack = await submitAuctionCommand(
-          slug,
-          commandId(),
+      for (const lotId of targets) {
+        const outcome = await commands.dispatch(
+          `requeue-${lotId}`,
           "RequeueLot",
           { lotId },
-          view.auctionId,
+          (id, immutable) =>
+            submitAuctionCommand(slug, id, "RequeueLot", immutable, view.auctionId),
+          { targets, accepted: acknowledged },
         );
-        if (!ack.accepted) {
-          refusal = commandRefusalMessage(ack.reason);
+        if (outcome.kind !== "accepted") {
+          refusal =
+            outcome.kind === "refused"
+              ? commandRefusalMessage(outcome.ack.reason)
+              : outcome.message;
           break;
         }
-        requeued += 1;
+        acknowledged.push(lotId);
+        requeued++;
       }
-    } catch {
-      refusal =
-        "Lost the connection before the auction answered — check the queue before acting again.";
     } finally {
+      sweep.current = false;
       setPending(null);
     }
+    if (commands.stopped) return;
     if (refusal === null) {
       toast({
         title: `${String(requeued)} unsold ${requeued === 1 ? "player is" : "players are"} back in the queue`,
@@ -243,21 +280,31 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
   /** A practice ends here, not by completing: completing sends the results. */
   const practiceRoom = view.practice?.inPractice === true;
   const endThePractice = async () => {
-    setPending("complete");
-    try {
-      const result = await endPracticeAction(slug);
-      if (!result.ok) {
-        toast({ title: result.error, tone: "danger" });
-        return;
-      }
-      toast({
-        title: "Practice ended — everyone is back in the real auction's waiting room",
-        tone: "success",
-      });
-      router.push(`/seasons/${slug}/auction`);
-    } finally {
-      setPending(null);
+    if (stale || offline) return;
+    const capturedRoom = presentation.capture();
+    const realAuctionId = view.practice?.realAuctionId;
+    if (!realAuctionId) return;
+    const outcome = await practiceCommands.dispatchPractice(
+      "end",
+      "EndPracticeLifecycle",
+      { realAuctionId, practiceId: view.auctionId, perTeam: 2 },
+      (id, frozen) =>
+        practiceIntentAction(
+          slug,
+          "end",
+          String(frozen["realAuctionId"]),
+          String(frozen["practiceId"]),
+          Number(frozen["perTeam"]),
+          id,
+        ),
+    );
+    if (practiceCommands.stopped || !presentation.current(capturedRoom)) return;
+    if (outcome.kind !== "accepted") {
+      toast({ title: outcome.message, tone: "danger" });
+      return;
     }
+    toast({ title: outcome.message, tone: "success" });
+    router.push(`/seasons/${slug}/auction`);
   };
   const [shortSquads, setShortSquads] = useState(false);
   const [overrideReason, setOverrideReason] = useState("");
@@ -266,26 +313,23 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
     const payload = shortSquads
       ? { overrideSquadMinimum: true, reason: overrideReason.trim() }
       : {};
-    setPending("complete");
-    let ack;
-    try {
-      ack = await submitAuctionCommand(
-        slug,
-        commandId(),
-        "CompleteAuction",
-        payload,
-        view.auctionId,
-      );
-    } catch {
-      toast({
-        title:
-          "Lost the connection before the auction answered — reload to see whether the night closed.",
-        tone: "danger",
-      });
+    if (stale || offline) {
+      toast({ title: "Wait for the auction to reconnect before finishing.", tone: "danger" });
       return;
-    } finally {
-      setPending(null);
     }
+    const outcome = await commands.dispatch(
+      "complete",
+      "CompleteAuction",
+      payload,
+      (id, immutable) =>
+        submitAuctionCommand(slug, id, "CompleteAuction", immutable, view.auctionId),
+    );
+    if (commands.stopped) return;
+    if (outcome.kind === "unknown" || outcome.kind === "not-started") {
+      toast({ title: outcome.message, tone: "danger" });
+      return;
+    }
+    const ack = outcome.ack;
     if (ack.accepted) {
       setCompleteOpen(false);
       setShortSquads(false);
@@ -328,18 +372,29 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
       setUndoOpen(false);
       return;
     }
-    const undone = await send(
-      "undo",
-      "UndoLastAction",
-      {},
-      "Undone — the lot is held, restart it when you're ready",
-    );
-    setUndoOpen(false);
-    if (!undone) {
-      return;
+    const lease = commands.acquireChain("UndoLastAction", {});
+    if (!lease) return;
+    try {
+      const undone = await send(
+        "undo",
+        "UndoLastAction",
+        {},
+        "Undo accepted — checking whether the reopened lot can be held",
+        lease,
+      );
+      if (!undone) return;
+      if (!(await commands.waitForRoom("undo"))) {
+        toast({
+          title: "Undo accepted. The room has not caught up; the lot has not been confirmed held.",
+          tone: "danger",
+        });
+        return;
+      }
+      setUndoOpen(false);
+      await send("undo-hold", "HoldLot", { lotId: target.lotId }, "Lot hold accepted", lease);
+    } finally {
+      await commands.releaseChain(lease);
     }
-    // Commands are serial per auction, so this lands on the reopened lot.
-    await send("undo-hold", "HoldLot", { lotId: target.lotId }, undefined);
   };
 
   /**
@@ -650,6 +705,17 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
       data-testid="cockpit-panel"
       data-hydrated={hydrated ? "true" : "false"}
     >
+      <PracticeRecovery commands={practiceCommands} slug={slug} />
+      <CommandRecovery
+        commands={commands}
+        slug={slug}
+        currentRoom={(minimum) =>
+          snapshot?.auctionId === view.auctionId &&
+          snapshot.version >= minimum &&
+          !stale &&
+          !offline
+        }
+      />
       <AuctionAnnouncer snapshot={snapshot} ceremony={ceremony} remainingMs={remainingMs} />
       {/* One sticky bar, not two. The shell's header and this ribbon both stuck
           at top: 0 and overlapped; the ribbon belongs in the header, which is
@@ -830,6 +896,31 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
           action={action}
           stale={stale}
           pending={pending}
+          isPending={(key) =>
+            pending === key ||
+            commands.pending(key) ||
+            (key === "complete" && practiceCommands.pending("end"))
+          }
+          isBlocked={(key) => {
+            if (key === "complete" && practiceRoom)
+              return practiceCommands.blocked("EndPracticeLifecycle", {
+                practiceId: view.auctionId,
+              });
+            const types: Record<string, string | undefined> = {
+              "close-lot": "CloseLot",
+              "open-next": "OpenLot",
+              "open-auction": "OpenAuction",
+              queue: "QueueLots",
+              pause: "PauseAuction",
+              resume: "ResumeAuction",
+              freeze: "HoldLot",
+              recover: "RecoverAuction",
+            };
+            const type = types[key];
+            return (
+              type !== undefined && commands.blocked(type, { lotId: snapshot?.currentLot?.lotId })
+            );
+          }}
           canOverride={view.viewer.canOverride}
           undoable={undoTarget !== null}
           gavelRef={gavelRef}
@@ -880,7 +971,10 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                               `${entry.lotNumber} on the block`,
                             )
                           }
-                          loading={pending === `open-${entry.lotId}`}
+                          loading={
+                            pending === `open-${entry.lotId}` ||
+                            commands.pending(`open-${entry.lotId}`)
+                          }
                           disabled={lot !== null || !live || stale}
                           data-testid={`open-${entry.lotNumber}`}
                           aria-label={`Open ${entry.lotNumber}, ${entry.playerName ?? "unnamed"}`}
@@ -897,7 +991,10 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                               playerName: entry.playerName,
                             });
                           }}
-                          loading={pending === `withdraw-${entry.lotId}`}
+                          loading={
+                            pending === `withdraw-${entry.lotId}` ||
+                            commands.pending(`withdraw-${entry.lotId}`)
+                          }
                           disabled={stale}
                           data-testid={`withdraw-${entry.lotNumber}`}
                           aria-label={`Withdraw ${entry.lotNumber}, ${entry.playerName ?? "unnamed"}`}
@@ -943,7 +1040,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                             unsoldToRequeue(needsResolution).map((entry) => entry.id),
                           )
                         }
-                        loading={pending === "requeue-all"}
+                        loading={pending === "requeue-all" || commands.pending("requeue-all")}
                         disabled={stale || (busy && pending !== "requeue-all")}
                         data-testid="requeue-all-unsold"
                       >
@@ -978,7 +1075,10 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                                 `${entry.lotNumber} requeued`,
                               )
                             }
-                            loading={pending === `requeue-${entry.id}`}
+                            loading={
+                              pending === `requeue-${entry.id}` ||
+                              commands.pending(`requeue-${entry.id}`)
+                            }
                             disabled={stale}
                             data-testid={`requeue-${entry.lotNumber}`}
                           >
@@ -995,7 +1095,10 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                                   playerName: entry.playerName ?? null,
                                 });
                               }}
-                              loading={pending === `withdraw-${entry.id}`}
+                              loading={
+                                pending === `withdraw-${entry.id}` ||
+                                commands.pending(`withdraw-${entry.id}`)
+                              }
                               disabled={stale}
                               data-testid={`withdraw-frozen-${entry.lotNumber}`}
                             >
@@ -1090,7 +1193,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                             </Select>
                             <Button
                               onClick={() => void invite()}
-                              loading={pending === "invite"}
+                              loading={pending === "invite" || commands.pending("invite")}
                               /* `finished` joins the derived blocked states. The control was
                    offered on a completed auction and failed on click with
                    "This auction has ended." — the panel already derived
@@ -1171,7 +1274,10 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                                       size="sm"
                                       variant="ghost"
                                       onClick={() => void revokeInvite(entry.id)}
-                                      loading={pending === `revoke-${entry.id}`}
+                                      loading={
+                                        pending === `revoke-${entry.id}` ||
+                                        commands.pending(`revoke-${entry.id}`)
+                                      }
                                       data-testid={`revoke-invite-${entry.id}`}
                                     >
                                       Withdraw link
@@ -1222,7 +1328,10 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                                   <Button
                                     size="sm"
                                     onClick={() => void grant(entry.teamId, entry.acceptedBy ?? "")}
-                                    loading={pending === `grant-${entry.teamId}`}
+                                    loading={
+                                      pending === `grant-${entry.teamId}` ||
+                                      commands.pending(`grant-${entry.teamId}`)
+                                    }
                                     /* Offboarded. `removeMember` cannot withdraw an auction
                            acceptance (no command exists), so the row survives —
                            but handing a paddle and a purse to somebody who has
@@ -1307,7 +1416,15 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
             </Button>
             <Button
               onClick={() => void confirmUndo()}
-              loading={pending === "undo" || pending === "undo-hold"}
+              loading={
+                pending === "undo" ||
+                commands.pending("undo") ||
+                pending === "undo-hold" ||
+                commands.pending("undo-hold")
+              }
+              disabled={
+                stale || offline || undoTarget === null || commands.blocked("UndoLastAction", {})
+              }
               data-testid="confirm-undo"
             >
               Undo — reverse this result
@@ -1346,9 +1463,10 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
               )}
             </p>
             <p className="competitions-hint" data-testid="undo-held-note">
-              Nothing is deleted — the reversal is appended to the ledger and stays visible. The lot
-              comes back <strong>frozen, with the clock stopped</strong>. Requeue it from “Needs
-              resolution” when you are ready to run it again.
+              Nothing is deleted — the reversal is appended to the ledger and stays visible. Undo
+              reopens the lot, then requests a hold. Wait for <strong>Lot hold accepted</strong>
+              and the current room to confirm its clock is stopped before continuing. Requeue the
+              held lot from “Needs resolution” when you are ready to run it again.
             </p>
           </>
         )}
@@ -1374,8 +1492,17 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
             <Button
               variant="danger"
               onClick={() => void confirmWithdraw()}
-              loading={withdrawTarget !== null && pending === `withdraw-${withdrawTarget.lotId}`}
-              disabled={stale}
+              loading={
+                withdrawTarget !== null &&
+                (pending === `withdraw-${withdrawTarget.lotId}` ||
+                  commands.pending(`withdraw-${withdrawTarget.lotId}`))
+              }
+              disabled={
+                stale ||
+                offline ||
+                withdrawTarget === null ||
+                commands.blocked("WithdrawLot", { lotId: withdrawTarget.lotId })
+              }
               data-testid="confirm-withdraw"
             >
               Withdraw from the auction
@@ -1419,8 +1546,16 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
             </Button>
             <Button
               onClick={() => void confirmComplete()}
-              loading={pending === "complete"}
-              disabled={shortSquads && overrideReason.trim() === ""}
+              loading={pending === "complete" || commands.pending("complete")}
+              disabled={
+                stale ||
+                offline ||
+                (shortSquads && overrideReason.trim() === "") ||
+                commands.blocked(
+                  "CompleteAuction",
+                  shortSquads ? { overrideSquadMinimum: true, reason: overrideReason.trim() } : {},
+                )
+              }
               data-testid="confirm-complete"
             >
               {shortSquads ? "Close short — on the record" : "Complete auction"}

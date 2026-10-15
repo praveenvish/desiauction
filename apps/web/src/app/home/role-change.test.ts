@@ -56,3 +56,9 @@ describe("the menu says when it changes", () => {
     expect(roleChangeFor(["player"], "")?.item).toBe("My profile");
   });
 });
+
+it("does not announce another Score menu when a manager becomes a scorer", () => {
+  expect(roleChangeFor(["manager", "scorer"], signatureOf(["manager"]))).toBeNull();
+  expect(roleChangeFor(["finance"], "")?.item).toBe("Money");
+  expect(roleChangeFor(["operator"], "")?.item).toBe("Platform admin");
+});

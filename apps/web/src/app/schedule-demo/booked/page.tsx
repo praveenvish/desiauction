@@ -1,3 +1,4 @@
+import { START_CLUB_LOGIN } from "../../../lib/start-intent";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -34,7 +35,7 @@ export default function DemoBookedPage() {
       </p>
       <p className="prose-p">
         You don&apos;t have to wait for the call to begin —{" "}
-        <Link href="/login" className="prose-link">
+        <Link href={START_CLUB_LOGIN} className="prose-link">
           set your tournament up now
         </Link>{" "}
         and bring your questions to the demo.

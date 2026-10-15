@@ -1,0 +1,14 @@
+.auction-command-status {
+  display: grid;
+  padding: 0.5rem 1.5rem;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.auction-command-status > span {
+  grid-area: 1 / 1;
+}
+.auction-command-status-reserve {
+  visibility: hidden;
+}

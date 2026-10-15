@@ -7,7 +7,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@desiauction/ui";
 import type { RaidScoringSetup } from "../../../../server/scoring/home";
-import { bindScoringActor } from "../../storage";
+import { bindScoringActor, scoringWorkGuard } from "../../storage";
 import { scoringDevice } from "../queue";
 export function RaidSetup({ setup, actorId }: { setup: RaidScoringSetup; actorId: string }) {
   const router = useRouter();
@@ -30,8 +30,10 @@ export function RaidSetup({ setup, actorId }: { setup: RaidScoringSetup; actorId
     setBusy(true);
     setError(null);
     try {
-      await bindScoringActor(actorId);
+      const check = scoringWorkGuard(await bindScoringActor(actorId));
       const deviceId = await scoringDevice();
+      check();
+      check();
       const response = await fetch(`/api/score/${setup.fixtureId}/start`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -52,6 +54,7 @@ export function RaidSetup({ setup, actorId }: { setup: RaidScoringSetup; actorId
       if (value.phase === "not_started" || pending.current) {
         if (!pending.current) {
           const history = await readHistory(setup.fixtureId);
+          check();
           const state = raidEngine.replay(history.events);
           const format = setup.formats.find((value) => value.key === formatKey) ?? setup.format;
           const payloads: { type: MatchEvent["type"]; payload: unknown }[] = [];
@@ -107,6 +110,7 @@ export function RaidSetup({ setup, actorId }: { setup: RaidScoringSetup; actorId
           }
         }
         if (pending.current) {
+          check();
           const accepted = await fetch(`/api/score/${setup.fixtureId}/events`, {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -122,6 +126,7 @@ export function RaidSetup({ setup, actorId }: { setup: RaidScoringSetup; actorId
             throw new Error(rejected?.message ?? result.message ?? "Check the starting players.");
         }
       }
+      check();
       router.push(`/score/${setup.fixtureId}`);
     } catch (error) {
       setError(error instanceof Error ? error.message : "Match setup could not be saved.");
@@ -130,8 +135,13 @@ export function RaidSetup({ setup, actorId }: { setup: RaidScoringSetup; actorId
     }
   }
   return (
-    <main className="score-home raid-setup" data-testid="raid-setup">
+    <main className="score-home raid-setup family-setup" data-testid="raid-setup">
+      <p className="score-cap">{setup.fixtureNumber} · Match setup</p>
       <h1>{setup.teams.map((team) => team.name).join(" vs ")}</h1>
+      <p>
+        Select the format and seven starting players per team. Other squad members remain available
+        under the current match rules.
+      </p>
       <label>
         Format
         <select

@@ -326,8 +326,17 @@ test("viewer, insights and organiser reference screens from accepted matches", a
     await image(viewer, "20-live-link-preview", new URL(og, viewer.url()).href);
     await viewer.clock.install();
     await viewer.route("**/api/live/**", (request) => request.abort("internetdisconnected"));
-    await viewer.clock.runFor(15000);
-    await expect(viewer.getByTestId("live-reconnecting")).toBeVisible();
+    // A poll scheduled before clock.install still runs on real time, so one
+    // fixed jump can land before it fails. Advance until two polls have failed.
+    await expect
+      .poll(
+        async () => {
+          await viewer.clock.runFor(2000);
+          return viewer.getByTestId("live-reconnecting").isVisible();
+        },
+        { timeout: 30000 },
+      )
+      .toBe(true);
     await capture(viewer, "21-states-reconnecting");
     await viewer.clock.fastForward(65000);
     await expect(viewer.getByTestId("live-stale")).toBeVisible();

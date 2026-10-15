@@ -3,6 +3,7 @@ import { and, eq, inArray, lt, or, sql } from "drizzle-orm";
 
 import { systemDb } from "../db";
 import { sendEngineCommand } from "./engine-client";
+import type { CommandAck } from "@desiauction/core";
 
 /**
  * End a practice auction through the engine, its single writer (0101). True
@@ -14,7 +15,18 @@ import { sendEngineCommand } from "./engine-client";
  * there is callable from a browser, and this takes the auction id on trust.
  */
 export async function endPractice(practiceId: string, personId: string): Promise<boolean> {
-  const ack = await sendEngineCommand({
+  const ack = await endPracticeCommand(practiceId, personId);
+  return ack.accepted || ack.reason === "illegal_transition";
+}
+
+/** Same canonical command and authority; retain its actual acknowledgement for UI recovery. */
+export async function endPracticeCommand(
+  practiceId: string,
+  personId: string,
+  commandId?: string,
+): Promise<CommandAck> {
+  return sendEngineCommand({
+    ...(commandId ? { commandId } : {}),
     auctionId: practiceId,
     type: "AbortAuction",
     actor: personId,
@@ -22,7 +34,6 @@ export async function endPractice(practiceId: string, personId: string): Promise
     manage: true,
     payload: { reason: "practice ended" },
   });
-  return ack.accepted || ack.reason === "illegal_transition";
 }
 
 /** A practice is a ten-minute rehearsal; one still running after this was forgotten. */

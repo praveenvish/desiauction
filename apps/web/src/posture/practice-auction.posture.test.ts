@@ -151,11 +151,12 @@ describe("the practice auction under the production roles", () => {
 
   it("the organiser starts one inside the club's boundary on desiauction_app", async () => {
     await signIn(organiser);
-    expect(await startPracticeAction(slug, 2)).toEqual({ ok: true });
+    const started = await startPracticeAction(slug, 2);
     const [practice] = await owner
       .select({ id: auctions.id, kind: auctions.kind, status: auctions.status })
       .from(auctions)
       .where(and(eq(auctions.competitionId, competitionId), eq(auctions.kind, "practice")));
+    expect(started).toEqual({ ok: true, practiceId: practice?.id });
     expect(practice).toMatchObject({ kind: "practice", status: "scheduled" });
     const practiceLots = await owner
       .select({ id: lots.id })

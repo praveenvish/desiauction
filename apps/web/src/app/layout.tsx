@@ -23,17 +23,14 @@ import { ClientErrorListener } from "../components/client-error-listener";
 import { WebVitalsReporter } from "../components/web-vitals-reporter";
 import { ProductShell } from "../components/shell/product-shell";
 import { THEME_BOOTSTRAP } from "../components/shell/theme-bootstrap";
-import { platformDoorCapabilities } from "../server/admin/actions";
+import type { platformDoorCapabilities } from "../server/admin/actions";
 import { currentSession, logoutAction } from "../server/auth/actions";
-import { inboxState } from "../server/auth/security-events";
-import { competitionsView } from "../server/competition/actions";
-import { myOrgs } from "../server/orgs/actions";
-import { rolesOf } from "../server/roles/roles";
+import type { competitionsView } from "../server/competition/actions";
+import type { myOrgs } from "../server/orgs/actions";
+import type { rolesOf } from "../server/roles/roles";
 import { seasonRoleFor, type NavRoles, type SeasonRole } from "../components/shell/nav";
-import { myRegistrations } from "../server/competition/public";
-import { finopsOrgIds } from "../server/financial-operations/actions";
+import type { myRegistrations } from "../server/competition/public";
 import { requestLogger } from "../server/logger";
-import { settlementOrgIds } from "../server/settlement/actions";
 
 export const metadata: Metadata = {
   // WITHOUT metadataBase, Next resolves every relative metadata URL — including
@@ -166,6 +163,28 @@ export default async function RootLayout({
   if (session !== null) {
     const personId = session.personId;
     try {
+      // Anonymous public pages never use these private-workspace readers. Load
+      // their modules only after the session gate, retaining the same readers,
+      // current grants, parallel calls and failure boundary for signed-in people.
+      const [
+        { myOrgs },
+        { competitionsView },
+        { settlementOrgIds },
+        { finopsOrgIds },
+        { inboxState },
+        { platformDoorCapabilities },
+        { rolesOf },
+        { myRegistrations },
+      ] = await Promise.all([
+        import("../server/orgs/actions"),
+        import("../server/competition/actions"),
+        import("../server/settlement/actions"),
+        import("../server/financial-operations/actions"),
+        import("../server/auth/security-events"),
+        import("../server/admin/actions"),
+        import("../server/roles/roles"),
+        import("../server/competition/public"),
+      ]);
       const [orgs, competitionsView_, settlementOrgs, financeOrgs, unreadCount, platform, lens] =
         await Promise.all([
           myOrgs(),
@@ -295,7 +314,13 @@ export default async function RootLayout({
   return (
     // `suppressHydrationWarning`: the bootstrap below rewrites `data-theme`
     // before React hydrates, which is a deliberate server/client difference.
-    <html lang="en" data-theme="daylight" suppressHydrationWarning>
+    <html
+      lang="en"
+      data-theme="daylight"
+      data-ui-treatment={env.UI_TREATMENT}
+      data-ui-contract="ui-r1"
+      suppressHydrationWarning
+    >
       <body>
         {/* Replay the remembered console theme before first paint (no flash),
             and catch the browser's install event before hydration

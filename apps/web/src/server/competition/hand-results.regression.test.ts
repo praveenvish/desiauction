@@ -35,6 +35,10 @@ import { env } from "../../env";
 import { createOrg } from "../orgs/orgs";
 import { createCompetition, createTeam, type CompetitionSummary } from "./competitions";
 import { ownedTeamIdsOn } from "./team-ownership";
+import { registrationWriteState } from "./registration-write-state";
+import { squadWriteState } from "./squad-write-state";
+import { setRegistrationMarks } from "./registration-aggregate";
+import { playerDeskContext } from "./player-desk";
 import { teamsWorkspace } from "./team-workspace";
 import { playerPosterFor, seasonPosterFor, teamPosterFor } from "./posters";
 import { auctionHoldsRoster, rosterAuction, seasonRosterLocked } from "./registration-aggregate";
@@ -289,5 +293,127 @@ describe("RESULTS ENTERED BY HAND", () => {
       payload: {},
     });
     expect(await seasonRosterLocked(db, other.id)).toBe(true);
+  });
+});
+
+describe("formation-aware player desk", () => {
+  it("retains imported auction hand entry and suppresses it for both non-auction formation paths", async () => {
+    for (const formation of ["auction", "organizer", "team_entry"] as const) {
+      const season = await createCompetition(db, orgId, owner, {
+        name: `Desk ${formation} ${RUN}`,
+        sport: "cricket",
+        teamFormation: formation,
+      });
+      await db
+        .update(competitionsTable)
+        .set({ auctionSource: "imported" })
+        .where(eq(competitionsTable.id, season.id));
+      const context = await playerDeskContext(db, owner, season);
+      expect(context).toMatchObject({
+        teamFormation: formation,
+        canManageTeams: true,
+        rosterLocked: false,
+        auctionExists: false,
+        handEntry: formation === "auction",
+      });
+      const outsider = newId();
+      await db
+        .insert(people)
+        .values({ id: outsider, name: "Desk outsider", email: `${outsider}@example.test` });
+      personIds.push(outsider);
+      expect(await playerDeskContext(db, outsider, season)).toMatchObject({
+        teamFormation: formation,
+        canManageTeams: false,
+        handEntry: false,
+      });
+    }
+  });
+});
+
+describe("complete private squad-write reconciliation", () => {
+  it("includes an off-page non-approved captain and returns only identity, membership and marks", async () => {
+    const source = teamIds[0],
+      destination = teamIds[1];
+    if (!source || !destination) throw new Error("Missing teams");
+    const old = await seed("21", { teamId: destination });
+    await db
+      .update(registrationsTable)
+      .set({ isCaptain: true, status: "waitlisted" })
+      .where(eq(registrationsTable.id, old));
+    const before = await squadWriteState(db, comp.id, [reg.free], [destination]);
+    expect(before?.teams.sort()).toEqual([source, destination].sort());
+    expect(before?.rows.find((row) => row.id === old)).toMatchObject({
+      teamId: destination,
+      isCaptain: true,
+    });
+    for (const row of before?.rows ?? [])
+      expect(Object.keys(row).sort()).toEqual(
+        ["id", "teamId", "isCaptain", "isIcon", "isRetained"].sort(),
+      );
+    // The canonical writer, rather than a UI assumption, establishes uniqueness.
+    expect(
+      await setRegistrationMarks(
+        db,
+        orgId,
+        comp.id,
+        reg.free,
+        { teamId: destination, isCaptain: true },
+        owner,
+      ),
+    ).toMatchObject({ ok: true });
+    const after = await squadWriteState(db, comp.id, [reg.free, old], [source, destination]);
+    expect(after?.rows.find((row) => row.id === old)).toMatchObject({ isCaptain: false });
+    expect(after?.rows.find((row) => row.id === reg.free)).toMatchObject({
+      teamId: destination,
+      isCaptain: true,
+    });
+  });
+  it("rejects foreign/missing registrations and bounded-input violations", async () => {
+    expect(await squadWriteState(db, newId(), [reg.free], [])).toBeNull();
+    expect(await squadWriteState(db, comp.id, [newId()], [])).toBeNull();
+    expect(
+      await squadWriteState(db, comp.id, [reg.free, reg.icon, reg.dear, reg.cheap], []),
+    ).toBeNull();
+    expect(await squadWriteState(db, comp.id, [reg.free], [newId(), newId(), newId()])).toBeNull();
+  });
+});
+
+describe("bounded bulk reconciliation", () => {
+  it("reads the maximum 1000 selected rows in one minimal batch, including records outside the visible page", async () => {
+    const records = Array.from({ length: 1000 }, () => ({ id: newId(), personId: newId() }));
+    personIds.push(...records.map((row) => row.personId));
+    await db
+      .insert(people)
+      .values(
+        records.map((row) => ({ id: row.personId, name: "Batch validation", clubOrgId: orgId })),
+      );
+    await db.insert(registrationsTable).values(
+      records.map((row) => ({
+        id: row.id,
+        personId: row.personId,
+        orgId,
+        competitionId: comp.id,
+        registrationNumber: registrationNumber(row.id),
+        status: "submitted" as const,
+        role: "batter",
+        adultConfirmedAt: null,
+      })),
+    );
+    const rows = await registrationWriteState(
+      db,
+      comp.id,
+      records.map((row) => row.id),
+    );
+    expect(rows).toHaveLength(1000);
+    expect(new Set(rows?.map((row) => row.id))).toEqual(new Set(records.map((row) => row.id)));
+    for (const row of rows ?? [])
+      expect(Object.keys(row).sort()).toEqual(
+        ["id", "status", "adultConfirmed", "rejectionReason", "rejectionNote"].sort(),
+      );
+    expect(
+      await registrationWriteState(db, comp.id, [...records.map((row) => row.id), newId()]),
+    ).toBeNull();
+    expect(await registrationWriteState(db, comp.id, [reg.free, newId()])).toBeNull();
+    expect(await registrationWriteState(db, newId(), [reg.free])).toBeNull();
   });
 });

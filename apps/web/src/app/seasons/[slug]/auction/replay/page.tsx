@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { replayViewerData } from "../../../../../server/auction/conduct-actions";
 import { ReplayPanel } from "./replay-panel";
+import { AuctionTaskContext } from "../auction-task-context";
 import "../../../seasons.css";
 import "../auction.css";
 import "./replay.css";
@@ -21,11 +22,15 @@ export default async function ReplayPage({ params }: { params: Promise<{ slug: s
       <header className="rp-head">
         <div className="rp-head-text">
           <h1>Replay</h1>
-          <p>{data.auctionName} · every bid and hammer, exactly as recorded</p>
+          <AuctionTaskContext
+            task="Recorded auction"
+            scope={data.auctionName}
+            detail="Replay follows the ledger. It does not place bids or change results."
+          />
         </div>
         <div className="rp-head-actions">
           <ButtonLink href={`/seasons/${slug}/auction/cockpit`} variant="ghost" size="sm">
-            Cockpit
+            Back to cockpit
           </ButtonLink>
           <ButtonLink href={`/seasons/${slug}/auction/ledger`} variant="secondary" size="sm">
             Ledger

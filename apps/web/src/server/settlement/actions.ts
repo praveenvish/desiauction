@@ -5,8 +5,10 @@ import { newId, teams as teamsTable, withTenantDb, type Db } from "@desiauction/
 import { eq } from "drizzle-orm";
 
 import { derivedId } from "../derived-id";
+import { readFinancialRecords, type FinancialIntent } from "../../lib/financial-intent";
 import {
   isPaymentMethod,
+  isManualMethod,
   settlementCapabilitiesOf,
   type ObligationBasis,
 } from "@desiauction/settlement";
@@ -906,4 +908,116 @@ export async function voidCaseAction(
     return { ok: false, error: messageFor("reason_required") };
   }
   return command(slug, (deps, actor) => voidCase(deps, actor, caseId, newId(), reason.trim()));
+}
+
+export type FinancialIntentReview =
+  { outcome: "accepted"; seq: number } | { outcome: "unknown" | "unavailable" };
+
+/** Read only: absence never establishes that an unanswered command failed. */
+export async function reviewFinancialIntentAction(
+  slug: string,
+  original: FinancialIntent,
+): Promise<FinancialIntentReview> {
+  const gate = await moneyGate(slug);
+  if (
+    !gate ||
+    original.actorId !== gate.personId ||
+    original.orgId !== gate.competition.orgId ||
+    !(original.kind === "payment" ? gate.viewer.canCollect : gate.viewer.canOverride)
+  )
+    return { outcome: "unavailable" };
+  try {
+    readFinancialRecords([{ intent: original, outcome: "unknown", message: "" }], {
+      actorId: gate.personId,
+      orgId: gate.competition.orgId,
+      caseId: original.caseId,
+    });
+  } catch {
+    return { outcome: "unavailable" };
+  }
+  const parsed = parseRupees(original.amount);
+  if (
+    !parsed.ok ||
+    !/^[0-9A-HJKMNP-TV-Z]{26}$/.test(original.caseId) ||
+    !/^[0-9A-HJKMNP-TV-Z]{26}$/.test(original.targetId)
+  )
+    return { outcome: "unavailable" };
+  return withTenantDb(
+    dbHandle,
+    { personId: gate.personId, orgId: gate.competition.orgId },
+    async (db) => {
+      // Recheck current grants inside the actual read boundary, not just page visibility.
+      const capability = original.kind === "payment" ? "settlement.collect" : "settlement.override";
+      if (
+        !(await canSettlement(db, gate.personId, gate.competition.orgId, "settlement.view")) ||
+        !(await canSettlement(db, gate.personId, gate.competition.orgId, capability))
+      )
+        return { outcome: "unavailable" };
+      const deps = settlementDeps(db);
+      const caseRow = await deps.store.loadCase(original.caseId);
+      if (
+        !caseRow ||
+        caseRow.orgId !== gate.competition.orgId ||
+        caseRow.competitionId !== gate.competition.id
+      )
+        return { outcome: "unavailable" };
+      let stream: "payment" | "case" = "payment";
+      let streamId = original.targetId;
+      let commandId: string;
+      let eventType: string;
+      if (original.kind === "payment") {
+        if (!isPaymentMethod(original.method) || !isManualMethod(original.method))
+          return { outcome: "unavailable" };
+        const identity = paymentIntent(
+          original.caseId,
+          original.targetId,
+          original.method,
+          parsed.paise,
+          original.key,
+        );
+        streamId = identity.paymentId;
+        commandId = identity.commandId;
+        eventType = "PaymentInitiated";
+      } else if (original.kind === "refund") {
+        const payment = await deps.store.loadPayment(original.targetId);
+        if (
+          !payment ||
+          payment.caseId !== original.caseId ||
+          payment.orgId !== gate.competition.orgId ||
+          !isPaymentMethod(payment.method) ||
+          !isManualMethod(payment.method)
+        )
+          return { outcome: "unavailable" };
+        commandId = overrideCommandId(
+          "refundManualPayment",
+          [original.targetId, String(parsed.paise)],
+          original.key,
+        );
+        eventType = "PaymentRefunded";
+      } else {
+        stream = "case";
+        streamId = original.caseId;
+        commandId = overrideCommandId(
+          "waiveObligation",
+          [original.caseId, original.targetId, String(parsed.paise)],
+          original.key,
+        );
+        eventType = "ObligationWaived";
+      }
+      const event = await deps.store.findByCommandId(stream, streamId, commandId);
+      if (!event) return { outcome: "unknown" };
+      const payload = event.payload;
+      const matches =
+        event.type === eventType &&
+        event.actor === gate.personId &&
+        payload["amount"] === parsed.paise &&
+        (original.kind === "payment"
+          ? payload["caseId"] === original.caseId &&
+            payload["teamId"] === original.targetId &&
+            payload["method"] === original.method
+          : payload["reason"] === original.reason.trim() &&
+            (original.kind !== "waiver" || payload["teamId"] === original.targetId));
+      return matches ? { outcome: "accepted", seq: event.seq } : { outcome: "unavailable" };
+    },
+  );
 }

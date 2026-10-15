@@ -26,7 +26,10 @@ const URGENCY: Record<string, number> = {
 
 export function OwnerHome({ teams }: { teams: OwnedTeam[] }) {
   const ordered = [...teams].sort(
-    (a, b) => (URGENCY[a.auctionStatus] ?? 2) - (URGENCY[b.auctionStatus] ?? 2),
+    (a, b) =>
+      (URGENCY[a.auctionStatus] ?? 2) - (URGENCY[b.auctionStatus] ?? 2) ||
+      a.competitionSlug.localeCompare(b.competitionSlug) ||
+      a.teamId.localeCompare(b.teamId),
   );
   return (
     <>

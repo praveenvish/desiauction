@@ -1,10 +1,16 @@
 import { createStore, promisifyRequest } from "idb-keyval";
+import { createActorBinder, type ActorBindingReceipt } from "./actor-binding";
 // Same store as C24's default idb-keyval store; no migration or queue relocation.
 const store = createStore("keyval-store", "keyval");
 const EPOCH = "da:scoring-epoch";
 let lease: Promise<string> | undefined;
 export { onScoringStop } from "./storage-events";
-import { isScoringStopped, resetScoringStops, notifyScoringStop } from "./storage-events";
+import {
+  isScoringStopped,
+  resetScoringStops,
+  notifyScoringStop,
+  scoringStopGeneration,
+} from "./storage-events";
 function epoch(): Promise<string> {
   if (!lease)
     lease = store(
@@ -37,9 +43,16 @@ export async function scoringRead<T>(key: string): Promise<T | undefined> {
   return store("readonly", (objectStore) => promisifyRequest<T | undefined>(objectStore.get(key)));
 }
 /** Epoch comparison and publication share one transaction: stale tabs cannot resurrect data. */
-export async function scoringWrite(
+export function scoringWrite(
   entries: readonly [string, unknown][],
   projection?: { key: string; update: (value: unknown) => unknown },
+): Promise<void> {
+  return writeScoring(entries, projection);
+}
+async function writeScoring(
+  entries: readonly [string, unknown][],
+  projection?: { key: string; update: (value: unknown) => unknown },
+  valid: () => boolean = () => true,
 ): Promise<void> {
   const expected = await epoch();
   if (isScoringStopped()) throw new Error("Scoring storage closed after sign-out.");
@@ -49,7 +62,7 @@ export async function scoringWrite(
       new Promise<void>((resolve, reject) => {
         const request = objectStore.get(EPOCH);
         request.onsuccess = () => {
-          if (isScoringStopped() || request.result !== expected) {
+          if (isScoringStopped() || request.result !== expected || !valid()) {
             objectStore.transaction.abort();
             return;
           }
@@ -93,8 +106,14 @@ export async function scoringUpdate<T>(
           }
           const read = objectStore.get(key);
           read.onsuccess = () => {
-            value = updater(read.result as T | undefined);
-            objectStore.put(value, key);
+            try {
+              value = updater(read.result as T | undefined);
+              objectStore.put(value, key);
+            } catch (error) {
+              // A fail-closed updater must abort, not leave an unresolved IDB promise.
+              objectStore.transaction.abort();
+              reject(error instanceof Error ? error : new Error("Storage update refused."));
+            }
           };
         };
         objectStore.transaction.oncomplete = () => {
@@ -108,6 +127,9 @@ export async function scoringUpdate<T>(
 }
 export async function clearScoringStorage(): Promise<void> {
   notifyScoringStop();
+  await purgeScoringStorage();
+}
+async function purgeScoringStorage(): Promise<void> {
   await store(
     "readwrite",
     (objectStore) =>
@@ -130,16 +152,26 @@ export async function clearScoringStorage(): Promise<void> {
   );
 }
 /** Only call with the actor supplied by an authenticated server page/response. */
-export async function bindScoringActor(actorId: string): Promise<void> {
-  if (isScoringStopped()) {
+export const bindScoringActor = createActorBinder({
+  stopped: isScoringStopped,
+  stopGeneration: scoringStopGeneration,
+  reopen: () => {
     resetScoringStops();
     lease = undefined;
-  }
-  const previous = await scoringRead<string>("ls1:actor");
-  if (previous && previous !== actorId) {
-    await clearScoringStorage();
-    resetScoringStops();
-    lease = undefined;
-  }
-  await scoringWrite([["ls1:actor", actorId]]);
+  },
+  readActor: () => scoringRead<string>("ls1:actor"),
+  stop: notifyScoringStop,
+  purge: purgeScoringStorage,
+  writeActor: (actorId, valid) => writeScoring([["ls1:actor", actorId]], undefined, valid),
+});
+
+/** Initialization validates the receipt once; later writes obey stop/epoch cancellation. */
+export function scoringWorkGuard(receipt: ActorBindingReceipt) {
+  if (!receipt.valid())
+    throw new Error("Account storage binding changed. Reload after signing in.");
+  const generation = scoringStopGeneration();
+  return () => {
+    if (isScoringStopped() || scoringStopGeneration() !== generation)
+      throw new Error("Scoring stopped after account storage changed.");
+  };
 }

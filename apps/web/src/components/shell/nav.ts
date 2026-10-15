@@ -1,4 +1,5 @@
 import { sportLabel } from "@desiauction/core/sport-labels";
+import { rankLiveScopes } from "../../lib/home-tasks";
 
 /* ===========================================================================
  * THE SEVEN NAVIGATION LAWS (RN-1)
@@ -624,6 +625,7 @@ const SECTION_LABELS: [RegExp, string][] = [
   [/\/reviews$/, "Reviews"],
   [/\/awards$/, "Season awards"],
   [/\/brief\/[^/]+$/, "Captain’s brief"],
+  [/^\/me\/insights$/, "My cricket insights"],
   [/\/insights$/, "Player insights"],
   [/\/standings$/, "Table"],
   [/\/auction\/ledger$/, "Ledger"],
@@ -1125,7 +1127,7 @@ export function operatorDoorHref(held: readonly PlatformDoorCapability[]): strin
  * the whole room is stopped, whereas an owner's absence costs only that owner.
  */
 function liveDoor(roles: NavRoles): NavItem | null {
-  const night = roles.conducts.find((scope) => scope.live);
+  const night = rankLiveScopes(roles.conducts).find((scope) => scope.live);
   if (night !== undefined) {
     return {
       key: "cockpit",
@@ -1136,7 +1138,7 @@ function liveDoor(roles: NavRoles): NavItem | null {
       live: true,
     };
   }
-  const team = roles.teams.find((scope) => scope.live);
+  const team = rankLiveScopes(roles.teams).find((scope) => scope.live);
   if (team !== undefined) {
     return {
       key: "room",
@@ -1166,7 +1168,8 @@ function scopeItem(
   icon: NavIcon,
   href: (scope: NavScope) => string,
 ): NavItem | null {
-  const first = scopes[0];
+  const ordered = rankLiveScopes(scopes);
+  const first = ordered[0];
   if (first === undefined) {
     return null;
   }
@@ -1187,8 +1190,8 @@ function scopeItem(
     href: href(first),
     icon,
     ...(scopes.some((scope) => scope.live) ? { live: true } : {}),
-    choices: scopes.map((scope, index) => ({
-      key: `${key}-${String(index)}`,
+    choices: ordered.map((scope) => ({
+      key: `${key}-${scope.seasonSlug}-${scope.teamId ?? "season"}`,
       label: scope.label,
       hint: scope.seasonName,
       href: href(scope),

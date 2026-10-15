@@ -3,6 +3,7 @@ import { Fragment, type ReactNode } from "react";
 import { BrandGlyph, IconChevronDown } from "./icons";
 import { PopoverMenu } from "./popover-menu";
 import { PublicMobileMenu } from "./public-mobile-menu";
+import { OpaqueContent } from "./opaque-content";
 import styles from "./public-shell.module.css";
 import type { PublicShellProps } from "./public-shell-types";
 
@@ -117,7 +118,7 @@ export function PublicShell({
         data-fill={contentFill ? "" : undefined}
         tabIndex={-1}
       >
-        {children}
+        <OpaqueContent>{children}</OpaqueContent>
       </div>
       <footer
         className={styles["footer"]}

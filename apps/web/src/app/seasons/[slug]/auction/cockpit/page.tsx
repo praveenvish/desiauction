@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { MoneyUnitOverride } from "../../../../../components/money-unit";
 import { cockpitView } from "../../../../../server/auction/conduct-actions";
 import { PracticeBar } from "../practice-bar";
+import { AuctionTaskContext } from "../auction-task-context";
 import { CockpitPanel } from "./cockpit-panel";
 import "../../../seasons.css";
 import "../auction.css";
@@ -36,6 +37,11 @@ export default async function CockpitPage({ params }: { params: Promise<{ slug: 
               title stays (it is the page's heading); the doors move to the foot,
               where leaving belongs on the surface you leave last. */}
             <h1 className="auction-sr-only">{view.auctionName} — cockpit</h1>
+            <AuctionTaskContext
+              task={finished ? "Auction record" : "Conductor desk"}
+              scope={view.auctionName}
+              detail={inPractice ? "Practice · real squads stay unchanged" : undefined}
+            />
             <PracticeBar
               slug={slug}
               practice={view.practice}

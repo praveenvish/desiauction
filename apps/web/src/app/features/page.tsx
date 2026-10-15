@@ -1,3 +1,4 @@
+import { START_CLUB_LOGIN } from "../../lib/start-intent";
 import { ButtonLink } from "@desiauction/ui";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
@@ -270,7 +271,7 @@ export default function FeaturesPage() {
             </Link>
           </p>
           <div className="mk-cta-actions mk-cta-actions--closing">
-            <ButtonLink href="/login" variant="primary" size="lg">
+            <ButtonLink href={START_CLUB_LOGIN} variant="primary" size="lg">
               Start your auction
             </ButtonLink>
             <ButtonLink href="/pricing" variant="secondary" size="lg">

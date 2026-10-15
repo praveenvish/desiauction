@@ -2,7 +2,8 @@
 
 import { Button } from "@desiauction/ui";
 
-import { scoringSignOut } from "../../lib/scoring-sign-out";
+import { useState } from "react";
+import { SignOutDialog } from "../../components/sign-out-dialog";
 
 /**
  * Sign out, and forget this device's inbox read-state on the way out.
@@ -15,11 +16,25 @@ import { scoringSignOut } from "../../lib/scoring-sign-out";
  * rather than the only defence — but on a shared phone, belt AND braces.
  */
 export function SignOutButton({ logout }: { logout: () => Promise<void> }) {
+  const [open, setOpen] = useState(false);
   return (
-    <form action={() => scoringSignOut(logout)}>
-      <Button type="submit" variant="secondary">
+    <>
+      <Button
+        type="button"
+        variant="secondary"
+        onClick={() => {
+          setOpen(true);
+        }}
+      >
         Sign out
       </Button>
-    </form>
+      <SignOutDialog
+        open={open}
+        onClose={() => {
+          setOpen(false);
+        }}
+        logout={logout}
+      />
+    </>
   );
 }

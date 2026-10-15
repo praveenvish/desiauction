@@ -46,6 +46,8 @@ export interface OrganizedClub {
 }
 
 export interface OwnedTeam {
+  orgId?: string;
+  competitionId?: string;
   teamId: string;
   teamName: string;
   auctionId: string;
@@ -73,6 +75,7 @@ export interface PersonRoles {
 }
 
 export interface ConductedSeason {
+  orgId?: string;
   /** Resolved from the person's own conduct grant — the key `conductSetup` takes. */
   competitionId: string;
   competitionSlug: string;
@@ -92,6 +95,9 @@ export interface ScoringSeason {
   competitionName: string;
   competitionStatus: string;
   startsOn: string | null;
+  /** Actual appointment/grant and team management are separate identities. */
+  scorer?: boolean;
+  managerTeamIds?: string[];
 }
 
 async function scoringSeasons(personId: string, grantedIds: string[]): Promise<ScoringSeason[]> {
@@ -107,7 +113,7 @@ async function scoringSeasons(personId: string, grantedIds: string[]): Promise<S
         ),
       ),
     systemDb
-      .select({ competitionId: teamManagers.competitionId })
+      .select({ competitionId: teamManagers.competitionId, teamId: teamManagers.teamId })
       .from(teamManagers)
       .where(and(eq(teamManagers.personId, personId), isNull(teamManagers.revokedAt))),
   ]);
@@ -119,7 +125,7 @@ async function scoringSeasons(personId: string, grantedIds: string[]): Promise<S
     ]),
   ];
   if (ids.length === 0) return [];
-  return systemDb
+  const rows = await systemDb
     .select({
       orgId: competitions.orgId,
       competitionId: competitions.id,
@@ -131,6 +137,18 @@ async function scoringSeasons(personId: string, grantedIds: string[]): Promise<S
     .from(competitions)
     .where(inArray(competitions.id, ids))
     .orderBy(competitions.id);
+  const scoring = new Set([...grantedIds, ...official.map((row) => row.competitionId)]);
+  return rows.map((row) => ({
+    ...row,
+    scorer: scoring.has(row.competitionId),
+    managerTeamIds: [
+      ...new Set(
+        managed
+          .filter((team) => team.competitionId === row.competitionId)
+          .map((team) => team.teamId),
+      ),
+    ].sort(),
+  }));
 }
 
 const MANAGING_SETS = new Set(["org:owner", "org:staff"]);
@@ -139,6 +157,7 @@ async function conductedSeasons(competitionIds: string[]): Promise<ConductedSeas
   if (competitionIds.length === 0) return [];
   const rows = await systemDb
     .select({
+      orgId: competitions.orgId,
       competitionId: competitions.id,
       competitionSlug: competitions.slug,
       competitionName: competitions.name,
@@ -221,6 +240,8 @@ export async function conductSetup(competitionId: string): Promise<ConductSetup>
 
 async function ownedTeams(personId: string): Promise<OwnedTeam[]> {
   const columns = {
+    orgId: competitions.orgId,
+    competitionId: competitions.id,
     teamId: teams.id,
     teamName: teams.name,
     auctionId: auctions.id,
@@ -270,6 +291,8 @@ async function ownedTeams(personId: string): Promise<OwnedTeam[]> {
   return [...byTeam.values()]
     .sort((a, b) => b.at.getTime() - a.at.getTime())
     .map((row) => ({
+      orgId: row.orgId,
+      competitionId: row.competitionId,
       teamId: row.teamId,
       teamName: row.teamName,
       auctionId: row.auctionId,
@@ -355,5 +378,18 @@ const AUCTION_OVER = new Set(["completed", "reconciled"]);
  * night an owner is preparing for), else simply the newest.
  */
 export function currentTeam(roles: PersonRoles): OwnedTeam | null {
-  return roles.owns.find((team) => !AUCTION_OVER.has(team.auctionStatus)) ?? roles.owns[0] ?? null;
+  const priority = (team: OwnedTeam) =>
+    ["live", "paused"].includes(team.auctionStatus)
+      ? 0
+      : AUCTION_OVER.has(team.auctionStatus)
+        ? 2
+        : 1;
+  return (
+    [...roles.owns].sort(
+      (a, b) =>
+        priority(a) - priority(b) ||
+        a.competitionSlug.localeCompare(b.competitionSlug) ||
+        a.teamId.localeCompare(b.teamId),
+    )[0] ?? null
+  );
 }

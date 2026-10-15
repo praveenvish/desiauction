@@ -106,7 +106,8 @@ test("a lost request lets go of the screen, says so, and the retry works", async
   await advance.click();
   await expect(notice).toBeVisible();
   await expect(notice).toHaveAttribute("data-kind", "stale-page");
-  await expect(notice).toContainText("out of date");
+  await expect(notice).toContainText("outdated page");
+  await expect(notice).toContainText("check the affected record before repeating an action");
   await expect(advance).toBeEnabled();
   await page.unroute("**/*");
 

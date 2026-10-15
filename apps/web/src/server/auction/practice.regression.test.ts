@@ -44,8 +44,64 @@ import {
   transitionLot,
   type AuctionRecord,
 } from "@desiauction/auction";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+// Lifecycle action tests mock only authenticated session and engine transport.
+// Canonical aggregate writes below use the isolated real Postgres fixture.
+let actingPerson = "";
+let endMode: "accepted" | "unknown" | "post-commit-unknown" | "replacement" | "real-start" =
+  "accepted";
+const endedIds: string[] = [];
+vi.mock("../auth/actions", () => ({
+  currentSession: () => Promise.resolve({ personId: actingPerson }),
+}));
+vi.mock("./engine-client", () => ({
+  sendEngineCommand: async (input: { auctionId: string; actor: string; commandId: string }) => {
+    endedIds.push(input.auctionId);
+    if (endMode === "unknown")
+      return {
+        commandId: input.commandId,
+        accepted: false,
+        reason: "engine_unreachable",
+        version: 0,
+      };
+    const [row] = await db
+      .select()
+      .from(auctionsTable)
+      .where(eq(auctionsTable.id, input.auctionId));
+    if (!row) throw new Error("No selected practice");
+    const ended = await transitionAuction(
+      db,
+      row as AuctionRecord,
+      input.actor,
+      "abort",
+      "practice ended",
+    );
+    if (!ended.ok)
+      return { commandId: input.commandId, accepted: false, reason: ended.reason, version: 0 };
+    if (endMode === "post-commit-unknown")
+      return { commandId: input.commandId, accepted: false, reason: "command_failed", version: 0 };
+    if (endMode === "replacement") {
+      const created = await createPracticeAuction(
+        db,
+        real,
+        owner,
+        practiceAuctionConfig(real.config, 2),
+        8,
+      );
+      if (!created.ok) throw new Error("Replacement setup failed");
+    }
+    if (endMode === "real-start")
+      await db.update(auctionsTable).set({ status: "live" }).where(eq(auctionsTable.id, real.id));
+    return { commandId: input.commandId, accepted: true, version: 1 };
+  },
+}));
+import {
+  practiceIntentAction,
+  practiceCardView,
+  practiceLifecycleContext,
+} from "./practice-actions";
 
 import { env } from "../../env";
 import {
@@ -263,5 +319,190 @@ describe("THE PRACTICE AUCTION", () => {
     expect(
       (await createPracticeAuction(db, real, owner, practiceAuctionConfig(real.config, 3), 11)).ok,
     ).toBe(true);
+  });
+});
+
+describe("identity-bound practice lifecycle actions", () => {
+  beforeEach(async () => {
+    actingPerson = owner;
+    endMode = "accepted";
+    endedIds.length = 0;
+    await db
+      .update(auctionsTable)
+      .set({ status: "scheduled" })
+      .where(eq(auctionsTable.id, real.id));
+    const active = await practiceOf(db, comp.id);
+    if (active) expect((await transitionAuction(db, active, owner, "abort")).ok).toBe(true);
+  });
+  async function start() {
+    const result = await practiceIntentAction(comp.slug, "start", real.id, null, 2, newId());
+    expect(result).toMatchObject({ kind: "accepted", stage: "complete", ended: false });
+    if (!result.practiceId) throw new Error("No created practice receipt");
+    return result.practiceId;
+  }
+  it("returns actual identity and exposes scoped card identities", async () => {
+    const id = await start();
+    expect((await practiceOf(db, comp.id))?.id).toBe(id);
+    expect(await practiceCardView(comp.slug)).toMatchObject({
+      personId: owner,
+      realAuctionId: real.id,
+      practice: { id },
+    });
+  });
+  it("refuses stale End and Run again without ending the replacement", async () => {
+    const old = await start();
+    expect((await practiceIntentAction(comp.slug, "end", real.id, old, 2, newId())).kind).toBe(
+      "accepted",
+    );
+    endedIds.length = 0;
+    const replacement = await start();
+    for (const kind of ["end", "again"] as const)
+      expect((await practiceIntentAction(comp.slug, kind, real.id, old, 2, newId())).kind).toBe(
+        "refused",
+      );
+    expect((await practiceOf(db, comp.id))?.id).toBe(replacement);
+    expect(endedIds).toEqual([]);
+  });
+  it("does not turn an ended old Run again into Start", async () => {
+    const old = await start();
+    await practiceIntentAction(comp.slug, "end", real.id, old, 2, newId());
+    const [before] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(auctionsTable)
+      .where(eq(auctionsTable.competitionId, comp.id));
+    expect((await practiceIntentAction(comp.slug, "again", real.id, old, 2, newId())).kind).toBe(
+      "refused",
+    );
+    const [after] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(auctionsTable)
+      .where(eq(auctionsTable.competitionId, comp.id));
+    expect(after).toEqual(before);
+    expect(await practiceOf(db, comp.id)).toBeNull();
+  });
+  it.each(["unknown", "post-commit-unknown"] as const)(
+    "stops before creation after %s End",
+    async (mode) => {
+      const old = await start();
+      endMode = mode;
+      const [before] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(auctionsTable)
+        .where(eq(auctionsTable.competitionId, comp.id));
+      expect(
+        await practiceIntentAction(comp.slug, "again", real.id, old, 2, newId()),
+      ).toMatchObject({ kind: "unknown", stage: "end", ended: false });
+      const [after] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(auctionsTable)
+        .where(eq(auctionsTable.competitionId, comp.id));
+      expect(after).toEqual(before);
+      expect(endedIds).toEqual([old]);
+    },
+  );
+  it.each(["replacement", "real-start"] as const)(
+    "reports ended-old/create-refused when %s intervenes",
+    async (mode) => {
+      const old = await start();
+      endMode = mode;
+      expect(
+        await practiceIntentAction(comp.slug, "again", real.id, old, 2, newId()),
+      ).toMatchObject({ kind: "refused", stage: "create", ended: true });
+      expect(endedIds).toEqual([old]);
+      if (mode === "replacement") expect((await practiceOf(db, comp.id))?.id).not.toBe(old);
+    },
+  );
+  it("rejects foreign identities and invalid size without writes", async () => {
+    const old = await start();
+    expect((await practiceIntentAction(comp.slug, "end", newId(), old, 2, newId())).kind).toBe(
+      "refused",
+    );
+    expect((await practiceIntentAction(comp.slug, "end", real.id, newId(), 2, newId())).kind).toBe(
+      "refused",
+    );
+    expect((await practiceIntentAction(comp.slug, "again", real.id, old, 3, newId())).kind).toBe(
+      "refused",
+    );
+    expect(endedIds).toEqual([]);
+    expect((await practiceOf(db, comp.id))?.id).toBe(old);
+  });
+  it("refuses a non-member directly and discloses no card or lifecycle context", async () => {
+    const old = await start();
+    actingPerson = personIds[0] ?? "";
+    expect((await practiceIntentAction(comp.slug, "end", real.id, old, 2, newId())).kind).toBe(
+      "refused",
+    );
+    expect(await practiceCardView(comp.slug)).toBeNull();
+    expect(await practiceLifecycleContext(comp.slug, real.id)).toBeNull();
+    expect(endedIds).toEqual([]);
+  });
+  it("lets an appointed conductor End but never Start/Run again or read the manager card", async () => {
+    const old = await start();
+    const conductor = personIds[1];
+    if (!conductor) throw new Error("Missing conductor fixture");
+    await db.insert(orgMembers).values({ orgId, personId: conductor });
+    await db.insert(grantsTable).values({
+      id: newId(),
+      personId: conductor,
+      scopeType: "tournament",
+      scopeId: comp.id,
+      capabilitySet: "auction:conductor",
+      grantedBy: owner,
+    });
+    try {
+      actingPerson = conductor;
+      expect(await practiceCardView(comp.slug)).toBeNull();
+      expect(await practiceLifecycleContext(comp.slug, real.id)).toMatchObject({
+        personId: conductor,
+        practiceId: old,
+      });
+      expect((await practiceIntentAction(comp.slug, "start", real.id, null, 2, newId())).kind).toBe(
+        "refused",
+      );
+      expect((await practiceIntentAction(comp.slug, "again", real.id, old, 2, newId())).kind).toBe(
+        "refused",
+      );
+      expect(endedIds).toEqual([]);
+      expect((await practiceIntentAction(comp.slug, "end", real.id, old, 2, newId())).kind).toBe(
+        "accepted",
+      );
+      expect(endedIds).toEqual([old]);
+    } finally {
+      await db
+        .delete(grantsTable)
+        .where(and(eq(grantsTable.personId, conductor), eq(grantsTable.scopeId, comp.id)));
+    }
+  });
+  it("concurrent Start creates one active practice and leaves real money/history unchanged", async () => {
+    const before = await db.select().from(auctionsTable).where(eq(auctionsTable.id, real.id));
+    const money = await db.select().from(bidsTable).where(eq(bidsTable.auctionId, real.id));
+    const history = await db
+      .select()
+      .from(auctionEventsTable)
+      .where(eq(auctionEventsTable.auctionId, real.id));
+    const results = await Promise.all(
+      [1, 2].map(() => practiceIntentAction(comp.slug, "start", real.id, null, 2, newId())),
+    );
+    expect(results.filter((item) => item.kind === "accepted")).toHaveLength(1);
+    const active = await db
+      .select()
+      .from(auctionsTable)
+      .where(
+        and(
+          eq(auctionsTable.competitionId, comp.id),
+          eq(auctionsTable.kind, "practice"),
+          sql`${auctionsTable.status} <> 'abandoned'`,
+        ),
+      );
+    expect(active).toHaveLength(1);
+    expect(await db.select().from(auctionsTable).where(eq(auctionsTable.id, real.id))).toEqual(
+      before,
+    );
+    expect(await db.select().from(bidsTable).where(eq(bidsTable.auctionId, real.id))).toEqual(
+      money,
+    );
+    expect(
+      await db.select().from(auctionEventsTable).where(eq(auctionEventsTable.auctionId, real.id)),
+    ).toEqual(history);
   });
 });

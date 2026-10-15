@@ -4,6 +4,13 @@ import { z } from "zod";
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   APP_VERSION: z.string().min(1).default("dev"),
+  // UI refinement is presentation only; rollback never changes data, claims or grants.
+  /**
+   * The UI-refinement styles (pad reflow that keeps every control on a phone
+   * screen, the toast out of the Wicket button's way, live-page layout).
+   * "refined" is what was validated; "baseline" restores the old styles only.
+   */
+  UI_TREATMENT: z.enum(["baseline", "refined"]).default("refined"),
   DATABASE_URL: z.string().startsWith("postgres"),
   // Optional app-role connection for schema isolation regression checks.
   APP_DATABASE_URL: z.string().startsWith("postgres").optional(),

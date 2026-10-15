@@ -77,6 +77,7 @@ test("the founder journey: enroll passkey, sign out, passkey-only sign in", asyn
   await expect(page.getByTestId("events-panel")).toContainText("Passkey added");
 
   await page.getByRole("button", { name: "Sign out" }).click();
+  await page.getByTestId("sign-out-confirm").click();
   await expect(page).toHaveURL(/\/login/);
 
   await page.getByTestId("passkey-login").click();

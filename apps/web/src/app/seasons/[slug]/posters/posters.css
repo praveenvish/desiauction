@@ -252,13 +252,14 @@
 
   .ps-phone-bar {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--space-2);
     margin-top: var(--space-3);
   }
 
   .ps-phone-bar .ps-tab {
-    min-block-size: 40px;
+    min-block-size: 44px;
   }
 
   .ps-download-phone {
@@ -294,5 +295,16 @@
 
   .ps-swatch {
     scroll-snap-align: start;
+  }
+}
+
+.ps-layout img.poster-preview-image {
+  inline-size: min(100%, calc(72vh * var(--ps-preview-ratio)));
+  aspect-ratio: var(--ps-preview-ratio);
+}
+
+@media (max-width: 1023.98px) {
+  .ps-layout img.poster-preview-image {
+    inline-size: min(100%, calc(max(240px, calc(100svh - 345px)) * var(--ps-preview-ratio)));
   }
 }

@@ -21,11 +21,15 @@ export const metadata = { title: "Live · Platform admin" };
  * Administration watches; it cannot conduct. Every repair — pausing, closing,
  * recovering a room — happens in the organizer's cockpit, under their grants.
  */
-export default async function AdminLivePage() {
+export default async function AdminLivePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   if ((await platformAdminPageGate("live")) === null) {
     notFound();
   }
-  const board = await adminLiveBoard();
+  const board = await adminLiveBoard((await searchParams).page);
   if (board === null) {
     notFound();
   }
@@ -33,9 +37,10 @@ export default async function AdminLivePage() {
     <main className="registrations-dash">
       <div className="dash-stack admin-stack">
         <AdminPageHead readOnly>
-          Every auction running now, busiest first. Watching never touches the room.
+          Open auctions, busiest first, in pages of 50. Counts describe this page; live activity can
+          change page order. Watching never touches the room.
         </AdminPageHead>
-        <LiveBoard initial={board} />
+        <LiveBoard key={board.pagination?.page ?? 1} initial={board} />
       </div>
     </main>
   );

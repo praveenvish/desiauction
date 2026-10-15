@@ -496,3 +496,28 @@
   text-align: left;
   border-bottom: 1px solid var(--border-subtle);
 }
+
+.live-visible-freshness {
+  display: none;
+}
+[data-ui-treatment="refined"] .live-hero {
+  border-color: var(--border-strong);
+  border-inline-start: var(--space-1) solid var(--accent-line);
+  border-radius: var(--radius-xl);
+}
+[data-ui-treatment="refined"] .live-visible-freshness {
+  display: block;
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  color: var(--text-secondary);
+}
+[data-ui-treatment="refined"] .live-footer .live-updated {
+  display: none;
+}
+[data-ui-treatment="refined"] .live-panel {
+  border-radius: var(--radius-xl);
+}
+[data-ui-treatment="refined"] .live-score {
+  overflow-wrap: anywhere;
+}

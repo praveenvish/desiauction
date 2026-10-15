@@ -607,6 +607,19 @@ button.paddle-chip:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
+/* Reserve the actual wrapped notice at every width/zoom, without clipping.
+   Showing or clearing feedback must not move another held Bid target. */
+.owner-gesture-notice {
+  display: block;
+  order: 4;
+  visibility: hidden;
+  overflow-wrap: anywhere;
+}
+
+.owner-gesture-notice[data-visible="true"] {
+  visibility: visible;
+}
+
 .owner-budget b {
   font-weight: var(--font-weight-semibold);
   color: var(--text-heading);

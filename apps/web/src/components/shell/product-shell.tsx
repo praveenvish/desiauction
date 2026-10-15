@@ -1,6 +1,6 @@
 "use client";
 
-import { scoringSignOut } from "../../lib/scoring-sign-out";
+import { SignOutDialog } from "../sign-out-dialog";
 import {
   AppShell,
   Breadcrumb,
@@ -44,6 +44,7 @@ import { AdminSectionNav } from "../../app/admin/admin-section-nav";
 import { recordRecentCompetition } from "../../app/home/home-shortcuts";
 import { HAS_CASE_STUDIES } from "../../content/case-studies";
 import { LEGAL_IDENTITY } from "../../content/company";
+import { START_CLUB_LOGIN } from "../../lib/start-intent";
 import { UNREAD_CAP } from "../../lib/inbox-cap";
 import { NewsletterForm } from "../../components/marketing/newsletter-form";
 import { personContact, personLabel } from "../../lib/person-label";
@@ -344,6 +345,7 @@ export function ProductShell({
   // navigating anywhere closes it in the same render, with no effect needed to
   // notice the route changed.
   const [drawerOpenOn, setDrawerOpenOn] = useState<string | null>(null);
+  const [signOutOpen, setSignOutOpen] = useState(false);
   const drawerOpen = drawerOpenOn === pathname;
   const reportProblem = useReportProblem();
   const [titleOverride, setTitleOverride] = useState<ShellTitleOverride | null>(null);
@@ -792,7 +794,7 @@ export function ProductShell({
                 <Link className="shell-header-link" href="/login">
                   Sign in
                 </Link>
-                <Link className="shell-header-cta shell-desktop-only" href="/login">
+                <Link className="shell-header-cta shell-desktop-only" href={START_CLUB_LOGIN}>
                   Start free <IconArrowRight width={16} height={16} />
                 </Link>
               </>
@@ -1168,8 +1170,7 @@ export function ProductShell({
                       label: "Sign out",
                       danger: true,
                       onSelect: () => {
-                        track("auth.logout");
-                        void scoringSignOut(logout);
+                        setSignOutOpen(true);
                       },
                     },
                   ]}
@@ -1268,7 +1269,10 @@ export function ProductShell({
                 <button
                   type="button"
                   className="shell-drawer-link shell-drawer-danger"
-                  onClick={() => void scoringSignOut(logout)}
+                  onClick={() => {
+                    setDrawerOpenOn(null);
+                    setSignOutOpen(true);
+                  }}
                 >
                   Sign out
                 </button>
@@ -1276,6 +1280,16 @@ export function ProductShell({
             </ul>
           </Drawer>
         ) : null}
+        <SignOutDialog
+          open={signOutOpen}
+          onClose={() => {
+            setSignOutOpen(false);
+          }}
+          logout={logout}
+          onConfirm={() => {
+            track("auth.logout");
+          }}
+        />
       </ShellActionContext.Provider>
     </ShellTitleContext.Provider>
   );

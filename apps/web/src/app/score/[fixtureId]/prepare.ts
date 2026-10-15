@@ -155,8 +155,11 @@ export async function prepareMatch(
       const snapshot = await fetchPreparedSnapshot(fixtureId, fetcher);
       if (!snapshot) continue;
       if (isStopped()) throw new Error("Preparation stopped after sign-out.");
-      await bindScoringActor(snapshot.bootstrap.actorId);
-      if (isStopped()) throw new Error("Preparation stopped after sign-out.");
+      const receipt = await bindScoringActor(snapshot.bootstrap.actorId);
+      if (!receipt.valid()) throw new Error("Preparation stopped after account storage changed.");
+      // A valid initializer may acknowledge its own intentional actor purge;
+      // later stop events remain sticky for all subsequent preparation work.
+      stopped = false;
       await warmScoringShell(fetcher);
       const confirmation = await fetcher(
         snapshot.preparation === "unstarted"
@@ -181,7 +184,9 @@ export async function prepareMatch(
         bootstrap: snapshot.bootstrap,
       };
       await scoringWrite([[preparedKey(fixtureId), prepared]]);
+      if (isStopped()) throw new Error("Preparation stopped after sign-out.");
       await requestPersistentStorage();
+      if (isStopped()) throw new Error("Preparation stopped after sign-out.");
       return prepared;
     }
     throw new Error("This match restarted during preparation. Try again.");

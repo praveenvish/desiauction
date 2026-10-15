@@ -1,3 +1,4 @@
+import { boundedInsightQuery } from "../../../../../../lib/insight-navigation";
 import {
   battingStyleLabel,
   bowlingStyleLabel,
@@ -22,7 +23,7 @@ export default async function PublicInsightsPage({
   searchParams: Promise<InsightSearch>;
 }) {
   const { slug, number } = await params;
-  const query = await searchParams;
+  const query = boundedInsightQuery(await searchParams);
   const insights = await publicCricketInsights(slug, number, insightFilters(query));
   if (!insights) notFound();
   const player = await publicPlayer(slug, number);
@@ -44,12 +45,16 @@ export default async function PublicInsightsPage({
   const basePath = `/c/${encodeURIComponent(slug)}/p/${encodeURIComponent(number)}/insights`;
   return (
     <main>
-      <Link href={`/c/${encodeURIComponent(slug)}/p/${encodeURIComponent(number)}`}>
+      <Link
+        className="insight-back"
+        href={`/c/${encodeURIComponent(slug)}/p/${encodeURIComponent(number)}`}
+      >
         Back to player
       </Link>
       <h1>Player insights</h1>
       <CricketInsights
         name={player.name}
+        scope="public"
         profile={{ seed: player.registrationId, photoUrl: player.photoUrl, description }}
         {...insights}
         basePath={basePath}

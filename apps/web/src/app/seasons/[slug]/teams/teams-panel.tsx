@@ -561,7 +561,10 @@ function TeamGridCard({
           ) : null}
         </>
       ) : (
-        <ul className="tm-steps" aria-label={`${team.name}: before the auction`}>
+        <ul
+          className="tm-steps"
+          aria-label={`${team.name}: ${view.teamFormation === "auction" ? "before the auction" : "team preparation"}`}
+        >
           {steps.map((step) => (
             <li key={step.key} data-done={step.done ? "" : undefined}>
               <span className="tm-step-mark" aria-hidden>
@@ -690,6 +693,7 @@ function RosterDetail({
             </summary>
             <div className="tm-presigned-body">
               <SquadPreSign
+                formation={view.teamFormation ?? "auction"}
                 slug={slug}
                 teamId={team.id}
                 teamName={team.name}
@@ -706,16 +710,24 @@ function RosterDetail({
             icon={<IconCrown />}
             tone="gold"
             title="Captain, icons & retained"
-            description="Named before the auction — they join this squad without being bid for."
+            description={
+              view.teamFormation === "auction" || view.teamFormation === undefined
+                ? "Named before the auction — they join this squad without being bid for."
+                : "Record squad roles and marks. Match lineups are chosen separately."
+            }
           >
             <SquadPreSign
+              formation={view.teamFormation ?? "auction"}
               slug={slug}
               teamId={team.id}
               teamName={team.name}
               teamColor={team.color}
               roster={roster}
               locked={false}
-              settlesAtOpen={view.rulesSource !== null}
+              settlesAtOpen={
+                (view.teamFormation === "auction" || view.teamFormation === undefined) &&
+                view.rulesSource !== null
+              }
             />
           </SectionCard>
         )
@@ -989,14 +1001,18 @@ function RosterDetail({
                         locked={view.rulesSource?.locked ?? false}
                       />
                       <CoachEditor slug={slug} teamId={team.id} initial={team.coachName ?? ""} />
-                      <OwnerInvite
-                        slug={slug}
-                        teamId={team.id}
-                        ownerName={team.ownerName}
-                        canConduct={view.viewer.canConduct}
-                        auctionExists={view.rulesSource !== null}
-                        auctionFinished={view.rulesSource?.finished ?? false}
-                      />
+                      {view.teamFormation === "auction" || view.teamFormation === undefined ? (
+                        <OwnerInvite
+                          slug={slug}
+                          teamId={team.id}
+                          ownerName={team.ownerName}
+                          canConduct={view.viewer.canConduct}
+                          auctionExists={view.rulesSource !== null}
+                          auctionFinished={view.rulesSource?.finished ?? false}
+                        />
+                      ) : team.ownerName ? (
+                        <p>Owner: {team.ownerName}</p>
+                      ) : null}
                     </div>
                   </div>
                 </div>

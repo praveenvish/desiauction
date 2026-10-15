@@ -109,11 +109,25 @@ function Row({ season }: { season: ConductedSeason }) {
 }
 
 export function AuctioneerHome({ seasons }: { seasons: ConductedSeason[] }) {
-  const tonight = seasons.find((season) => LIVE.has(season.auctionStatus ?? "")) ?? null;
-  const queue = seasons.filter(
+  const ordered = [...seasons].sort(
+    (a, b) =>
+      Number(LIVE.has(b.auctionStatus ?? "")) - Number(LIVE.has(a.auctionStatus ?? "")) ||
+      (LIVE.has(a.auctionStatus ?? "") && LIVE.has(b.auctionStatus ?? "")
+        ? a.competitionSlug.localeCompare(b.competitionSlug)
+        : a.startsOn === b.startsOn
+          ? 0
+          : a.startsOn === null
+            ? 1
+            : b.startsOn === null
+              ? -1
+              : a.startsOn.localeCompare(b.startsOn)) ||
+      a.competitionSlug.localeCompare(b.competitionSlug),
+  );
+  const tonight = ordered.find((season) => LIVE.has(season.auctionStatus ?? "")) ?? null;
+  const queue = ordered.filter(
     (season) => season !== tonight && !OVER.has(season.auctionStatus ?? ""),
   );
-  const done = seasons.filter((season) => OVER.has(season.auctionStatus ?? ""));
+  const done = ordered.filter((season) => OVER.has(season.auctionStatus ?? ""));
 
   return (
     <>

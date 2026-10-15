@@ -134,7 +134,7 @@ test("the player desk: review in one pass, pre-sign, edit in place, export what 
   const jersey = page.getByTestId("edit-jersey-number");
   await jersey.fill("77");
   await jersey.press("Enter");
-  await expect(sheet.getByText("Saved")).toBeVisible();
+  await expect(jersey.locator("..").getByText("Saved", { exact: true })).toBeVisible();
 
   // THE DESK: one tap on "Paid".
   await page.getByTestId("sheet-tab-fee").click();

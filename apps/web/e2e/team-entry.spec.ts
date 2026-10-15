@@ -7,10 +7,16 @@ import { scoringSession, runBall, sent, readScoringFixture } from "./scoring-fix
 
 async function formationScreens(page: import("@playwright/test").Page, name: string) {
   for (const theme of ["daylight", "floodlight"]) {
-    await page.evaluate(
-      (value) => document.documentElement.setAttribute("data-theme", value),
-      theme,
-    );
+    await page.evaluate(async (value) => {
+      document.documentElement.setAttribute("data-theme", value);
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      await Promise.all(
+        document
+          .getAnimations()
+          .filter((item) => item instanceof CSSTransition)
+          .map((item) => item.finished.catch(() => undefined)),
+      );
+    }, theme);
     for (const width of [390, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
@@ -90,7 +96,9 @@ test("organizer creates team sign-ups, captain submits, approval builds squads a
     await page.getByTestId("advance-status").click();
     await expect(page.getByTestId("competition-status")).toHaveText("registration open");
     await page.goto(`${base}/teams`);
-    const link = await page.getByRole("link", { name: /^\/join\// }).getAttribute("href");
+    const link = await page
+      .getByRole("link", { name: "Open captain sign-up", exact: true })
+      .getAttribute("href");
     expect(link).toMatch(/^\/join\/[A-HJ-NP-Z2-9]{6}$/);
     for (const side of ["Entry Smashers", "Entry Panthers"]) {
       const joinResponse = await captainPage.goto(link!);
@@ -221,6 +229,7 @@ test("legacy club invitations retain account switching, acceptance and generic e
     await page.goto(`/join/${valid.token}`);
     await expect(page.getByTestId("join-card")).toContainText(org.name);
     await page.getByTestId("join-switch-account").click();
+    await page.getByTestId("sign-out-confirm").click();
     await expect(page).toHaveURL(new RegExp(`/login\\?next=.*${valid.token}`));
     await scoringSession(second, memberToken);
     await reader.goto(`/join/${valid.token}`);
