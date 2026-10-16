@@ -13,6 +13,8 @@ import { readHistory } from "./history";
 export { SyncRefusal } from "./sync-refusal";
 export { readHistory } from "./history";
 export const retryDelay = (failures: number) => Math.min(30_000, 1000 * 2 ** Math.min(failures, 5));
+/** How often a sender that believes it is offline checks again. */
+export const OFFLINE_RECHECK_MS = 5000;
 
 export async function sendBatch(
   fixtureId: string,
@@ -76,7 +78,17 @@ export function startSync(
   const isStopped = () => stopped;
   let timer: ReturnType<typeof setTimeout> | undefined;
   async function flush(keepalive = false) {
-    if (running || stopped || blocked || !target.navigator.onLine) return;
+    if (running || stopped || blocked) return;
+    if (!target.navigator.onLine) {
+      // The `online` event is the fast path, not the only one: a page opened
+      // while offline can miss it (Firefox did, in the nightly), and the queue
+      // then waited forever with the signal back. Look again until it is.
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        void flush();
+      }, OFFLINE_RECHECK_MS);
+      return;
+    }
     running = true;
     try {
       const batch = await source.batch();

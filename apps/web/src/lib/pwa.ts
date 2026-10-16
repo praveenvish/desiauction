@@ -178,11 +178,34 @@ export function useInstallOffer(): InstallOffer {
   );
 }
 
-/** Ask after an explicit match-day preparation action; refusal is recoverable. */
-export async function requestPersistentStorage(): Promise<boolean> {
+/** How long match-day preparation waits on the browser's storage answer. */
+export const PERSIST_WAIT_MS = 3000;
+
+/**
+ * Ask after an explicit match-day preparation action; refusal is recoverable.
+ *
+ * Bounded: Firefox answers `persist()` with a permission prompt and the promise
+ * stays pending until the person answers it. Unbounded, "Get ready for match
+ * day" sat on "Preparing matches…" for as long as the prompt was ignored. The
+ * match is already saved by then; the prompt stays up and its answer still
+ * counts, preparation just stops waiting for it.
+ */
+export async function requestPersistentStorage(waitMs = PERSIST_WAIT_MS): Promise<boolean> {
   try {
     const storage = navigator as { storage?: { persist?: () => Promise<boolean> } };
-    return (await storage.storage?.persist?.()) ?? false;
+    const asked = storage.storage?.persist?.();
+    if (asked === undefined) return false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const unanswered = new Promise<false>((resolve) => {
+      timer = setTimeout(() => {
+        resolve(false);
+      }, waitMs);
+    });
+    try {
+      return await Promise.race([asked.catch(() => false), unanswered]);
+    } finally {
+      clearTimeout(timer);
+    }
   } catch {
     return false;
   }
