@@ -66,6 +66,10 @@ jobs:
       OTP_PROVIDER: dev
       PLAYWRIGHT_PRECOMPILED: "1"
       NEXT_DIST_DIR: .next-e2e
+      # Canonical and OG URLs must point at the server the suite runs, or the
+      # specs that fetch them (ls1-screens, the T10 journey) hit :3000. The
+      # per-commit e2e job has had this since LS-1; the nightly lacked it.
+      PUBLIC_BASE_URL: http://localhost:3050
       ALLOW_INSECURE_LOCAL_PRODUCTION: "1"
     steps:
       - uses: actions/checkout@v4
@@ -142,6 +146,10 @@ jobs:
       OTP_PROVIDER: dev
       PLAYWRIGHT_PRECOMPILED: "1"
       NEXT_DIST_DIR: .next-e2e
+      # Canonical and OG URLs must point at the server the suite runs, or the
+      # specs that fetch them (ls1-screens, the T10 journey) hit :3000. The
+      # per-commit e2e job has had this since LS-1; the nightly lacked it.
+      PUBLIC_BASE_URL: http://localhost:3050
       ALLOW_INSECURE_LOCAL_PRODUCTION: "1"
     steps:
       - uses: actions/checkout@v4
