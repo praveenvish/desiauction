@@ -32,6 +32,13 @@ import { createHmac, timingSafeEqual } from "node:crypto";
  * and reports nothing, so a 200 tells a forger nothing a 403 would not — and a
  * proved but unreadable body (a test ping) is 200 "ignored" too. Before this,
  * the 403/400 answers made the webhook impossible to register.
+ *
+ * THE SHAPE, as the form's own preview shows it: `event_name` is a list
+ * (`["hardbounce"]`, `["fbl_compliant"]` — sic, not "complaint"),
+ * `event_message` a list of `{ email_info, event_data }`, and the address an
+ * event is ABOUT is in `event_data[].details[]` (`bounced_recipient` for a
+ * bounce, `to` for a complaint) — `email_info.to` lists every recipient of the
+ * message, so it is only the fallback.
  */
 
 /** The header a Zoho CPaaS webhook is configured to send the key in. */
@@ -157,6 +164,14 @@ function recipients(to: unknown): string[] {
   return found;
 }
 
+/** Addresses named by one `details` field — a string or a list of strings. */
+function named(details: Json[], field: string): string[] {
+  return details
+    .flatMap((d) => (Array.isArray(d[field]) ? (d[field] as unknown[]) : [d[field]]))
+    .map((value) => text(value).trim())
+    .filter((address) => address.includes("@"));
+}
+
 /** `hard bounce`, `hardbounce`, `hard_bounce` → `hardbounce`. */
 function normalise(name: string): string {
   return name.toLowerCase().replace(/[^a-z]/g, "");
@@ -185,14 +200,18 @@ export function zeptomailEventActions(payload: string): {
   for (const message of list(body["event_message"])) {
     const info = record(message["email_info"]);
     const data = list(message["event_data"]);
-    const objects = data.map((entry) => text(entry["object"]).toLowerCase());
+    const objects = data.map((entry) => normalise(text(entry["object"])));
     const details = data.flatMap((entry) => list(entry["details"]));
     const reason = details.map((d) => text(d["reason"])).find((r) => r !== "") ?? "";
     const dispatchId = text(info["client_reference"]);
     const emailRef = text(info["email_reference"]) || text(body["webhook_request_id"]);
 
-    const hard = names.includes("hardbounce");
-    const complaint = names.includes("feedbackloop") || objects.includes("fbl_complaint");
+    const hard = names.includes("hardbounce") || objects.includes("hardbounce");
+    // Zoho spells it `fbl_compliant`; the help pages say "feedback loop" and
+    // `fbl_complaint`. Any of them is a person marking our mail as spam.
+    const complaint = [...names, ...objects].some((name) =>
+      ["fblcompliant", "fblcomplaint", "feedbackloop", "fbl"].includes(name),
+    );
     if (!hard && !complaint) continue; // soft bounce, open, click: nothing to suppress
 
     const report = (event: string, recipient: string): void => {
@@ -208,7 +227,8 @@ export function zeptomailEventActions(payload: string): {
       });
     };
 
-    for (const recipient of recipients(info["to"])) {
+    const about = named(details, complaint ? "to" : "bounced_recipient");
+    for (const recipient of about.length > 0 ? about : recipients(info["to"])) {
       actions.push({
         kind: "suppress",
         recipient,

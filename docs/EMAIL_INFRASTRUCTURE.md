@@ -97,7 +97,7 @@ Names only — values live in `.env.local` (dev) and `web.env` + `runner.env`
 | `EMAIL_API_ENDPOINT` / `EMAIL_API_KEY` | web, runner | Resend — keep until cleanup |
 | `ZEPTOMAIL_API_KEY` | web, runner | the Mail Agent's Send Mail token, **without** the `Zoho-enczapikey ` prefix |
 | `ZEPTOMAIL_ENDPOINT` | web, runner | optional; unset = India, `https://cpaas.zoho.in/v1.1/email` |
-| `ZEPTOMAIL_WEBHOOK_KEY` | web | the webhook's authentication key — unset closes `/api/webhooks/zeptomail` (404) |
+| `ZEPTOMAIL_WEBHOOK_KEY` | web | the value Zoho sends in the `X-DesiAuction-Webhook-Key` header — unset closes `/api/webhooks/zeptomail` (404) |
 
 A production process **refuses to boot** without a configured mailer, and a
 named provider (`ses`/`resend`/`zeptomail`) that is half-configured is refused rather than
@@ -383,6 +383,11 @@ the same key (signatures older than 24 h are refused). **Every call is answered
 web.env disagree). A hard bounce or a feedback-loop complaint suppresses the
 address (`suppressEmailAddress`) and, when `client_reference` is present,
 reports it against the dispatch; soft bounces, opens and clicks are ignored.
+The real payload (the form's preview, 2026-10-01): `event_name` is a list —
+`["hardbounce"]`, `["softbounce"]`, `["fbl_compliant"]` (sic) — and the address
+the event is about is `event_data[].details[].bounced_recipient` (bounce) or
+`.to` (complaint); `email_info.to` lists every recipient of the message and is
+only the fallback.
 
 **Check the DNS:**
 

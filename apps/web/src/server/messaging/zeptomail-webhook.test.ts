@@ -286,3 +286,140 @@ describe("handleZeptomailWebhook — one POST, start to finish", () => {
     ).rejects.toThrow("db down");
   });
 });
+
+/** Two recipients, as in Zoho's preview — only one of them is the event's. */
+const PREVIEW_TO = [
+  { email_address: { address: "bouncerecipient@zylker.com", name: "BounceRecipient" } },
+  { email_address: { address: "testrecipient@zylker.com", name: "TestRecipient" } },
+];
+
+/**
+ * The payloads Zoho's "Add webhook" preview shows (2026-10-01), trimmed to the
+ * fields that decide anything — `event_name` a list, the address the event is
+ * about in `event_data[].details[]`.
+ */
+function previewHardBounce(clientReference?: string) {
+  return JSON.stringify({
+    event_name: ["hardbounce"],
+    event_message: [
+      {
+        email_info: {
+          ...(clientReference === undefined ? {} : { client_reference: clientReference }),
+          email_reference: "2518b.566de397c0d9ee76.m1.907867@zylker.com",
+          to: PREVIEW_TO,
+          object: "email",
+        },
+        event_data: [
+          {
+            details: [
+              {
+                reason: "relaying-issues",
+                bounced_recipient: "bouncerecipient@zylker.com",
+                diagnostic_message: "bad-mailbox",
+              },
+            ],
+            object: "hardbounce",
+          },
+        ],
+      },
+    ],
+    webhook_request_id: "2518b.566de397c0d9ee76.w1.907b4d",
+  });
+}
+
+function previewComplaint() {
+  return JSON.stringify({
+    event_name: ["fbl_compliant"],
+    event_message: [
+      {
+        email_info: {
+          email_reference: "2518b.m1.88e222@zylker.com",
+          to: PREVIEW_TO,
+          object: "email",
+        },
+        event_data: [
+          {
+            details: [
+              {
+                fblFrom: "mail.zylker.com",
+                returnPath: "bouncerecipient@zylker.com",
+                from: "webhooktest@zylker.com",
+                to: "testrecipient@zylker.com",
+              },
+            ],
+            object: "fbl_compliant",
+          },
+        ],
+      },
+    ],
+  });
+}
+
+function previewSoftBounce() {
+  return JSON.stringify({
+    event_name: ["softbounce"],
+    event_message: [
+      {
+        email_info: { email_reference: "r", to: PREVIEW_TO },
+        event_data: [{ details: [{ bounced_recipient: "x@zylker.com" }], object: "softbounce" }],
+      },
+    ],
+  });
+}
+
+describe("zeptomailEventActions — Zoho's real payloads", () => {
+  it("suppresses ONLY the bounced recipient, not every address on the message", () => {
+    const { type, actions } = zeptomailEventActions(previewHardBounce("01J9XYZ"));
+    expect(type).toBe("hardbounce");
+    expect(actions).toEqual([
+      {
+        kind: "suppress",
+        recipient: "bouncerecipient@zylker.com",
+        reason: "bounce",
+        note: "zeptomail hard bounce: relaying-issues",
+      },
+      {
+        kind: "report",
+        raw: JSON.stringify({
+          event: "bounced",
+          providerRef: "email:01J9XYZ",
+          eventId:
+            "zeptomail:2518b.566de397c0d9ee76.m1.907867@zylker.com:bounced:bouncerecipient@zylker.com",
+          recipient: "bouncerecipient@zylker.com",
+        }),
+      },
+    ]);
+    const report = actions[1];
+    expect(report?.kind === "report" ? parseEmailCallback(report.raw)?.dispatchId : null).toBe(
+      "01J9XYZ",
+    );
+  });
+
+  it("suppresses the person who complained — `fbl_compliant`, as Zoho spells it", () => {
+    const { type, actions } = zeptomailEventActions(previewComplaint());
+    expect(type).toBe("fblcompliant");
+    expect(actions).toEqual([
+      {
+        kind: "suppress",
+        recipient: "testrecipient@zylker.com",
+        reason: "complaint",
+        note: "zeptomail complaint: feedback loop",
+      },
+    ]);
+  });
+
+  it("leaves a soft bounce alone even when it names a recipient", () => {
+    expect(zeptomailEventActions(previewSoftBounce()).actions).toEqual([]);
+  });
+
+  it("is acted on end to end when the header key proves it", async () => {
+    for (const payload of [previewHardBounce(), previewComplaint()]) {
+      const d = deps();
+      expect(await handleZeptomailWebhook(payload, keyed(KEY), d)).toEqual({
+        status: 200,
+        body: { status: "suppressed" },
+      });
+      expect(d.suppress).toHaveBeenCalledTimes(1);
+    }
+  });
+});
