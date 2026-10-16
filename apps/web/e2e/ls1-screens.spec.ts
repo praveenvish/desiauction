@@ -128,7 +128,11 @@ async function capture(
       await page.screenshot({
         path: path.join(ROOT, file),
         animations: "disabled",
-        omitBackground: screen === "26-stream-overlay",
+        // A transparent capture is Chromium's alone; Firefox refuses the option
+        // ("Not implemented"), so the overlay keeps its backdrop there.
+        omitBackground:
+          screen === "26-stream-overlay" &&
+          page.context().browser()?.browserType().name() === "chromium",
       });
       captures.push({ screen, file, url: page.url(), theme, representation: "viewport" });
     }

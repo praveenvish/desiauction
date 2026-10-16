@@ -620,6 +620,9 @@ test("a full T10 match: twenty legal overs, corrections, public viewer and resul
     "href",
     liveUrl,
   );
+  // The season page writes its view into the URL after it loads; leaving
+  // before that lands makes Firefox abort the next navigation.
+  await viewer.waitForLoadState("networkidle");
   await viewer.goto(`/c/${fixture.slug}/p/LS1-Home-1`);
   const career = viewer.getByTestId("cricket-career");
   await expect(career).toBeVisible();

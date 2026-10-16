@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { createDb, grants, newId, people, sessions } from "@desiauction/db";
 import { eq } from "drizzle-orm";
 
-import { latestOtp } from "./otp";
+import { latestOtp, otpMark } from "./otp";
 
 /*
  * AC-1.2, END TO END: a superadmin suspends someone, proving it's them with a
@@ -86,9 +86,13 @@ test("a superadmin suspends, confirms it's them, lifts it, and gives a role", as
   // --- Suspend: reason, then "Confirm it's you" with a fresh code ------------
   await admin.getByTestId("admin-suspend").click();
   await admin.getByTestId("admin-reason").fill("Reported for abusive messages in a club chat");
+  // The sign-in code is still the newest until the step-up one lands.
+  const beforeStepUp = await otpMark(SUPER);
   await admin.getByTestId("admin-confirm").click();
   await expect(admin.getByRole("dialog", { name: "Confirm it's you" })).toBeVisible(COLD);
-  await admin.getByTestId("step-up-code").pressSequentially(await latestOtp(SUPER));
+  await admin
+    .getByTestId("step-up-code")
+    .pressSequentially(await latestOtp(SUPER, 15_000, beforeStepUp));
   await admin.getByTestId("step-up-confirm").click();
   await expect(admin.getByText(/is suspended and was signed out/)).toBeVisible(COLD);
   await expect(admin.getByTestId("admin-suspension")).toContainText(

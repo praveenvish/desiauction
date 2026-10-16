@@ -419,6 +419,22 @@ export async function nextBowler(page: Page, name: string) {
     .click();
   await dialog.getByRole("button", { name: `${name} to bowl`, exact: true }).click();
 }
+/**
+ * Open an exact pad address while offline. The worker answers it with the
+ * data-free shell (`/score/shell#<id>`); Chromium proves that redirect. In
+ * Firefox and WebKit Playwright's offline switch does not reach the worker's
+ * own fetch, so the server would answer instead; there the test opens the
+ * shell address the worker sends it to, and everything after still runs.
+ */
+export async function openPadOffline(page: Page, fixtureId: string, browserName: string) {
+  if (browserName === "chromium") {
+    await page.goto(`/score/${fixtureId}`);
+    await expect(page).toHaveURL(`/score/shell#${fixtureId}`);
+  } else {
+    await page.goto(`/score/shell#${fixtureId}`);
+  }
+}
+
 export async function readyOffline(page: Page, fixtureId: string) {
   await sent(page);
   await page.goto("/score");

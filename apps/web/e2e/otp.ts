@@ -32,28 +32,59 @@ import { desc, eq } from "drizzle-orm";
 const DATABASE_URL =
   process.env["DATABASE_URL"] ?? "postgres://desiauction:desiauction@localhost:5433/desiauction";
 
+/** An email address is its own inbox key: the dev mailer files the email door's codes under the address, in the same table. */
+function inboxKey(phone: string): string {
+  return phone.startsWith("+") || phone.includes("@") ? phone : `+91${phone}`;
+}
+
 /**
- * The most recent code minted for a phone.
+ * Which code is the newest for a phone right now (its row id; null: none yet).
+ * Take it BEFORE the action that sends a code and pass it to `latestOtp`, so
+ * the read waits for the new code instead of returning this one — on a slow
+ * runner the previous code was still the newest when the read ran. An id, not
+ * a time: Postgres keeps microseconds and a JS Date drops them, so "newer than
+ * this time" matched the old row itself.
+ */
+export async function otpMark(phone: string): Promise<string | null> {
+  const handle = createDb(DATABASE_URL);
+  try {
+    const [row] = await handle.db
+      .select({ id: otpInbox.id })
+      .from(otpInbox)
+      .where(eq(otpInbox.phone, inboxKey(phone)))
+      .orderBy(desc(otpInbox.createdAt))
+      .limit(1);
+    return row?.id ?? null;
+  } finally {
+    await handle.sql.end({ timeout: 5 });
+  }
+}
+
+/**
+ * The most recent code minted for a phone (with `after`, one other than that
+ * marked code).
  *
  * Polls, because the caller races the server action that mints it. Specs
  * already wait for the form to flip to its code step first — this is the
  * belt to that braces, and it turns a rare flake into a slightly slower pass.
  */
-export async function latestOtp(phone: string, timeoutMs = 5000): Promise<string> {
-  // An email address is its own inbox key: the dev mailer files the email
-  // door's codes under the address, in the same table.
-  const e164 = phone.startsWith("+") || phone.includes("@") ? phone : `+91${phone}`;
+export async function latestOtp(
+  phone: string,
+  timeoutMs = 5000,
+  after: string | null = null,
+): Promise<string> {
+  const e164 = inboxKey(phone);
   const handle = createDb(DATABASE_URL);
   const deadline = Date.now() + timeoutMs;
   try {
     for (;;) {
       const [row] = await handle.db
-        .select({ code: otpInbox.code })
+        .select({ id: otpInbox.id, code: otpInbox.code })
         .from(otpInbox)
         .where(eq(otpInbox.phone, e164))
         .orderBy(desc(otpInbox.createdAt))
         .limit(1);
-      if (row !== undefined) {
+      if (row !== undefined && row.id !== after) {
         return row.code;
       }
       if (Date.now() >= deadline) {

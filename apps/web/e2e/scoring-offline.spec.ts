@@ -15,6 +15,7 @@ import {
   scoringSession,
   committedQueue,
   persistedQueue,
+  openPadOffline,
 } from "./scoring-fixtures";
 
 test.use({ serviceWorkers: "allow" });
@@ -22,6 +23,7 @@ test.use({ serviceWorkers: "allow" });
 test("five offline balls survive a cold open and sync to the exact server sequence", async ({
   page,
   context,
+  browserName,
 }) => {
   const fixture = await seedScoringFixture();
   await startScoring(page, fixture);
@@ -34,8 +36,7 @@ test("five offline balls survive a cold open and sync to the exact server sequen
   await expect(page.getByTestId("pad-recent")).toContainText("Waiting for acceptance");
   await expect(page.getByTestId("pad-recent").locator("li")).toHaveCount(0);
   const queuedIds = await committedQueue(page, fixture.fixtureId, Array<string>(5).fill("ball"));
-  await page.goto(`/score/${fixture.fixtureId}`);
-  await expect(page).toHaveURL(`/score/shell#${fixture.fixtureId}`);
+  await openPadOffline(page, fixture.fixtureId, browserName);
   await expect(page.getByTestId("pad-score")).toHaveText("1/0");
   await expect(page.getByTestId("pad-sync")).toHaveAttribute("data-pending", "5");
   expect((await persistedQueue(page, fixture.fixtureId)).map((item) => item.event.eventId)).toEqual(
@@ -274,7 +275,14 @@ for (const theme of ["daylight", "floodlight"] as const) {
   });
 }
 
-test("missing required family assets prevent offline readiness", async ({ page, context }) => {
+test("missing required family assets prevent offline readiness", async ({
+  page,
+  context,
+  browserName,
+}) => {
+  // The worker fetches build files itself, and Playwright's routing reaches
+  // that fetch in Chromium only: elsewhere the refused file arrives anyway.
+  test.skip(browserName !== "chromium", "Playwright's routing misses the worker's fetch here");
   const fixture = await seedScoringFixture();
   await startScoring(page, fixture);
   await runBall(page);
