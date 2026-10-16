@@ -1,0 +1,17 @@
+-- ADULT, BY THE CLUB'S WORD (2026-10-04).
+--
+-- HAND-AUTHORED, like 0019 onward: the drizzle snapshots stop at 0018.
+--
+-- A face rides a public surface only when the player is known to be an adult
+-- (P0-6, DPDP §9). Until now "known" meant a date of birth, and a name-only
+-- master sheet carries none: BPL4 imported 156 players and 47 photos, and the
+-- public season page showed every one of them as initials.
+--
+-- This is the other way to know: the organizer states that the player is 18 or
+-- older — at import ("everyone in this sheet"), in bulk on the Players list, or
+-- on one player's sheet. NULL means nobody said so, and the photo stays off the
+-- public surfaces. A date of birth, when there is one, still decides on its own:
+-- a stated under-18 age is never overridden by this.
+--
+-- Who said it is in the audit log (`registration.updated` / `registration.adult_confirmed`).
+ALTER TABLE "registrations" ADD COLUMN "adult_confirmed_at" timestamp with time zone;

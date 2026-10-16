@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ButtonLink,
   EmptyState,
   IconAlert,
   IconArrowRight,
@@ -48,7 +49,8 @@ const ENDED_SHOWN = 5;
  * any sign the engine has stopped (halted, stalled watchdog, commands queuing).
  */
 export function LiveBoard({ initial }: { initial: LiveBoardView }) {
-  const fetcher = useCallback(() => adminLiveBoard(), []);
+  const page = initial.pagination?.page ?? 1;
+  const fetcher = useCallback(() => adminLiveBoard(page), [page]);
   const { data, failed, revoked } = usePolled(initial, fetcher, REFRESH_MS, true);
   const pulse = data.running.reduce((sum, row) => sum + row.bids.lastFiveMinutes, 0);
   const connected = Object.values(data.engine).reduce(
@@ -65,6 +67,27 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
 
   return (
     <>
+      <nav aria-label="Live room pages">
+        <p>Page {page} · up to 50 open rooms. Counts and engine samples cover this page.</p>
+        {page > 1 ? (
+          <ButtonLink
+            variant="secondary"
+            size="touch"
+            href={`/admin/live?page=${String(page - 1)}`}
+          >
+            Previous rooms
+          </ButtonLink>
+        ) : null}{" "}
+        {data.pagination?.hasNext ? (
+          <ButtonLink
+            variant="secondary"
+            size="touch"
+            href={`/admin/live?page=${String(page + 1)}`}
+          >
+            Next rooms
+          </ButtonLink>
+        ) : null}
+      </nav>
       <LiveFreshness
         generatedAtMs={data.generatedAtMs}
         polling={!revoked}
@@ -104,8 +127,9 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
           testId="live-engine-down"
         >
           None of the {health.asked} open {health.asked === 1 ? "room" : "rooms"} it was asked about
-          replied, so nobody can bid anywhere until it is back. The rooms themselves are intact in
-          the database. <Link href="/admin/health">Check system health</Link>
+          replied. Their engine status is unconfirmed; this does not establish whether other rooms
+          can accept bids. The room records remain intact in the database.{" "}
+          <Link href="/admin/health">Check system health</Link>
         </Notice>
       ) : null}
 
@@ -126,8 +150,8 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
             <EmptyState
               size="compact"
               headingLevel={3}
-              title="Nothing is bidding right now"
-              description={nothingBiddingLine(quiet.length, REFRESH_MS / 1000)}
+              title="Nothing is bidding on this page"
+              description={`${nothingBiddingLine(quiet.length, REFRESH_MS / 1000)} Activity can move rooms to another page.`}
             />
           </div>
         ) : (
@@ -316,7 +340,7 @@ function EngineTile({ health }: { health: ReturnType<typeof engineHealth> }) {
       icon={<IconShieldCheck />}
       concept="neutral"
       value={health.kind === "answering" ? "Answering" : <span className="admin-zero">—</span>}
-      label={health.kind === "answering" ? "Engine" : "Engine · no room open"}
+      label={health.kind === "answering" ? "Engine" : "Engine · no room on page"}
       testId="live-engine"
     />
   );

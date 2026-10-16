@@ -64,7 +64,8 @@ const columns = {
   createdAt: demoRequests.createdAt,
   contactedAt: demoRequests.contactedAt,
   outcome: demoRequests.outcome,
-  slotStart: sql<Date | null>`${demoBookings.slotStart}`.as("slot_start"),
+  // Retain the timestamp column's driver decoder through the left join.
+  slotStart: demoBookings.slotStart,
 };
 
 export async function demoQueue(): Promise<DemoQueue> {

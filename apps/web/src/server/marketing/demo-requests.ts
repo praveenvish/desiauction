@@ -24,7 +24,14 @@ export const PREFERRED_WINDOWS = [
   "weekend-evening",
   "any",
 ] as const;
-export const DEMO_SOURCES = ["schedule-demo", "pricing", "landing", "help", "other"] as const;
+export const DEMO_SOURCES = [
+  "schedule-demo",
+  "pricing",
+  "landing",
+  "help",
+  "founding-25",
+  "other",
+] as const;
 
 /**
  * WHAT THEY ASKED FOR — the SP-1 gate's only instrument (migration 0045).

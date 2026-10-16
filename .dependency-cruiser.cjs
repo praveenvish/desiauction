@@ -66,9 +66,9 @@ module.exports = {
       to: { path: "^apps/web/src/server/settlement" },
     },
     {
-      name: "admin-is-read-only",
+      name: "admin-writes-only-through-platform-ops",
       comment:
-        "PX-9: Platform Administration OBSERVES. It may not import any DOMAIN's writer, store or server actions — the modules through which every business mutation on this platform passes. Administration reads tables and certified snapshots; the day someone needs a button here, this rule fails and the conversation happens at review, not in production. (`auth/actions` is deliberately absent from this list: `currentSession` is where EVERY gate in the app — settlement's, finops' and now administration's — resolves identity, so forbidding it would forbid the gate itself. Auth's own writes are person-scoped self-service, not administration of others, and the runtime proof in admin-foundation.regression.test.ts covers what this rule cannot: it drives every admin view through a db handle that throws on insert/update/delete, so a write would fail the suite no matter which module it came through.)",
+        "AC-1.1 (replaces PX-9's admin-is-read-only): Platform Administration may not import any DOMAIN's writer, store or server actions — the modules through which every business mutation passes. When /admin needs to CHANGE something, the change is written in apps/web/src/server/platform-ops, where every writer starts at `operatorFor` (capability on the singleton scope, a step-up code on this session in the last ten minutes, and a written reason) and is proven under the production roles by posture tests. Admin pages and server/admin import platform-ops; platform-ops may import the domains. (`auth/actions` is deliberately absent from this list: `currentSession` is where EVERY gate resolves identity. The runtime proof in admin-foundation.regression.test.ts still drives every admin VIEW through a db handle that throws on insert/update/delete.)",
       severity: "error",
       from: { path: "^apps/web/src/(server|app)/admin" },
       to: {
@@ -170,11 +170,17 @@ module.exports = {
      * `apps/web/src`. It does not exist in CI, which is exactly why the heap
      * crash only ever happened to a developer and never to the gate.
      *
+     * NEXT_DIST_DIR also names retained validation/rollback builds such as
+     * `.next-ui-refined`; exclude those generated directories with the same
+     * boundary, retaining traversal of every actual source module.
+     *
      * Measured on this tree: a heap crash before, 987 modules in seconds
      * after, with `apps/web/src` coverage unchanged at 532.
      */
     exclude: {
-      path: "(^|/)(\\.next|\\.next-e2e|\\.local|dist|coverage|playwright-report|test-results)/",
+      // `.next[^/]*` also covers the per-run build dirs a parallel UI run
+      // leaves behind (`.next-ui-*`); 96 of them crashed the heap again.
+      path: "(^|/)(\\.next[^/]*|\\.local|dist|coverage|playwright-report|test-results)/",
     },
     doNotFollow: { path: "node_modules" },
     tsPreCompilationDeps: true,

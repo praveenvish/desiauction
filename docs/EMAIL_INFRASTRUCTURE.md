@@ -97,7 +97,7 @@ Names only — values live in `.env.local` (dev) and `web.env` + `runner.env`
 | `EMAIL_API_ENDPOINT` / `EMAIL_API_KEY` | web, runner | Resend — keep until cleanup |
 | `ZEPTOMAIL_API_KEY` | web, runner | the Mail Agent's Send Mail token, **without** the `Zoho-enczapikey ` prefix |
 | `ZEPTOMAIL_ENDPOINT` | web, runner | optional; unset = India, `https://cpaas.zoho.in/v1.1/email` |
-| `ZEPTOMAIL_WEBHOOK_KEY` | web | the value Zoho sends in the `X-Webhook-Key` header — unset closes `/api/webhooks/zeptomail` (404) |
+| `ZEPTOMAIL_WEBHOOK_KEY` | web | the value Zoho sends in the `X-DesiAuction-Webhook-Key` header — unset closes `/api/webhooks/zeptomail` (404) |
 
 A production process **refuses to boot** without a configured mailer, and a
 named provider (`ses`/`resend`/`zeptomail`) that is half-configured is refused rather than
@@ -359,24 +359,35 @@ exists — a retry after a lost response can send twice, as with SES.
    do not touch the SES, Resend or Zoho Mail records.
 3. Submit the account review (transactional use case — reuse the SES text).
 4. Create a Mail Agent → copy its **Send Mail token** → `ZEPTOMAIL_API_KEY`.
-5. Mail Agent → Webhooks → Configure Webhook: URL
-   `https://desiauction.in/api/webhooks/zeptomail`; **Authorization headers**:
-   key `X-Webhook-Key`, value = a random secret (`openssl rand -hex 32`) that
-   also goes into `ZEPTOMAIL_WEBHOOK_KEY`; events **Soft bounces, Hard
-   bounces, Feedback loop**. Set the key on the host and restart web BEFORE
-   pressing Verify — the route is closed (404) until it is set.
+5. Generate the webhook key, `openssl rand -hex 32`, and put it on the host
+   **first**: `sudo set-secret production ZEPTOMAIL_WEBHOOK_KEY web.env`, then
+   restart web. (Unset, the endpoint answers 404 and Zoho's "Verify" fails;
+   the production preflight also refuses a deploy without it once
+   `EMAIL_PROVIDER=zeptomail`.)
+6. Mail Agent → Webhooks → Configure Webhook: URL
+   `https://desiauction.in/api/webhooks/zeptomail`, **Authorization headers**
+   name `X-DesiAuction-Webhook-Key`, value the key from step 5; events
+   **Hard bounces** and **Feedback loop** (soft bounces are ignored anyway).
+   Verify, then Add. The Zoho CPaaS form has no "authentication key" field of
+   its own — the header IS the proof.
 
 **Webhook:** `apps/web/src/server/messaging/zeptomail-webhook.ts`. A POST is
-proved by the `X-Webhook-Key` header (constant-time compare), or by a signed
-`producer-signature` HMAC if Zoho sends one; anything else gets 403. The real
-payload (the form's preview, 2026-10-01): `event_name` is a list —
+proved by the `X-DesiAuction-Webhook-Key` header (or `Authorization: <key>` /
+`Bearer <key>`), compared in constant time, or by a
+`producer-signature: ts=…;s=<base64>;s-algorithm=HmacSHA256` HMAC keyed with
+the same key (signatures older than 24 h are refused). **Every call is answered
+200** except our own database failing (503, so Zoho retries): Zoho requires
+200 from its Verify call and from every event, so an unproved call is 200
+"ignored" — it suppresses and reports nothing — and logged at WARN as
+`zeptomail_webhook.unproved` (a real event there means the key in Zoho and in
+web.env disagree). A hard bounce or a feedback-loop complaint suppresses the
+address (`suppressEmailAddress`) and, when `client_reference` is present,
+reports it against the dispatch; soft bounces, opens and clicks are ignored.
+The real payload (the form's preview, 2026-10-01): `event_name` is a list —
 `["hardbounce"]`, `["softbounce"]`, `["fbl_compliant"]` (sic) — and the address
 the event is about is `event_data[].details[].bounced_recipient` (bounce) or
-`.to` (complaint); `email_info.to` lists every recipient and is only the
-fallback. A hard bounce or complaint suppresses that address
-(`suppressEmailAddress`) and, when `client_reference` is present, reports it
-against the dispatch; soft bounces, opens, clicks and Verify's empty post all
-get 200 and change nothing (Zoho requires 200).
+`.to` (complaint); `email_info.to` lists every recipient of the message and is
+only the fallback.
 
 **Check the DNS:**
 

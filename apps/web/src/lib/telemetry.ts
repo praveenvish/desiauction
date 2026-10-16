@@ -33,7 +33,11 @@ export type ProductEventName =
   // question "is the pricing-page CTA worth anything?" has no answer but a
   // guess, and the question "should the calendar exist at all?" has none either.
   | "demo.form_viewed"
+  // Requested is a submit attempt; response_shown observes the acknowledgement UI,
+  // including deliberate anti-abuse success responses. Neither proves a saved lead,
+  // booked appointment or measured conversion uplift.
   | "demo.requested"
+  | "demo.response_shown"
   | "demo.slot_picked"
   | "demo.confirmed"
   | "demo.cancelled"
@@ -57,7 +61,12 @@ export type ProductEventName =
   | "share.native_opened"
   | "share.video_made"
   | "share.video_shared"
-  | "share.video_saved";
+  | "share.video_saved"
+  // The installed app. `outcome` is the browser's answer to its own dialog;
+  // `from` names the door (avatar menu, account). Whether the offer is worth
+  // a menu slot is answered by these and nothing else.
+  | "app.install_prompted"
+  | "app.install_steps_opened";
 
 export type TelemetryProps = Record<string, string | number | boolean>;
 

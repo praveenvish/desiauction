@@ -80,8 +80,28 @@ try {
 // which is an independent setting from NODE_ENV.
 const PRECOMPILED = process.env["PLAYWRIGHT_PRECOMPILED"] === "1";
 
+/** Specs bound to the UI-refinement lab database (see `testIgnore`). */
+const UI_LAB_SPECS = [
+  "**/ui-admin-email-preview.spec.ts",
+  "**/ui-auction-gesture.spec.ts",
+  "**/ui-auction-money.spec.ts",
+  "**/ui-auction-recovery.spec.ts",
+  "**/ui-auction-status.spec.ts",
+  "**/ui-career-insights.spec.ts",
+  "**/ui-family-flow.spec.ts",
+  "**/ui-home-flow.spec.ts",
+  "**/ui-real-auction-recovery.spec.ts",
+  "**/ui-remaining-views.spec.ts",
+  "**/ui-season-flow.spec.ts",
+  "**/ui-timed-lobby-flow.spec.ts",
+];
+
 export default defineConfig({
   testDir: "./e2e",
+  // UI refinement's lab journeys refuse any database but its isolated lab
+  // (e2e/env.ts) and need fixtures a fresh database does not have. They run
+  // only on request; CI and the normal suite leave them out.
+  ...(process.env["UI_LAB_E2E"] === "1" ? {} : { testIgnore: UI_LAB_SPECS }),
   fullyParallel: true,
   // Local runs share one on-demand `next dev` compiler; more workers overload
   // it into moving 30s timeouts (M-IP2-4 sweep). At PX-5 the suite crossed 70
@@ -107,6 +127,18 @@ export default defineConfig({
   use: {
     // localhost (not 127.0.0.1): WebAuthn rpID must suffix-match the host.
     baseURL: "http://localhost:3050",
+    // The precompiled server is a production build, and production registers
+    // a service worker (public/sw.js). It is ALLOWED, so every spec runs the
+    // product the way a phone does, worker included.
+    //
+    // A SPEC THAT FAKES RESPONSES WITH `page.route` MUST BLOCK THE WORKER:
+    //   test.use({ serviceWorkers: "block" });
+    // In Chromium a page.route still sees requests the worker passes through,
+    // but on WebKit, once a worker controls the page, page-level routing sees
+    // none of its requests at all, and the fakes go silently unused (found by
+    // the first nightly ever to run on WebKit: lost-request and Google Drive
+    // import "failed" only because their mocks never fired).
+    serviceWorkers: "allow",
   },
   /*
    * TWO ENGINES, AND UNTIL NOW THERE WERE NONE DECLARED AT ALL.
@@ -216,7 +248,7 @@ export default defineConfig({
         NODE_OPTIONS: "--max-old-space-size=8192",
         // Its OWN build directory: sharing .next with a developer's server on
         // :3000 corrupts the webpack pack cache for both.
-        NEXT_DIST_DIR: ".next-e2e",
+        NEXT_DIST_DIR: process.env["NEXT_DIST_DIR"] ?? ".next-e2e",
         // Codes to the dev inbox, never to a real mailbox. A developer whose
         // .env.local carries live Resend credentials would otherwise have the
         // suite send actual email to test addresses on every run — and the

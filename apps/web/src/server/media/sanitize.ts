@@ -1,4 +1,9 @@
-import { MAX_IMAGE_BYTES, bytesMatchImageType, type AllowedImageType } from "@desiauction/core";
+import {
+  MAX_IMAGE_BYTES,
+  THUMB_EDGE,
+  bytesMatchImageType,
+  type AllowedImageType,
+} from "@desiauction/core";
 
 /**
  * THE UPLOAD SANITIZER — every image is re-encoded by us before anyone sees it
@@ -92,6 +97,24 @@ export async function sanitizeImage(
     // Pixel ceiling exceeded, corrupt data, or a polyglot that only LOOKS like
     // an image in its first twelve bytes.
     return { ok: false, error: NOT_AN_IMAGE };
+  }
+}
+
+/**
+ * The small copy of an already-sanitized photo (`thumbKeyOf`): the shorter edge
+ * at THUMB_EDGE, WebP. Input is OUR bytes (sanitizeImage's output), so no
+ * ceiling or magic check is repeated. Null when it cannot be made — a missing
+ * small copy only means readers fall back to the photo itself.
+ */
+export async function makeThumbnail(bytes: Buffer): Promise<Buffer | null> {
+  try {
+    const sharp = (await import("sharp")).default;
+    return await sharp(bytes, { limitInputPixels: MAX_INPUT_PIXELS })
+      .resize({ width: THUMB_EDGE, height: THUMB_EDGE, fit: "outside", withoutEnlargement: true })
+      .webp({ quality: 78 })
+      .toBuffer();
+  } catch {
+    return null;
   }
 }
 

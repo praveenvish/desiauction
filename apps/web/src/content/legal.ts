@@ -122,6 +122,10 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
       },
       { kind: "heading", level: 2, text: "Acceptable use" },
       {
+        kind: "paragraph",
+        text: "Live scores are for following matches. Using them for betting or resale is not allowed.",
+      },
+      {
         kind: "list",
         items: [
           { text: "Use the platform only for genuine tournaments and their participants." },

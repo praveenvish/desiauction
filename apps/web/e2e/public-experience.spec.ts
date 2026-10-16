@@ -1,3 +1,4 @@
+import { writeFile } from "node:fs/promises";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { latestOtp } from "./otp";
@@ -171,7 +172,32 @@ test("invalid routes render the branded 404 — no crash, no leak", async ({ pag
  *
  * A mistyped address is the commonest 404 there is.
  */
-test("a mistyped address does not make every onward link fail on the server", async ({ page }) => {
+test("a mistyped address does not make every onward link fail on the server", async ({
+  page,
+}, testInfo) => {
+  const diagnostics: unknown[] = [];
+  page.on("pageerror", (error) =>
+    diagnostics.push({ kind: "pageerror", message: error.message, stack: error.stack }),
+  );
+  page.on("console", (message) =>
+    diagnostics.push({ kind: "console", type: message.type(), text: message.text() }),
+  );
+  page.on("requestfailed", (request) =>
+    diagnostics.push({ kind: "requestfailed", url: request.url(), error: request.failure() }),
+  );
+  page.on("response", (response) =>
+    diagnostics.push({
+      kind: "response",
+      url: response.url(),
+      status: response.status(),
+      timing: response.request().timing(),
+    }),
+  );
+  await page.addInitScript(() => {
+    document.addEventListener("securitypolicyviolation", (event) =>
+      console.error("CSP diagnostic", event.violatedDirective, event.blockedURI),
+    );
+  });
   const failures: string[] = [];
   page.on("response", (response) => {
     if (response.status() >= 500) {
@@ -179,19 +205,34 @@ test("a mistyped address does not make every onward link fail on the server", as
     }
   });
 
-  // A URL matching no route at all — not one that resolves and calls notFound().
-  const response = await page.goto("/pricing/nonsense");
-  expect(response?.status()).toBe(404);
-  await expect(page.getByText("This page doesn't exist")).toBeVisible();
-  // The prefetches are fired after paint; give the router time to send them.
-  await page.waitForTimeout(2000);
+  try {
+    // A URL matching no route at all — not one that resolves and calls notFound().
+    const response = await page.goto("/pricing/nonsense");
+    expect(response?.status()).toBe(404);
+    await expect(page.getByText("This page doesn't exist")).toBeVisible();
+    // The prefetches are fired after paint; give the router time to send them.
+    await page.waitForTimeout(2000);
 
-  // And getting out is a real client-side navigation, not a fallback reload.
-  await page.getByRole("link", { name: "Get help" }).click();
-  await expect(page).toHaveURL(/\/help/);
-  await page.waitForTimeout(500);
+    // And getting out is a real client-side navigation, not a fallback reload.
+    const documentRequests: string[] = [];
+    page.on("request", (request) => {
+      if (request.isNavigationRequest() && request.frame() === page.mainFrame())
+        documentRequests.push(request.url());
+    });
+    await page.getByRole("link", { name: "Get help" }).click();
+    await expect(page).toHaveURL(/\/help/);
+    await page.waitForTimeout(500);
 
-  expect(failures, `the server failed on:\n${failures.join("\n")}`).toEqual([]);
+    expect(documentRequests, "onward navigation remains client-side").toEqual([]);
+    expect(failures, `the server failed on:\n${failures.join("\n")}`).toEqual([]);
+  } finally {
+    const diagnosticPath = testInfo.outputPath("404-diagnostics.json");
+    await writeFile(diagnosticPath, JSON.stringify(diagnostics, null, 2));
+    await testInfo.attach("404-diagnostics", {
+      path: diagnosticPath,
+      contentType: "application/json",
+    });
+  }
 });
 
 test("search is navigation only and honest about no matches", async ({ page }) => {
@@ -225,7 +266,8 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
     timeout: 30_000,
   });
   const code = await latestOtp(phone);
-  await page.getByLabel("6-digit code").fill(code);
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(code);
   await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).not.toHaveURL(/\/login/);
 }

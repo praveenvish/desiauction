@@ -230,7 +230,7 @@
 
 .my-team-stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
   gap: var(--space-2);
   margin: 0;
 }
@@ -268,7 +268,9 @@
   line-height: 1.25;
   color: var(--text-heading);
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .my-team-context {
@@ -517,4 +519,22 @@
   font-family: var(--font-text);
   font-size: var(--text-base-size);
   font-weight: var(--font-weight-semibold);
+}
+
+/* Exact financial figures must remain readable on narrow rooms and text reflow. */
+@media (max-width: 480px) {
+  .my-team-stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .my-team-stat {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  .my-team-value {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
 }

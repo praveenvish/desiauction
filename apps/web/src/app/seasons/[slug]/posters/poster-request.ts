@@ -24,7 +24,7 @@ import {
  * database or a rasterizer.
  */
 
-export const DEFAULT_POSTER_THEME: PosterTheme = "floodlight";
+export const DEFAULT_POSTER_THEME: PosterTheme = "stadium";
 export const DEFAULT_POSTER_SIZE: PosterSize = "portrait";
 export const DEFAULT_TOP_COUNT: TopBuyCount = 5;
 /** A sponsor credit is somebody's typing, drawn on a poster. Keep it a line. */

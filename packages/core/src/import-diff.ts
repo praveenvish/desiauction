@@ -29,6 +29,7 @@
  */
 
 import { attributeImportField } from "./import-attribute-field";
+import { nameKey } from "./competition";
 import type { CsvRegistrationRow } from "./registration-csv";
 import { DEFAULT_SPORT, attributeSpec, type SportPack } from "./sports";
 
@@ -315,8 +316,21 @@ export function planImportRow(
 export interface ImportDiffRow {
   line: number;
   name: string;
-  phone: string;
+  phone: string | null;
   plan: ImportRowPlan;
+}
+
+/**
+ * How a file row finds the registration it is about.
+ *
+ * By phone when it has one — the identity everything else keys on. A row with
+ * no phone is a club-only player, and the only thing a second file can find
+ * them by is their NAME, within this season. The parser refuses two phoneless
+ * rows with one name, and the server refuses a name two stored club-only
+ * players share, so this key never picks between two people.
+ */
+export function importMatchKey(row: { phone: string | null; name: string }): string {
+  return row.phone ?? `name:${nameKey(row.name)}`;
 }
 
 export interface ImportDiff {
@@ -324,16 +338,16 @@ export interface ImportDiff {
   counts: { new: number; changed: number; unchanged: number; reinstate: number };
 }
 
-/** Plan a whole file against what is already stored, keyed by normalized phone. */
+/** Plan a whole file against what is already stored, keyed by `importMatchKey`. */
 export function planImport(
   rows: readonly CsvRegistrationRow[],
-  existingByPhone: ReadonlyMap<string, ExistingRegistration>,
+  existingByKey: ReadonlyMap<string, ExistingRegistration>,
   policy: ImportPolicy,
   pack: SportPack = DEFAULT_SPORT,
 ): ImportDiff {
   const counts = { new: 0, changed: 0, unchanged: 0, reinstate: 0 };
   const planned = rows.map((row) => {
-    const plan = planImportRow(row, existingByPhone.get(row.phone) ?? null, policy, pack);
+    const plan = planImportRow(row, existingByKey.get(importMatchKey(row)) ?? null, policy, pack);
     counts[plan.kind] += 1;
     return { line: row.line, name: row.name, phone: row.phone, plan };
   });

@@ -27,7 +27,8 @@ async function readCode(page: Page, phone: string): Promise<string> {
 
 async function otpLogin(page: Page, phone: string): Promise<void> {
   await requestCode(page, phone);
-  await page.getByLabel("6-digit code").fill(await readCode(page, phone));
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(await readCode(page, phone));
   await page.getByRole("button", { name: "Verify and continue" }).click();
 }
 
@@ -104,6 +105,9 @@ test("player-shaped users reach home directly; completion meter and notification
   await expect(page.getByTestId("inbox-list")).not.toContainText("Sign-in code requested");
   const firstRow = page.getByTestId("inbox-row").first();
   await expect(firstRow).toHaveAttribute("data-unread", "true");
+  // Marking read is a server action fired on mount; reloading before it lands
+  // cancels it. The bell clears once it has been recorded.
+  await expect(page.getByTestId("shell-bell")).toHaveAttribute("data-unread", "false");
   await page.reload();
   await expect(page.getByTestId("inbox-row").first()).toHaveAttribute("data-unread", "false");
   await expect(page.getByTestId("shell-bell")).toHaveAttribute("data-unread", "false");
@@ -140,7 +144,8 @@ test("lockout: five wrong codes burn the OTP, and the screen says so instead of 
 
   // Four rejections, each counting down the rope that is left.
   for (const left of [4, 3, 2, 1]) {
-    await page.getByLabel("6-digit code").fill("000000");
+    await page.getByLabel("6-digit code").clear();
+    await page.getByLabel("6-digit code").pressSequentially("000000");
     await page.getByRole("button", { name: "Verify and continue" }).click();
     await expect(
       page.getByText(`That code isn't right. ${left} ${left === 1 ? "attempt" : "attempts"} left.`),
@@ -150,7 +155,8 @@ test("lockout: five wrong codes burn the OTP, and the screen says so instead of 
   // here and forever after — advice that could never succeed — and left the
   // user holding the CORRECT code with nothing on screen to tell them why it
   // was refused. The state is now named, and the way out is pointed at.
-  await page.getByLabel("6-digit code").fill("000000");
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially("000000");
   await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(
     page.getByText("Too many attempts on this code. Tap 'Resend code' to get a new one."),
@@ -160,7 +166,8 @@ test("lockout: five wrong codes burn the OTP, and the screen says so instead of 
   // Attempt ceiling reached: the genuine code is dead too (attack cannot
   // brute-force), and another guess is not even offered.
   await expect(page.getByRole("button", { name: "Verify and continue" })).toBeDisabled();
-  await page.getByLabel("6-digit code").fill(realCode);
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(realCode);
   await expect(page).toHaveURL(/\/login/);
 
   // The escape is real: a fresh code clears the lockout and signs in. The
@@ -171,7 +178,8 @@ test("lockout: five wrong codes burn the OTP, and the screen says so instead of 
   await expect(page.getByTestId("resend-code")).toBeEnabled({ timeout: 35_000 });
   await page.getByTestId("resend-code").click();
   await expect(page.getByTestId("login-form")).toHaveAttribute("data-locked", "false");
-  await page.getByLabel("6-digit code").fill(await readCode(page, phone));
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(await readCode(page, phone));
   await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).toHaveURL(/\/onboarding/);
 });
@@ -190,7 +198,8 @@ test("the step lives in the URL: a refresh mid-code-step keeps the number and th
   // type it into.
   await page.reload();
   await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code");
-  await page.getByLabel("6-digit code").fill(await readCode(page, phone));
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(await readCode(page, phone));
   await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).toHaveURL(/\/onboarding/);
 });
@@ -209,7 +218,8 @@ test("deep links cannot skip onboarding: a nameless account is gated on every co
   await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code", {
     timeout: 15_000,
   });
-  await page.getByLabel("6-digit code").fill(await readCode(page, phone));
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(await readCode(page, phone));
   await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).toHaveURL(/\/onboarding/);
 
@@ -256,7 +266,8 @@ test("token flows are never hijacked by onboarding, and telemetry captures the f
     await expect(pageB.getByTestId("login-form")).toHaveAttribute("data-step", "code", {
       timeout: 15_000,
     });
-    await pageB.getByLabel("6-digit code").fill(await readCode(pageB, invitee));
+    await pageB.getByLabel("6-digit code").clear();
+    await pageB.getByLabel("6-digit code").pressSequentially(await readCode(pageB, invitee));
     await pageB.getByRole("button", { name: "Verify and continue" }).click();
     await expect(pageB).toHaveURL(/\/join\//);
     await pageB.getByTestId("accept-invite").click();
@@ -306,7 +317,8 @@ test("sessions persist across reloads; a cleared session gates and returns via n
   await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code", {
     timeout: 15_000,
   });
-  await page.getByLabel("6-digit code").fill(await readCode(page, phone));
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(await readCode(page, phone));
   await page.getByRole("button", { name: "Verify and continue" }).click();
   // Named user, next honored — straight back to work, no onboarding detour.
   // /seasons is now a pure 307 forward to /tournaments (the index it was a

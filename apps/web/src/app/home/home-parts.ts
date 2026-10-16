@@ -1,3 +1,4 @@
+import { initialsOf } from "@desiauction/core/initials";
 import type { KitTone } from "@desiauction/ui";
 
 /**
@@ -92,14 +93,7 @@ export function seasonBadge(row: {
 }
 
 export function monogram(name: string): string {
-  return (
-    name
-      .trim()
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase() ?? "")
-      .join("") || "—"
-  );
+  return initialsOf(name, { words: "first-two" }) || "—";
 }
 
 /**

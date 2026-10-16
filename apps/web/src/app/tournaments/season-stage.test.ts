@@ -107,3 +107,21 @@ describe("initialsOf", () => {
     expect(initialsOf("Thane")).toBe("TH");
   });
 });
+
+describe("non-auction season formation", () => {
+  it.each(["organizer", "team_entry"] as const)(
+    "takes %s closed registration straight to matches",
+    (teamFormation) => {
+      const closed = season({ teamFormation, status: "registration_closed" });
+      expect(seasonStage(closed, today)).toBe("season");
+      expect(nextStep(closed, today)).toMatchObject({
+        label: "Build the schedule",
+        href: "/seasons/tpl-2026/fixtures",
+      });
+      expect(seasonStage(season({ teamFormation, status: "registration_open" }), today)).toBe(
+        "registration",
+      );
+      expect(seasonStage(season({ teamFormation, status: "setup" }), today)).toBe("setup");
+    },
+  );
+});

@@ -64,6 +64,7 @@ const PROD_OK: Raw = {
   // One proxy in front (Caddy): the hop the client address is read from.
   TRUSTED_PROXY_COUNT: "1",
   ENGINE_SECRET: "x".repeat(48),
+  SCORING_HANDOVER_SECRET: "h".repeat(48),
   DEMO_TOKEN_SECRET: "d".repeat(48),
   REVIEW_TOKEN_SECRET: "r".repeat(48),
   PUBLIC_BASE_URL: "https://desiauction.in",
@@ -162,6 +163,16 @@ describe("web env — production refuses every dev-only default", () => {
     // fatal. The derivation is asserted below instead.
     // PI-1 P5 (D1): bucket mode without its signer credentials must refuse.
     ["MEDIA_S3 credentials", { MEDIA_S3_BUCKET: undefined }, /MEDIA_S3_BUCKET/],
+    [
+      "SCORING_HANDOVER_SECRET missing",
+      { SCORING_HANDOVER_SECRET: undefined },
+      /SCORING_HANDOVER_SECRET/,
+    ],
+    [
+      "SCORING_HANDOVER_SECRET short",
+      { SCORING_HANDOVER_SECRET: "short" },
+      /SCORING_HANDOVER_SECRET/,
+    ],
     ["ENGINE_SECRET default", { ENGINE_SECRET: "dev-engine-secret" }, /ENGINE_SECRET/],
     ["ENGINE_SECRET short", { ENGINE_SECRET: "short-but-eight" }, /at least 32 characters/],
     ["PUBLIC_BASE_URL", { PUBLIC_BASE_URL: "http://localhost:3000" }, /localhost/],
@@ -357,5 +368,43 @@ describe("web env — values the domain already decides", () => {
      */
     const env = parseEnv(raw({ ...DEV }));
     expect(env.RP_ORIGINS).toContain("http://localhost:3050");
+  });
+});
+
+describe("Android app-link signing configuration", () => {
+  it("defaults the package and leaves the route unconfigured without fingerprints", () => {
+    const result = parseEnv(raw({ DATABASE_URL: "postgres://test:test@localhost/test" }));
+    expect(result.TWA_PACKAGE_NAME).toBe("in.desiauction.app");
+    expect(result.TWA_SHA256_FINGERPRINTS).toBeUndefined();
+  });
+  it("normalizes the configured comma-separated SHA-256 certificates", () => {
+    const fingerprint = Array(32).fill("ab").join(":");
+    expect(
+      parseEnv(
+        raw({
+          DATABASE_URL: "postgres://test:test@localhost/test",
+          TWA_PACKAGE_NAME: "in.example.scoring",
+          TWA_SHA256_FINGERPRINTS: ` ${fingerprint},${fingerprint} `,
+        }),
+      ).TWA_SHA256_FINGERPRINTS,
+    ).toEqual([fingerprint.toUpperCase(), fingerprint.toUpperCase()]);
+  });
+  it("refuses malformed certificates and package names", () => {
+    expect(() =>
+      parseEnv(
+        raw({
+          DATABASE_URL: "postgres://test:test@localhost/test",
+          TWA_SHA256_FINGERPRINTS: "not-a-certificate",
+        }),
+      ),
+    ).toThrow(/TWA_SHA256_FINGERPRINTS/);
+    expect(() =>
+      parseEnv(
+        raw({
+          DATABASE_URL: "postgres://test:test@localhost/test",
+          TWA_PACKAGE_NAME: "bad/package",
+        }),
+      ),
+    ).toThrow(/TWA_PACKAGE_NAME/);
   });
 });

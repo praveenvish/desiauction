@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, Field, Select } from "@desiauction/ui";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import {
   createCompetitionAction,
@@ -42,6 +42,7 @@ export function CreateCompetitionForm({
    */
   suggestedName?: string;
 }) {
+  const [formation, setFormation] = useState("auction");
   const [state, formAction, pending] = useActionState(createCompetitionAction, {});
   /**
    * The message goes under the control that caused it, and nowhere else.
@@ -101,20 +102,43 @@ export function CreateCompetitionForm({
         <input type="hidden" name="sport" value={sports[0]?.key ?? ""} />
       ) : null}
 
-      {/* 0091: what the auction counts in. Points leagues run the same room,
+      <Select
+        label="How will teams be formed?"
+        name="teamFormation"
+        value={formation}
+        help={
+          formation === "auction"
+            ? "Players join the pool; owners build teams in the auction."
+            : formation === "organizer"
+              ? "You assign registered players to teams before scheduling matches."
+              : "Captains submit their squads; you review each team before it joins the season."
+        }
+        onChange={(event) => {
+          setFormation(event.target.value);
+        }}
+      >
+        <option value="auction">Auction</option>
+        <option value="organizer">I'll assign</option>
+        <option value="team_entry">Teams sign up</option>
+      </Select>
+      {formation === "auction" ? (
+        <>
+          {/* 0091: what the auction counts in. Points leagues run the same room,
           but their purses are points and nothing is ever owed or settled.
           Changeable under Season details until the auction is created. */}
-      <Select
-        label="Auction currency"
-        name="auctionUnit"
-        defaultValue="inr"
-        help="Points: purses and bids are points — no money changes hands."
-        data-testid="create-auction-unit"
-      >
-        {/* rupees-always: names the rupee unit itself */}
-        <option value="inr">Rupees (₹) — real money</option>
-        <option value="points">Points — no money changes hands</option>
-      </Select>
+          <Select
+            label="Auction currency"
+            name="auctionUnit"
+            defaultValue="inr"
+            help="Points: purses and bids are points — no money changes hands."
+            data-testid="create-auction-unit"
+          >
+            {/* rupees-always: names the rupee unit itself */}
+            <option value="inr">Rupees (₹) — real money</option>
+            <option value="points">Points — no money changes hands</option>
+          </Select>
+        </>
+      ) : null}
       <Field label="Location" name="location" placeholder="e.g. Malad, Mumbai" />
       <div className="date-row">
         <Field label="Starts on" name="startsOn" type="date" />

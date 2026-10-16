@@ -24,6 +24,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { servedAsStored } from "../../lib/stored-image";
 import "./tournament-card.css";
 
 /**
@@ -165,6 +166,7 @@ export function TournamentCard({
           <Image
             className="tc-cover"
             src={coverUrl}
+            unoptimized={servedAsStored(coverUrl)}
             alt=""
             width={800}
             height={320}
@@ -195,7 +197,13 @@ export function TournamentCard({
         <div className="tc-head">
           {hasLogo ? (
             <span className="tc-crest" aria-hidden>
-              <Image src={logoUrl} alt="" width={44} height={44} />
+              <Image
+                src={logoUrl}
+                unoptimized={servedAsStored(logoUrl)}
+                alt=""
+                width={44}
+                height={44}
+              />
             </span>
           ) : null}
           <div className="tc-title-block">

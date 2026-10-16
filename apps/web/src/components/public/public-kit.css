@@ -49,8 +49,14 @@
   z-index: -1;
 }
 
+/* Blurred: the photo is the band's light and colour, not a second copy of the
+   banner. The banner itself is drawn whole and sharp in the art slot
+   (`.pk-hero-banner`), and a sharp crop of the same poster behind it read as
+   two posters fighting. Scaled so the blur's soft edge never shows. */
 .pk-hero-cover img {
   object-fit: cover;
+  filter: blur(28px) saturate(1.25);
+  transform: scale(1.12);
 }
 
 .pk-hero-cover::after {
@@ -210,6 +216,41 @@
   gap: var(--space-3);
   justify-items: center;
   min-width: 0;
+}
+
+/* The organizer's banner, uncropped: a poster is read, not tiled. Its own
+   aspect ratio decides the shape; the frame only caps how tall it may get. */
+.pk-hero-banner {
+  display: block;
+  width: 100%;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--text-primary) 14%, transparent);
+  box-shadow:
+    0 24px 60px -24px rgb(0 0 0 / 0.7),
+    0 0 0 6px color-mix(in srgb, var(--text-primary) 4%, transparent);
+  background: color-mix(in srgb, var(--surface) 70%, #000);
+  line-height: 0;
+}
+
+.pk-hero-banner img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 360px;
+  object-fit: contain;
+}
+
+/* A phone meets the banner first, short, then the copy — under two stacked
+   buttons it read as an afterthought at the bottom of the band. */
+@media (max-width: 899px) {
+  .pk-hero-art:has(.pk-hero-banner) {
+    order: -1;
+  }
+
+  .pk-hero-banner img {
+    max-height: 220px;
+  }
 }
 
 /* ------------------------------------------------------------- script tag -- */

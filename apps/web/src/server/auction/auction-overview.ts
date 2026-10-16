@@ -149,6 +149,7 @@ export async function auctionOverview(
         photoKey: shownPhotoKey,
         photoConsentAt: shownPhotoConsentAt,
         dateOfBirth: registrations.dateOfBirth,
+        adultConfirmedAt: registrations.adultConfirmedAt,
       })
       .from(lots)
       .innerJoin(registrations, eq(registrations.id, lots.registrationId))

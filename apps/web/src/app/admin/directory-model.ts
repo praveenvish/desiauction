@@ -65,13 +65,19 @@ export function userFacts(row: Pick<UserDirectoryRow, "name" | "orgs" | "seasons
 }
 
 /** A person's grants as one flag, or none. */
-export function userFlags(row: Pick<UserDirectoryRow, "activeGrants">): Flag[] {
-  return row.activeGrants > 0
-    ? [
-        {
-          label: `${String(row.activeGrants)} grant${row.activeGrants === 1 ? "" : "s"}`,
-          tone: "blue",
-        },
-      ]
-    : [];
+export function userFlags(
+  row: Pick<UserDirectoryRow, "activeGrants"> & { suspendedAt?: Date | null },
+): Flag[] {
+  return [
+    // AC-1.2: a suspended account says so first, in red, on every row.
+    ...(row.suspendedAt != null ? [{ label: "Suspended", tone: "red" as const }] : []),
+    ...(row.activeGrants > 0
+      ? [
+          {
+            label: `${String(row.activeGrants)} grant${row.activeGrants === 1 ? "" : "s"}`,
+            tone: "blue" as const,
+          },
+        ]
+      : []),
+  ];
 }

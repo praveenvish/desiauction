@@ -1,6 +1,6 @@
 "use client";
 
-import { PlayerImage } from "@desiauction/ui";
+import { PlayerImage, TeamShield, useTeamBadge } from "@desiauction/ui";
 import { useMemo } from "react";
 
 import { TeamCard, TeamGrid, teamCardInitials } from "../../../components/public/team-card";
@@ -59,6 +59,7 @@ export function SquadsView({
 }) {
   const squads = useMemo(() => groupSquads(players), [players]);
 
+  const badge = useTeamBadge();
   const cards = useMemo(() => {
     const byName = new Map(squads.map((squad) => [squad.teamName, squad.players]));
     const named = teams.map((team) => ({ team, players: byName.get(team.name) ?? [] }));
@@ -102,7 +103,16 @@ export function SquadsView({
             color: team.primaryColor,
             coachName: team.coachName,
             crest:
-              team.logoUrl === null ? undefined : (
+              team.logoUrl === null ? (
+                // 0111: the season's default team logo, or the card's initials.
+                badge === "shield" ? (
+                  <TeamShield
+                    initials={teamCardInitials(team.name)}
+                    color={team.primaryColor}
+                    size={40}
+                  />
+                ) : undefined
+              ) : (
                 // A signed storage URL, already sized by the card; next/image
                 // would add a proxy hop for a 40px crest. A file that fails
                 // falls back to the initials the card draws without one.

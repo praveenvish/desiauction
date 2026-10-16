@@ -24,6 +24,8 @@ import {
   SectionCard,
   useToast,
   VisuallyHidden,
+  TeamShield,
+  useTeamBadge,
 } from "@desiauction/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -38,7 +40,7 @@ import {
 } from "react";
 
 import { HashTabs } from "../../../../components/hash-tabs/hash-tabs";
-import { useMoney } from "../../../../components/money-unit";
+import { useMoney, useMoneyUnit } from "../../../../components/money-unit";
 import { PageTitle } from "../../../../components/shell/page-title";
 import { CrestImage } from "../../../../components/team/crest-image";
 import { formatPhone } from "../../../../lib/format-phone";
@@ -47,9 +49,10 @@ import type { TeamsWorkspaceView } from "../../../../server/competition/actions"
 import type { TeamCard } from "../../../../server/competition/team-workspace";
 import { inviteOwnerAction } from "../../../../server/auction/owner-actions";
 import { ExportDialog } from "../_players/export-dialog";
+import { BoughtByHand, PublishByHand } from "./hand-entry";
 import { RosterSheetHost, SquadPreSign } from "./squad-desk";
 import { TeamLogoUploader } from "./team-logo-uploader";
-import { captainOf, preSigned, roleMix, setupSteps, type RoleShare } from "./teams-model";
+import { captainOf, iconsOf, preSigned, roleMix, setupSteps, type RoleShare } from "./teams-model";
 
 /**
  * DA-36: ONE monogram algorithm for a team, everywhere.
@@ -147,12 +150,19 @@ function TeamGrid({
                 {view.squadMax !== undefined && view.squadMax !== null
                   ? `, squad of ${String(view.squadMax)}`
                   : ""}{" "}
-                — {locked ? "locked when the auction started." : "set in the auction's rules."}{" "}
+                —{" "}
+                {view.handEntry === "published"
+                  ? "set when the results were published."
+                  : locked
+                    ? "locked when the auction started."
+                    : "set in the auction's rules."}{" "}
                 <Link className="tm-lede-link" href={`/seasons/${slug}/auction`}>
                   Rules of the night
                   <IconArrowRight size={14} className="icon-trail" aria-hidden />
                 </Link>
               </>
+            ) : view.handEntry === "open" && view.auctionSource === "imported" ? (
+              <>No purse is set yet — you enter it when you publish the results.</>
             ) : (
               <>
                 No purse is set yet. It is chosen in{" "}
@@ -180,7 +190,13 @@ function TeamGrid({
       {/* DA-41: this screen says "add the teams that will bid" and had no concept
           of the person who bids. Before the auction exists, THE next step is
           creating it — it sets the purse and squad size, and opens owner invites. */}
-      {view.viewer.canManageTeams && view.rulesSource === null && view.teams.length > 0 ? (
+      {/* Not for a season run offline (0110): "Create the auction" refuses it,
+          and its next step is typing the results in — the band below. */}
+      {view.viewer.canManageTeams &&
+      (view.teamFormation === undefined || view.teamFormation === "auction") &&
+      view.rulesSource === null &&
+      view.auctionSource !== "imported" &&
+      view.teams.length > 0 ? (
         <section className="tm-next" data-testid="teams-owner-hint" aria-labelledby="tm-next-title">
           <span className="tm-next-icon" aria-hidden>
             <IconGavel size={22} />
@@ -194,6 +210,28 @@ function TeamGrid({
           </span>
           <ButtonLink href={`/seasons/${slug}/auction`} data-testid="teams-create-auction">
             Create the auction
+            <IconArrowRight size={16} aria-hidden />
+          </ButtonLink>
+        </section>
+      ) : null}
+
+      {/* 0105: the auction happened in a hall, not here — type the results in. */}
+      {view.handEntry === "open" && view.viewer.canSeeRoster && view.teams.length > 0 ? (
+        <PublishByHand
+          slug={slug}
+          teams={view.teams}
+          imported={view.auctionSource === "imported"}
+          suggestedPurse={view.suggestedPurse ?? null}
+        />
+      ) : null}
+      {view.handEntry === "published" ? (
+        <section className="tm-next" data-testid="hand-published">
+          <span className="tm-next-text">
+            <strong>Results published</strong>
+            <span>The squads are final. Posters and team cards now show them.</span>
+          </span>
+          <ButtonLink href={`/seasons/${slug}/posters`} data-testid="hand-make-posters">
+            Make posters
             <IconArrowRight size={16} aria-hidden />
           </ButtonLink>
         </section>
@@ -226,7 +264,9 @@ function TeamGrid({
           title="No teams yet"
           description={
             view.viewer.canManageTeams
-              ? "The auction needs at least two teams. Add the first one with “Add team” above."
+              ? view.teamFormation !== undefined && view.teamFormation !== "auction"
+                ? "Add your teams or approve captain sign-ups before building the schedule."
+                : "The auction needs at least two teams. Add the first one with “Add team” above."
               : "The organizer hasn't added any teams yet."
           }
           data-testid="teams-empty"
@@ -248,6 +288,11 @@ function TeamGrid({
 /** A team's mark: its crest, else its initials on its own colour. */
 function Crest({ team, size }: { team: TeamCard; size: "md" | "lg" }) {
   const px = size === "lg" ? 64 : 44;
+  const badge = useTeamBadge();
+  if (team.logoUrl === null && badge === "shield") {
+    // 0111: the season's default team logo.
+    return <TeamShield initials={monogram(team)} color={team.color} size={px} />;
+  }
   const mono = (
     <span
       className="tm-crest tm-crest-mono"
@@ -343,16 +388,41 @@ function TeamGridCard({
   const money = useMoney();
   const roster = team.roster;
   const captain = roster === undefined ? null : captainOf(roster);
+  const icons = roster === undefined ? [] : iconsOf(roster);
   const auctionExists = view.rulesSource !== null;
   const started = view.rulesSource?.locked ?? false;
   const full =
     team.squadMax !== undefined && team.squadMax !== null && team.squadFilled >= team.squadMax;
-  const steps = setupSteps(team, captain, auctionExists, view.viewer.canManageTeams);
-  // What can be done now: the coach is optional, and the owner waits for the auction.
+  // An offline season never gets owner invites — no auction is created in the
+  // app — so "Owner — invited once the auction exists" would wait forever.
+  const steps = setupSteps(team, captain, icons, auctionExists, view.viewer.canManageTeams).filter(
+    (step) =>
+      (view.auctionSource !== "imported" &&
+        (view.teamFormation === undefined || view.teamFormation === "auction")) ||
+      step.key !== "owner",
+  );
+  // What can be done now: the coach and icons are optional, and the owner
+  // waits for the auction.
   const stillToSet = steps.filter(
-    (step) => !step.done && step.key !== "coach" && (step.key !== "owner" || auctionExists),
+    (step) =>
+      !step.done &&
+      step.key !== "coach" &&
+      step.key !== "icon" &&
+      (step.key !== "owner" || auctionExists),
   );
   const href = `/seasons/${slug}/teams?team=${team.id}`;
+  const unitWord = useMoneyUnit() === "points" ? "points" : "prices";
+  const bought =
+    view.handEntry === "open" && roster !== undefined
+      ? roster.filter((row) => !row.isCaptain && !row.isIcon && !row.isRetained)
+      : null;
+  const handBought =
+    bought === null
+      ? null
+      : {
+          count: bought.length,
+          unpriced: bought.filter((row) => (row.handPrice ?? null) === null).length,
+        };
   return (
     <article
       className="team-card tm-card"
@@ -377,6 +447,21 @@ function TeamGridCard({
                   ? team.ownerName
                   : `Owner · ${team.ownerName}`
                 : "No owner"}
+            </span>
+          ) : handBought !== null ? (
+            // Typing results in: what this team still needs is its buys and
+            // their points, not "Ready for auction night".
+            <span
+              className="tm-card-state"
+              data-done={handBought.count > 0 && handBought.unpriced === 0 ? "" : undefined}
+              data-testid={`hand-progress-${team.id}`}
+            >
+              {own ? <span className="tm-card-yours">Your team · </span> : null}
+              {handBought.count === 0
+                ? "Add who it bought"
+                : handBought.unpriced === 0
+                  ? `${String(handBought.count)} bought · all ${unitWord} in`
+                  : `${String(handBought.count)} bought · ${String(handBought.unpriced)} without ${unitWord}`}
             </span>
           ) : (
             <span className="tm-card-state" data-done={stillToSet.length === 0 ? "" : undefined}>
@@ -453,6 +538,9 @@ function TeamGridCard({
                     <span className="tm-quiet">No captain named</span>
                   )}
                 </span>
+                {icons.length > 0 ? (
+                  <span>Icon · {icons.map((icon) => icon.name ?? "Unnamed").join(", ")}</span>
+                ) : null}
                 <span className={team.coachName === null ? "tm-quiet" : undefined}>
                   {team.coachName !== null ? `Coach · ${team.coachName}` : "No coach named"}
                 </span>
@@ -473,7 +561,10 @@ function TeamGridCard({
           ) : null}
         </>
       ) : (
-        <ul className="tm-steps" aria-label={`${team.name}: before the auction`}>
+        <ul
+          className="tm-steps"
+          aria-label={`${team.name}: ${view.teamFormation === "auction" ? "before the auction" : "team preparation"}`}
+        >
           {steps.map((step) => (
             <li key={step.key} data-done={step.done ? "" : undefined}>
               <span className="tm-step-mark" aria-hidden>
@@ -540,8 +631,34 @@ function RosterDetail({
   const captain = captainOf(roster);
   const locked = view.rulesSource?.locked ?? false;
 
+  const handCard =
+    view.handEntry === "open" && view.viewer.canSeeRoster ? (
+      <SectionCard
+        className="tm-hand-card"
+        icon={<IconGavel />}
+        title="Bought in auction"
+        description={
+          view.auctionSource === "imported"
+            ? "Search each player this team bought and type the points they went for — Enter moves to the next. Points are optional."
+            : "Auction held outside the app? Add who this team bought — points are optional."
+        }
+      >
+        <BoughtByHand
+          slug={slug}
+          teamId={team.id}
+          teamName={team.name}
+          teamColor={team.color}
+          roster={roster}
+        />
+      </SectionCard>
+    ) : null;
+  // A season run offline is here to type results in: that card leads, above
+  // the captain and icon picks.
+  const handFirst = view.auctionSource === "imported";
+
   const squadSection = (
     <div className="tm-squad-tab">
+      {handFirst ? handCard : null}
       {canManage && view.viewer.canSeeRoster ? (
         locked ? (
           /* After the lock the icons and retained are a record, not a form:
@@ -576,6 +693,7 @@ function RosterDetail({
             </summary>
             <div className="tm-presigned-body">
               <SquadPreSign
+                formation={view.teamFormation ?? "auction"}
                 slug={slug}
                 teamId={team.id}
                 teamName={team.name}
@@ -592,20 +710,30 @@ function RosterDetail({
             icon={<IconCrown />}
             tone="gold"
             title="Captain, icons & retained"
-            description="Named before the auction — they join this squad without being bid for."
+            description={
+              view.teamFormation === "auction" || view.teamFormation === undefined
+                ? "Named before the auction — they join this squad without being bid for."
+                : "Record squad roles and marks. Match lineups are chosen separately."
+            }
           >
             <SquadPreSign
+              formation={view.teamFormation ?? "auction"}
               slug={slug}
               teamId={team.id}
               teamName={team.name}
               teamColor={team.color}
               roster={roster}
               locked={false}
-              settlesAtOpen={view.rulesSource !== null}
+              settlesAtOpen={
+                (view.teamFormation === "auction" || view.teamFormation === undefined) &&
+                view.rulesSource !== null
+              }
             />
           </SectionCard>
         )
       ) : null}
+
+      {handFirst ? null : handCard}
 
       {view.viewer.canSeeRoster ? (
         <SectionCard
@@ -723,6 +851,8 @@ function RosterDetail({
                         <td className="tm-roster-price tm-num" data-label="Buy price">
                           {row.buyPrice !== undefined && row.buyPrice !== null ? (
                             money.exact(row.buyPrice)
+                          ) : row.handPrice !== undefined && row.handPrice !== null ? (
+                            money.exact(row.handPrice)
                           ) : row.isCaptain || row.isIcon || row.isRetained ? (
                             <Pill tone={row.isCaptain ? "blue" : row.isIcon ? "amber" : "purple"}>
                               {row.isCaptain ? "Captain" : row.isIcon ? "Icon" : "Retained"} ·
@@ -871,14 +1001,18 @@ function RosterDetail({
                         locked={view.rulesSource?.locked ?? false}
                       />
                       <CoachEditor slug={slug} teamId={team.id} initial={team.coachName ?? ""} />
-                      <OwnerInvite
-                        slug={slug}
-                        teamId={team.id}
-                        ownerName={team.ownerName}
-                        canConduct={view.viewer.canConduct}
-                        auctionExists={view.rulesSource !== null}
-                        auctionFinished={view.rulesSource?.finished ?? false}
-                      />
+                      {view.teamFormation === "auction" || view.teamFormation === undefined ? (
+                        <OwnerInvite
+                          slug={slug}
+                          teamId={team.id}
+                          ownerName={team.ownerName}
+                          canConduct={view.viewer.canConduct}
+                          auctionExists={view.rulesSource !== null}
+                          auctionFinished={view.rulesSource?.finished ?? false}
+                        />
+                      ) : team.ownerName ? (
+                        <p>Owner: {team.ownerName}</p>
+                      ) : null}
                     </div>
                   </div>
                 </div>

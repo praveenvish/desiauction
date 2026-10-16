@@ -17,10 +17,13 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 export type SaveState = "idle" | "saving" | "saved" | "error";
 
-export type Commit = (value: string) => Promise<{ ok: boolean; error?: string }>;
+export type Commit = (
+  value: string,
+) => Promise<{ ok: boolean; error?: string; unconfirmed?: true; notStarted?: true }>;
 
 function useCommit(commit: Commit) {
   const [state, setState] = useState<SaveState>("idle");
+  const [unconfirmed, setUnconfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fade = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -33,30 +36,67 @@ function useCommit(commit: Commit) {
     [],
   );
 
-  const run = async (value: string): Promise<boolean> => {
+  const sequence = useRef(0);
+  const active = useRef(false);
+  const uncertainValue = useRef<string | null>(null);
+  const run = async (
+    value: string,
+  ): Promise<"saved" | "rejected" | "unconfirmed" | "not-started"> => {
+    if (active.current) return "not-started";
+    if (uncertainValue.current === value) return "unconfirmed";
+    uncertainValue.current = null;
+    active.current = true;
+    const attempt = ++sequence.current;
+    if (fade.current !== null) {
+      clearTimeout(fade.current);
+      fade.current = null;
+    }
     setState("saving");
     setError(null);
-    const result = await commit(value);
+    setUnconfirmed(false);
+    let result: Awaited<ReturnType<Commit>>;
+    try {
+      result = await commit(value);
+    } catch {
+      if (attempt === sequence.current) {
+        setState("error");
+        uncertainValue.current = value;
+        setUnconfirmed(true);
+        setError("Couldn't confirm the save. Check the current value before retrying.");
+      }
+      return "unconfirmed";
+    } finally {
+      active.current = false;
+    }
+    if (attempt !== sequence.current) return "unconfirmed";
+    if (result.notStarted === true) {
+      setState("idle");
+      setError(null);
+      return "not-started";
+    }
     if (!result.ok) {
       setState("error");
       setError(result.error ?? "That could not be saved.");
-      return false;
+      if (result.unconfirmed === true) uncertainValue.current = value;
+      setUnconfirmed(result.unconfirmed === true);
+      return result.unconfirmed === true ? "unconfirmed" : "rejected";
     }
     setState("saved");
-    if (fade.current !== null) {
-      clearTimeout(fade.current);
-    }
     fade.current = setTimeout(() => {
-      setState("idle");
+      if (attempt === sequence.current) setState("idle");
     }, 1600);
-    return true;
+    return "saved";
   };
   return {
     state,
     error,
+    unconfirmed,
     run,
     clearError: () => {
       setError(null);
+      setState("idle");
+      setUnconfirmed(false);
+      uncertainValue.current = null;
     },
   };
 }
@@ -77,6 +117,23 @@ function SaveMark({ state }: { state: SaveState }) {
     );
   }
   return null;
+}
+
+function SaveRecovery() {
+  return (
+    <>
+      <span> Reloading replaces local edits with the saved record.</span>{" "}
+      <button
+        type="button"
+        className="pd-link"
+        onClick={() => {
+          window.location.reload();
+        }}
+      >
+        Reload saved record
+      </button>
+    </>
+  );
 }
 
 interface BaseProps {
@@ -112,19 +169,22 @@ export function TextSetting({
   const id = useId();
   const [draft, setDraft] = useState(value);
   const [editing, setEditing] = useState(false);
-  const { state, error, run, clearError } = useCommit(commit);
+  const skipBlur = useRef(false);
+  const { state, error, unconfirmed, run, clearError } = useCommit(commit);
   // Follow the stored value while nobody is typing into this box — a sheet
   // switched to the next player, or a refresh that brought a newer value.
   const [seen, setSeen] = useState(value);
-  if (seen !== value) {
+  if (seen !== value && !editing && state !== "saving" && state !== "error") {
     setSeen(value);
-    if (!editing) {
-      setDraft(value);
-    }
+    setDraft(value);
   }
 
   const save = async () => {
     setEditing(false);
+    if (skipBlur.current) {
+      skipBlur.current = false;
+      return;
+    }
     if (draft.trim() === value.trim()) {
       clearError();
       return;
@@ -163,6 +223,7 @@ export function TextSetting({
           }}
           onKeyDown={(event) => {
             if (event.key === "Escape") {
+              skipBlur.current = true;
               setDraft(value);
               clearError();
               event.currentTarget.blur();
@@ -191,6 +252,7 @@ export function TextSetting({
             if (event.key === "Enter") {
               event.currentTarget.blur();
             } else if (event.key === "Escape") {
+              skipBlur.current = true;
               setDraft(value);
               clearError();
               event.currentTarget.blur();
@@ -202,6 +264,7 @@ export function TextSetting({
       {error !== null ? (
         <p className="pd-setting-error" id={`${id}-error`} role="alert">
           {error}
+          {unconfirmed ? <SaveRecovery /> : null}
         </p>
       ) : hint !== undefined ? (
         <p className="pd-setting-hint" id={`${id}-hint`}>
@@ -229,9 +292,9 @@ export function SelectSetting({
 }) {
   const id = useId();
   const [shown, setShown] = useState(value);
-  const { state, error, run } = useCommit(commit);
+  const { state, error, unconfirmed, run } = useCommit(commit);
   const [seen, setSeen] = useState(value);
-  if (seen !== value) {
+  if (seen !== value && state !== "saving" && !unconfirmed) {
     setSeen(value);
     setShown(value);
   }
@@ -253,7 +316,7 @@ export function SelectSetting({
           const previous = shown;
           setShown(next);
           void run(next).then((ok) => {
-            if (!ok) {
+            if (ok === "rejected" || ok === "not-started") {
               setShown(previous);
             }
           });
@@ -274,6 +337,7 @@ export function SelectSetting({
       {error !== null ? (
         <p className="pd-setting-error" role="alert">
           {error}
+          {unconfirmed ? <SaveRecovery /> : null}
         </p>
       ) : hint !== undefined ? (
         <p className="pd-setting-hint">{hint}</p>
@@ -293,14 +357,15 @@ export function SegmentSetting({
   commit,
   disabled,
   options,
+  hint,
   testId,
-}: Omit<BaseProps, "hint" | "wide"> & {
+}: Omit<BaseProps, "wide"> & {
   options: readonly { value: string; label: string }[];
 }) {
   const [shown, setShown] = useState(value);
-  const { state, error, run } = useCommit(commit);
+  const { state, error, unconfirmed, run } = useCommit(commit);
   const [seen, setSeen] = useState(value);
-  if (seen !== value) {
+  if (seen !== value && state !== "saving" && !unconfirmed) {
     setSeen(value);
     setShown(value);
   }
@@ -330,7 +395,7 @@ export function SegmentSetting({
               const previous = shown;
               setShown(option.value);
               void run(option.value).then((ok) => {
-                if (!ok) {
+                if (ok === "rejected" || ok === "not-started") {
                   setShown(previous);
                 }
               });
@@ -343,8 +408,10 @@ export function SegmentSetting({
       {error !== null ? (
         <p className="pd-setting-error" role="alert">
           {error}
+          {unconfirmed ? <SaveRecovery /> : null}
         </p>
       ) : null}
+      {hint !== undefined && error === null ? <p className="pd-setting-hint">{hint}</p> : null}
     </div>
   );
 }

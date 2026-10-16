@@ -2,6 +2,12 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 
 import { latestOtp } from "./otp";
 
+// This spec fakes network responses with `page.route`, so the service worker
+// is blocked for it: on WebKit, once a worker controls the page, page-level
+// routing never sees the page's requests (even ones the worker passes
+// through), and the fakes would go silently unused (playwright.config.ts).
+test.use({ serviceWorkers: "block" });
+
 /*
  * THE GOOGLE ROUTE, WITHOUT GOOGLE.
  *
@@ -119,7 +125,8 @@ async function organizerWithOpenSeason(page: Page, stamp: string): Promise<void>
   await page.getByLabel("Mobile number").fill(`77${stamp}`);
   await page.getByRole("button", { name: "Send code" }).click();
   await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code", COLD);
-  await page.getByLabel("6-digit code").fill(await latestOtp(`77${stamp}`));
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(await latestOtp(`77${stamp}`));
   await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).not.toHaveURL(/\/login/, COLD);
   if (page.url().includes("/onboarding")) {
@@ -179,6 +186,8 @@ test("a Form's Google Sheet syncs players, and their photos follow in the same s
   ).toBe(1);
   await dialog.getByTestId("photo-upload-all").click();
   await expect(page.getByText("2 photos uploaded")).toBeVisible(COLD);
+  // The list stays so the faces can be checked; Done closes the step.
+  await dialog.getByTestId("photo-done").click();
 
   // --- A week later: one more registration arrives in the sheet. -----------
   rows = 3;
@@ -195,6 +204,7 @@ test("a Form's Google Sheet syncs players, and their photos follow in the same s
   await expect(dialog.getByTestId("photo-match-table")).toContainText("Drive Player 3");
   await dialog.getByTestId("photo-upload-all").click();
   await expect(page.getByText("1 photo uploaded")).toBeVisible(COLD);
+  await dialog.getByTestId("photo-done").click();
   await expect(page.getByTestId("stat-total")).toContainText("3");
 });
 
@@ -250,6 +260,15 @@ test("a downloaded Form file finds its photo question by its Drive links and con
   await expect(dialog.getByTestId("photo-match-table")).toBeVisible(COLD);
   await expect(dialog.getByTestId("photo-match-table").getByText("by Drive link")).toHaveCount(2);
   await expect(dialog.getByTestId("photo-match-table")).toContainText("File Player 1");
+  // A photo that is not wanted comes out of the batch before anything uploads.
+  await expect(dialog.getByTestId("photo-match-table").locator("tbody tr")).toHaveCount(2);
+  await dialog.getByTestId("photo-remove-1").click();
+  await expect(dialog.getByTestId("photo-match-table").locator("tbody tr")).toHaveCount(1);
   await dialog.getByTestId("photo-upload-all").click();
-  await expect(page.getByText("2 photos uploaded")).toBeVisible(COLD);
+  await expect(page.getByText("1 photo uploaded")).toBeVisible(COLD);
+  // And an uploaded one that turns out wrong comes off its player from the
+  // same list — the player is back on the "No photo" list.
+  await dialog.getByTestId("photo-remove-uploaded-0").click();
+  await expect(page.getByText(/^Photo removed from /)).toBeVisible(COLD);
+  await expect(dialog.getByTestId("photo-match-table")).toBeHidden();
 });

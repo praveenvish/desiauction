@@ -1,5 +1,5 @@
+import { imageResponse } from "../../../../server/image-text/image-response";
 import { POSTER_SIZES, type PosterKind } from "@desiauction/core";
-import { ImageResponse } from "next/og";
 
 import { posterBrandMark, type PosterResult } from "../../../../server/competition/posters";
 import { renderSpriteBands } from "./poster-card";
@@ -48,13 +48,15 @@ export async function posterResponse<TInput, TModel>(args: {
     prices: args.forcePrices ?? query.prices,
     sponsor: query.sponsor,
     shareUrl: source.shareUrl ?? null,
+    noPhoto: source.noPhoto,
+    teamBadge: source.teamBadge,
   };
   const model = args.build(source.input);
   // Without these the rupee sign rasterizes as an empty box — see poster-fonts.
   const fonts = await posterFonts();
 
   if (!query.motion) {
-    return new ImageResponse(args.draw(model, options), {
+    return await imageResponse(args.draw(model, options), {
       ...POSTER_SIZES[query.size],
       fonts,
       headers: posterHeaders(source.filename, query.download),
@@ -67,7 +69,7 @@ export async function posterResponse<TInput, TModel>(args: {
   const sprite = renderSpriteBands(args.kind, (only) => args.draw(model, only), options);
   const pngs: Buffer[] = [];
   for (const band of sprite.bands) {
-    const image = new ImageResponse(band, { width: sprite.width, height: sprite.height, fonts });
+    const image = await imageResponse(band, { width: sprite.width, height: sprite.height, fonts });
     pngs.push(Buffer.from(await image.arrayBuffer()));
   }
   const { default: sharp } = await import("sharp");

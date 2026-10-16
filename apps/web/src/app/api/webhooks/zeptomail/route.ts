@@ -13,8 +13,7 @@ import {
  * ZEPTOMAIL (ZOHO CPAAS) EVENTS — hard bounces and spam complaints for every
  * message sent through the Mail Agent (docs/EMAIL_INFRASTRUCTURE.md →
  * ZeptoMail). The SES route's twin: prove the caller before touching the
- * database, here by the `X-Webhook-Key` header (or a `producer-signature`
- * HMAC); the logic is
+ * database, here by the `producer-signature` HMAC; the logic is
  * zeptomail-webhook.ts, the database half email-events.ts.
  *
  * `ZEPTOMAIL_WEBHOOK_KEY` unset means CLOSED (404), indistinguishable from absent.
@@ -35,19 +34,26 @@ async function handle(request: Request): Promise<NextResponse> {
     return new NextResponse(null, { status: 413 });
   }
   try {
-    const headers = {
-      key: request.headers.get(ZEPTOMAIL_KEY_HEADER),
-      signature: request.headers.get("producer-signature"),
-    };
-    const result = await handleZeptomailWebhook(raw, headers, {
-      key,
-      now: () => Date.now(),
-      suppress: (action) => suppressEmailAddress(action),
-      report: (reportRaw) => ingestEmailReport(reportRaw),
-      log: (fields, message) => {
-        logger().info(fields, message);
+    const result = await handleZeptomailWebhook(
+      raw,
+      {
+        signature: request.headers.get("producer-signature"),
+        headerKey:
+          request.headers.get(ZEPTOMAIL_KEY_HEADER) ?? request.headers.get("authorization"),
       },
-    });
+      {
+        key,
+        now: () => Date.now(),
+        suppress: (action) => suppressEmailAddress(action),
+        report: (reportRaw) => ingestEmailReport(reportRaw),
+        log: (fields, message) => {
+          // Unproved is WARN: Zoho's keyless Verify is one, but a real event
+          // here means the key in Zoho and in web.env disagree.
+          if (message === "zeptomail_webhook.unproved") logger().warn(fields, message);
+          else logger().info(fields, message);
+        },
+      },
+    );
     return result.body === null
       ? new NextResponse(null, { status: result.status })
       : NextResponse.json(result.body, { status: result.status });

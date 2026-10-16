@@ -1,5 +1,7 @@
+import { seasonNoPhotoStyle } from "../../../../../server/competition/season-no-photo";
+import { seasonTeamBadge } from "../../../../../server/competition/season-team-badge";
+import { imageResponse } from "../../../../../server/image-text/image-response";
 import { monogramOf } from "@desiauction/core";
-import { ImageResponse } from "next/og";
 
 import { teamFacts } from "../../../../../lib/team-facts";
 import { inlineStoredImage, posterBrandMark } from "../../../../../server/competition/posters";
@@ -27,9 +29,13 @@ export default async function OpengraphImage({
   params: Promise<{ slug: string; team: string }>;
 }) {
   const { slug, team: teamSlug } = await params;
-  const team = await publicTeam(slug, teamSlug);
+  const [team, noPhoto, teamBadge] = await Promise.all([
+    publicTeam(slug, teamSlug),
+    seasonNoPhotoStyle(slug),
+    seasonTeamBadge(slug),
+  ]);
   if (team === null) {
-    return new ImageResponse(renderShareFallback(), { ...size });
+    return await imageResponse(renderShareFallback(), { ...size });
   }
   const facts = teamFacts(team);
   const shown = team.members.slice(0, 7);
@@ -39,7 +45,7 @@ export default async function OpengraphImage({
     posterFonts(),
     ...shown.map((member) => inlineStoredImage(member.photoKey, 96)),
   ]);
-  return new ImageResponse(
+  return await imageResponse(
     renderTeamLinkCard(
       {
         teamName: team.team.name,
@@ -55,7 +61,7 @@ export default async function OpengraphImage({
           photoUrl: photos[index] ?? null,
         })),
       },
-      { brandMarkSrc },
+      { brandMarkSrc, noPhoto, teamBadge },
     ),
     { ...size, fonts },
   );

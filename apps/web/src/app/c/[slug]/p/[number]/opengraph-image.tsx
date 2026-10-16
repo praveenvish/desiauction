@@ -1,6 +1,8 @@
+import { seasonNoPhotoStyle } from "../../../../../server/competition/season-no-photo";
+import { seasonTeamBadge } from "../../../../../server/competition/season-team-badge";
+import { imageResponse } from "../../../../../server/image-text/image-response";
 import { buildPlayerPoster, buildPlayerShareCard } from "@desiauction/core";
-import { initialsFor } from "@desiauction/ui";
-import { ImageResponse } from "next/og";
+import { initialsFor, silhouetteDataUri } from "@desiauction/ui";
 
 import { inlineStoredImage, posterBrandMark } from "../../../../../server/competition/posters";
 import { publicPlayerCard, publicPlayerPoster } from "../../../../../server/competition/public";
@@ -42,7 +44,11 @@ export default async function OpengraphImage({
   params: Promise<{ slug: string; number: string }>;
 }) {
   const { slug, number } = await params;
-  const poster = await publicPlayerPoster(slug, number);
+  const [poster, noPhoto, teamBadge] = await Promise.all([
+    publicPlayerPoster(slug, number),
+    seasonNoPhotoStyle(slug),
+    seasonTeamBadge(slug),
+  ]);
   if (poster !== null) {
     const [photoUrl, teamCrestUrl, competitionLogoUrl, brandMarkSrc, fonts] = await Promise.all([
       inlineStoredImage(poster.photoKey, 640),
@@ -57,7 +63,7 @@ export default async function OpengraphImage({
       teamCrestUrl,
       competitionLogoUrl,
     });
-    return new ImageResponse(renderPlayerLinkCard(model, { brandMarkSrc }), {
+    return await imageResponse(renderPlayerLinkCard(model, { brandMarkSrc, noPhoto, teamBadge }), {
       ...LINK_CARD_SIZE,
       fonts,
     });
@@ -68,7 +74,7 @@ export default async function OpengraphImage({
   // makes no claim about the night.
   const card = await publicPlayerCard(slug, number);
   if (card === null) {
-    return new ImageResponse(renderShareFallback(), { ...size });
+    return await imageResponse(renderShareFallback(), { ...size });
   }
   const { player } = card;
   const model = buildPlayerShareCard({
@@ -83,6 +89,13 @@ export default async function OpengraphImage({
     competitionName: player.competitionName,
   });
   const { initials } = initialsFor(player.name);
-  const photo = await inlineStoredImage(card.photoKey);
-  return new ImageResponse(renderPlayerShareCard(model, initials ?? "DA", photo), { ...size });
+  // No photo, in a season that chose the cricketer (0107): the figure takes
+  // the photo's tile, on the card's own field.
+  const photo =
+    (await inlineStoredImage(card.photoKey)) ??
+    (noPhoto === "silhouette" ? silhouetteDataUri({ field: "#141B2A", figure: "#C9D3E6" }) : null);
+  return await imageResponse(renderPlayerShareCard(model, initials ?? "DA", photo), {
+    ...size,
+    fonts: await posterFonts(),
+  });
 }

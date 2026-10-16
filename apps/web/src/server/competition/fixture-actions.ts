@@ -25,7 +25,13 @@ import { acrossOrgs, asPerson } from "../tenant";
 import { resolveMemberCompetition } from "./resolve";
 import { notifyFixtureChanged, notifySchedulePublished } from "./fixture-notify";
 import { announceChampion, finaleState, type FinaleState } from "./season-finale";
+import {
+  seasonAwardComputation,
+  persistSeasonAwards,
+  seasonAwardDisplay,
+} from "../insights/season";
 import { fixtureSnapshot } from "./fixtures";
+import type { InsightFilter } from "../insights/sample";
 import { canCompetition, requireCompetitionCapability } from "./authz";
 import {
   isResultOutcome,
@@ -1291,6 +1297,8 @@ export async function recordResultAction(
     });
     if (!result.ok) {
       const message: Record<typeof result.reason, string> = {
+        scored_match:
+          "This match has a live scorecard. Correct the scoring entries to change its result.",
         unknown_fixture: "That fixture is not in this competition.",
         not_played:
           "That match has not been played. Publish it, start it and complete it before recording a result.",
@@ -1426,6 +1434,7 @@ export async function recordLobbyResultAction(
         "That match has not been played. Publish it, start it and complete it before recording a result.",
       incomplete: "Every squad in the lobby needs a placement before this can be saved.",
       invalid_placement: "Placements run from 1 upwards, and no squad can finish below the last.",
+      scored_fixture: "This match has scoring history. Correct it in the scoring pad.",
       impossible_score: "One of those numbers is outside what this sport allows.",
     };
     return { ok: false, error: message[result.reason] };
@@ -1478,4 +1487,83 @@ export async function announceChampionAction(
   }
   revalidatePath(`/seasons/${slug}`);
   return { ok: true, told: result.told };
+}
+
+/** Member-only canonical season awards, within the resolved tenant boundary. */
+export async function seasonAwardsView(slug: string, filter: InsightFilter = {}) {
+  const session = await requireSession();
+  const competition = await resolveMemberCompetition(session.personId, slug);
+  if (!competition) return null;
+  return inCompetitionOrg(session.personId, competition, async (db) => {
+    const computation = await seasonAwardComputation(db, competition.id);
+    if (!computation) return null;
+    const filtered = Object.keys(filter).length
+      ? await seasonAwardComputation(db, competition.id, filter)
+      : computation;
+    if (!filtered) return null;
+    const display = await seasonAwardDisplay(
+      db,
+      competition.id,
+      computation.scorers.map((row) => row.personId),
+    );
+    const canManage = await canCompetition(
+      db,
+      session.personId,
+      { orgId: competition.orgId, competitionId: competition.id },
+      "fixture.manage",
+    );
+    return {
+      competition: {
+        id: competition.id,
+        name: competition.name,
+        slug: competition.slug,
+        sport: competition.sport,
+      },
+      players: filtered.players,
+      picks: computation.picks,
+      awardPlayers: computation.players,
+      scorers: computation.scorers,
+      sixes: filtered.sixes,
+      matchCount: filtered.matchCount,
+      ...display,
+      canManage,
+    };
+  });
+}
+
+/** Organizer-triggered computation shares the finale writer and durable defaults. */
+export async function computeSeasonAwardsAction(slug: string) {
+  const gate = await fixtureGate(slug);
+  if (!gate.ok) return gate;
+  await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    persistSeasonAwards(db, gate.competition.id, gate.personId),
+  );
+  revalidatePath(`/seasons/${slug}/awards`);
+  return { ok: true as const };
+}
+
+/** Kabaddi uses the same member tenant boundary with its own canonical statistics. */
+export async function raidSeasonAwardsView(slug: string) {
+  const session = await requireSession();
+  const competition = await resolveMemberCompetition(session.personId, slug);
+  if (competition?.sport !== "kabaddi") return null;
+  return inCompetitionOrg(session.personId, competition, async (db) => {
+    const { raidSeasonAwardComputation } = await import("../scoring/raid-season-awards");
+    const computation = await raidSeasonAwardComputation(db, competition.id);
+    if (!computation) return null;
+    const display = await seasonAwardDisplay(db, competition.id);
+    const canManage = await canCompetition(
+      db,
+      session.personId,
+      { orgId: competition.orgId, competitionId: competition.id },
+      "fixture.manage",
+    );
+    return {
+      players: computation.players,
+      picks: computation.picks,
+      matchCount: computation.matchCount,
+      ...display,
+      canManage,
+    };
+  });
 }

@@ -52,6 +52,12 @@ import { describeGrantTarget, parseGrantTarget } from "../src/server/admin/grant
  *   pnpm --filter @desiauction/web seed:admin -- --set platform:privacy <phone or email>
  *   pnpm --filter @desiauction/web seed:admin -- --set platform:support <phone or email>
  *   pnpm --filter @desiauction/web seed:admin -- --set platform:moderation <phone or email>
+ *   pnpm --filter @desiauction/web seed:admin -- --set platform:superadmin <phone or email>
+ *
+ * `platform:superadmin` (AC-1.1) gives and takes the other six from /admin.
+ * THIS SCRIPT is the only way to make or remove one, and it refuses to remove
+ * the last: a platform with no superadmin can still be run, but no role could
+ * ever be given again without a database console.
  */
 const SETS = [
   "platform:admin",
@@ -60,6 +66,7 @@ const SETS = [
   "platform:privacy",
   "platform:support",
   "platform:moderation",
+  "platform:superadmin",
 ] as const;
 const setFlagAt = process.argv.indexOf("--set");
 const requestedSet = setFlagAt === -1 ? "platform:admin" : process.argv[setFlagAt + 1];
@@ -145,7 +152,26 @@ async function main(): Promise<void> {
       console.log(`${person.name ?? who} does not hold ${SET}. Nothing to revoke.`);
       return;
     }
-    await db.transaction(async (tx) => {
+    const refused = await db.transaction(async (tx) => {
+      if (SET === "platform:superadmin") {
+        // Lock every live superadmin grant BEFORE counting, so two revokes
+        // run at the same moment cannot both see "one other left".
+        const live = await tx
+          .select({ id: grants.id })
+          .from(grants)
+          .where(
+            and(
+              eq(grants.scopeType, PLATFORM_SCOPE_TYPE),
+              eq(grants.scopeId, PLATFORM_SCOPE_ID),
+              eq(grants.capabilitySet, SET),
+              isNull(grants.revokedAt),
+            ),
+          )
+          .for("update");
+        if (live.length <= 1) {
+          return true;
+        }
+      }
       await tx.update(grants).set({ revokedAt: new Date() }).where(eq(grants.id, existing.id));
       await tx.insert(auditLog).values({
         id: newId(),
@@ -158,7 +184,13 @@ async function main(): Promise<void> {
         subject: person.id,
         meta: { capabilitySet: SET, domain: "platform", via: "seed:admin" },
       });
+      return false;
     });
+    if (refused) {
+      throw new Error(
+        `${person.name ?? who} is the last superadmin. Make someone else superadmin first, then revoke this one.`,
+      );
+    }
     console.log(`Revoked ${SET} from ${person.name ?? who}.`);
     return;
   }

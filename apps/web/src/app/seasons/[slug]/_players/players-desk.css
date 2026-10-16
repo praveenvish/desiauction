@@ -586,6 +586,8 @@ body:has(.pd-sheet) {
 }
 
 .pd-sheet {
+  /* Overlay help needs the secondary token to retain AA contrast in both themes. */
+  --text-muted: var(--text-secondary);
   position: fixed;
   inset-block: 0;
   inset-inline-end: 0;
@@ -942,6 +944,18 @@ body:has(.pd-sheet) {
   font-size: var(--text-xs-size);
   line-height: var(--text-xs-line);
   color: var(--danger-strong);
+}
+
+/* "Add phone" for a club-only player: the box and its button on one line. */
+.pd-add-phone {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.pd-add-phone .pd-input {
+  flex: 1;
+  min-width: 0;
 }
 
 .pd-readonly {
@@ -1312,8 +1326,9 @@ body:has(.pd-sheet) {
   inset-inline: 0;
   top: calc(100% + 4px);
   z-index: 30;
-  max-height: 280px;
+  max-height: min(360px, 55vh);
   overflow-y: auto;
+  overscroll-behavior: contain;
   margin: 0;
   padding: var(--space-1);
   list-style: none;
@@ -1345,6 +1360,29 @@ body:has(.pd-sheet) {
 .pd-picker-option[aria-selected="true"],
 .pd-picker-option:hover {
   background: var(--surface-sunken);
+}
+
+.pd-picker-count {
+  position: sticky;
+  top: calc(-1 * var(--space-1));
+  z-index: 1;
+  margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-1)) var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-overlay);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+/* On another team, or pre-signed: listed so the organiser sees where they are,
+   but not pickable — nobody joins two squads. */
+.pd-picker-option[data-blocked="true"] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.pd-picker-option[data-blocked="true"]:hover {
+  background: none;
 }
 
 .pd-picker-empty {
@@ -1514,4 +1552,33 @@ body:has(.pd-sheet) {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+.pd-write-fields {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.pd-presign > .pd-write-fields {
+  display: grid;
+  grid-template-columns: inherit;
+  gap: inherit;
+  grid-column: 1 / -1;
+}
+.pd-presign > [role="status"],
+.pd-presign > [role="alert"] {
+  grid-column: 1 / -1;
+}
+
+.pd-sheet-panel[hidden] {
+  display: none;
+}
+
+/* Selected-row tint needs readable secondary information in both themes. */
+.pd-row[data-cursor="true"],
+.pd-row[data-selected="true"],
+.pd-row[data-open="true"] {
+  --text-muted: var(--text-secondary);
 }

@@ -19,8 +19,16 @@ f9772d26b7e72f5b4dadb87f4c30d513fbd1bf63:apps/web/src/server/seo/indexnow.test.t
 f9772d26b7e72f5b4dadb87f4c30d513fbd1bf63:apps/web/src/server/seo/indexnow.test.ts:generic-api-key:38
 f9772d26b7e72f5b4dadb87f4c30d513fbd1bf63:apps/web/src/server/seo/indexnow.test.ts:generic-api-key:45
 
+# LS-1 plan prose, not credentials: a sentence about the stream overlay's
+# polling and its boundary stings matches the generic key pattern (a long
+# slash-joined word after a comma). The third entry is this comment's own
+# first wording, which quoted that sentence.
+bd4e1c62bc631ee0641f955d534627af464863a5:docs/product/LS-1/exec/EXEC-LOG.md:generic-api-key:1116
+051c0c747197e1c7ac4893fc615f49588c7d98f5:docs/product/LS-1/exec/02-commits.md:generic-api-key:1017
+2da2da6aa42a41a0fb5a17338a4c32b948f4a438:.gitleaksignore:generic-api-key:22
+
 # A deliberately WRONG webhook key in the ZeptoMail webhook test (PR #186,
-# first commit): the value the 403 case sends, never a real credential. The
+# first commit): the value the wrong-key case sends, never a real credential. The
 # test now builds that value at runtime; this entry only stops the scanner
 # re-flagging the commit that had it as a literal.
 ee9a0b0561ac1d060bdf69f3abd89399f9398a65:apps/web/src/server/messaging/zeptomail-webhook.test.ts:generic-api-key:255

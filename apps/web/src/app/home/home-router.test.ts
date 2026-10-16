@@ -123,3 +123,21 @@ describe("the organize door", () => {
     expect(homeSections({ ...NOBODY, plays: true, manages: true })).toContain("player");
   });
 });
+
+it("actual scorer, manager, finance and operator duties compose without the newcomer or member dashboard", () => {
+  expect(
+    homeSections({
+      ...NOBODY,
+      belongsToClub: true,
+      scores: true,
+      managesTeam: true,
+      finance: true,
+      operator: true,
+      hasDocuments: true,
+    }),
+  ).toEqual(["scorer", "manager", "finance", "operator", "documents"]);
+  for (const key of ["scores", "managesTeam", "finance", "operator", "hasDocuments"] as const) {
+    expect(homeSections({ ...NOBODY, [key]: true })).not.toContain("newcomer");
+    expect(homeSections({ ...NOBODY, belongsToClub: true, [key]: true })).not.toContain("member");
+  }
+});

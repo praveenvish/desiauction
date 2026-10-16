@@ -96,10 +96,13 @@ export function ConductorDesk({
   action,
   stale,
   pending,
+  isPending = (key) => pending === key,
+  isBlocked = () => false,
   canOverride,
   undoable,
   gavelRef,
   controls,
+  practice = false,
 }: {
   roles: readonly { key: string; label: string }[];
   snapshot: AuctionSnapshot | null;
@@ -114,11 +117,19 @@ export function ConductorDesk({
   action: DeskAction;
   stale: boolean;
   pending: string | null;
+  isPending?: (key: string) => boolean;
+  isBlocked?: (key: string) => boolean;
   canOverride: boolean;
   /** There is a result the engine can reverse (the snapshot's last outcome). */
   undoable: boolean;
   gavelRef: Ref<GavelHandle>;
   controls: DeskControls;
+  /**
+   * A practice auction (0101) ends by "End practice", never by completing —
+   * completing is what sends the results. `controls.complete` is wired to the
+   * ending by the panel; this only says so in the words.
+   */
+  practice?: boolean;
 }) {
   const money = useMoney();
   const unit = useMoneyUnit();
@@ -135,10 +146,17 @@ export function ConductorDesk({
   // price row that names it in full.
   const shortOf = (teamName: string) =>
     teams.find((team) => team.name === teamName)?.shortName ?? teamName.split(" ")[0] ?? teamName;
-  const words = deskActionWords(action, {
-    amount: (value) => cardAmount(unit, value),
-    teamLabel: shortOf,
-  });
+  const words =
+    practice && action.kind === "complete"
+      ? {
+          label: "End practice",
+          shortLabel: "End practice",
+          why: "Every practice player has been called. End it, or run it again from the auction page.",
+        }
+      : deskActionWords(action, {
+          amount: (value) => cardAmount(unit, value),
+          teamLabel: shortOf,
+        });
   const claimed = (snapshot?.paddles ?? []).filter((paddle) => !paddle.released);
   // The clock runs against the window the lot is actually on: an extended lot
   // restarts on the anti-snipe clock, not the opening one.
@@ -256,6 +274,8 @@ export function ConductorDesk({
             shortLabel={words.shortLabel}
             stale={stale}
             pending={pending}
+            isPending={isPending}
+            isBlocked={isBlocked}
             gavelRef={gavelRef}
             resetKey={gavelResetKey(lot)}
             controls={controls}
@@ -266,8 +286,8 @@ export function ConductorDesk({
                 type="button"
                 className="desk-chip"
                 onClick={controls.pause}
-                disabled={stale || pending === "pause"}
-                aria-busy={pending === "pause" || undefined}
+                disabled={stale || isPending("pause") || isBlocked("pause")}
+                aria-busy={isPending("pause") || undefined}
                 data-testid="cockpit-pause"
               >
                 <IconPause size={18} weight="fill" aria-hidden />
@@ -280,8 +300,8 @@ export function ConductorDesk({
                 type="button"
                 className="desk-chip"
                 onClick={controls.freeze}
-                disabled={stale || pending === "freeze"}
-                aria-busy={pending === "freeze" || undefined}
+                disabled={stale || isPending("freeze") || isBlocked("freeze")}
+                aria-busy={isPending("freeze") || undefined}
                 data-testid="cockpit-freeze"
               >
                 <IconLock size={18} aria-hidden />
@@ -301,7 +321,7 @@ export function ConductorDesk({
                         testId: "cockpit-queue-lots",
                         onSelect: controls.queueLots,
                         disabled: stale,
-                        busy: pending === "queue",
+                        busy: isPending("queue"),
                       },
                     ]),
                 ...(canOverride
@@ -326,17 +346,20 @@ export function ConductorDesk({
                   testId: "cockpit-recover",
                   onSelect: controls.recover,
                   disabled: stale,
-                  busy: pending === "recover",
+                  busy: isPending("recover"),
                   grave: true,
                 },
                 {
                   key: "complete",
-                  group: "Close the night",
-                  label: "Complete auction",
-                  detail: "Asks first. Cannot be undone",
+                  group: practice ? "Finish the practice" : "Close the night",
+                  label: practice ? "End practice" : "Complete auction",
+                  detail: practice
+                    ? "Everyone goes back to the real auction's waiting room"
+                    : "Asks first. Cannot be undone",
                   testId: "cockpit-complete",
                   onSelect: controls.complete,
-                  disabled: stale,
+                  disabled: stale || isBlocked("complete"),
+                  busy: isPending("complete"),
                   grave: true,
                 },
               ]}
@@ -675,6 +698,8 @@ function PrimaryAction({
   shortLabel,
   stale,
   pending,
+  isPending = (key) => pending === key,
+  isBlocked = () => false,
   gavelRef,
   resetKey,
   controls,
@@ -684,6 +709,8 @@ function PrimaryAction({
   shortLabel: string;
   stale: boolean;
   pending: string | null;
+  isPending?: (key: string) => boolean;
+  isBlocked?: (key: string) => boolean;
   gavelRef: Ref<GavelHandle>;
   /** `gavelResetKey(lot)`: a new bid mid-hold aborts the hold. */
   resetKey: string;
@@ -708,14 +735,14 @@ function PrimaryAction({
         label={words}
         holdingLabel="Keep holding…"
         icon={<IconGavel size={24} weight="fill" />}
-        disabled={stale || pending === "close-lot"}
+        disabled={stale || isPending("close-lot") || isBlocked("close-lot")}
         resetKey={resetKey}
         onConfirm={controls.gavel}
       />
     );
   }
   const key = PENDING_KEY[action.kind];
-  const busy = key !== undefined && pending === key;
+  const busy = key !== undefined && isPending(key);
   return (
     <button
       type="button"
@@ -723,7 +750,9 @@ function PrimaryAction({
       data-kind={action.kind}
       data-testid={PRIMARY_TEST_ID[action.kind]}
       onClick={action.kind === "complete" ? controls.complete : controls.primary}
-      disabled={stale || busy || action.kind === "connecting"}
+      disabled={
+        stale || busy || (key !== undefined && isBlocked(key)) || action.kind === "connecting"
+      }
       aria-busy={busy || undefined}
     >
       {PRIMARY_ICON[action.kind] === undefined ? null : (

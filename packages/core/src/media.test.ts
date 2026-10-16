@@ -4,8 +4,10 @@ import {
   MAX_IMAGE_BYTES,
   deriveMediaKey,
   isAllowedImageType,
+  isStoredMediaKey,
   isValidMediaKey,
   mediaKeyBelongsTo,
+  thumbKeyOf,
   validateUpload,
 } from "./media";
 
@@ -114,5 +116,27 @@ describe("mediaKeyBelongsTo (S2 — attach binding)", () => {
   it("REJECTS a malformed key regardless of target", () => {
     expect(mediaKeyBelongsTo(`org/${ORG}/team/${SUBJ}/../../x`, target)).toBe(false);
     expect(mediaKeyBelongsTo("", target)).toBe(false);
+  });
+});
+
+describe("thumbKeyOf / isStoredMediaKey — the player photo's 256px copy", () => {
+  const ID = "01HZX5Q8Y3J0K4M6N7P8R9S0TA";
+  const photo = `org/${ID}/player/${ID}/${ID}.jpg`;
+  const small = `org/${ID}/player/${ID}/${ID}-256.webp`;
+
+  it("derives the small copy for a player photo only", () => {
+    expect(thumbKeyOf(photo)).toBe(small);
+    expect(thumbKeyOf(`org/${ID}/player/${ID}/${ID}.png`)).toBe(small);
+    expect(thumbKeyOf(`org/${ID}/team/${ID}/${ID}.png`)).toBeNull();
+    expect(thumbKeyOf(small)).toBeNull();
+    expect(thumbKeyOf("../etc/passwd")).toBeNull();
+  });
+
+  it("lets the server touch the small copy, never lets a client name one", () => {
+    expect(isStoredMediaKey(photo)).toBe(true);
+    expect(isStoredMediaKey(small)).toBe(true);
+    expect(isValidMediaKey(small)).toBe(false);
+    expect(isStoredMediaKey(`org/${ID}/team/${ID}/${ID}-256.webp`)).toBe(false);
+    expect(isStoredMediaKey(`org/${ID}/player/${ID}/../${ID}-256.webp`)).toBe(false);
   });
 });

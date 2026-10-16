@@ -21,6 +21,13 @@ import type { SecurityAction } from "../server/auth/security-actions";
  * missing label a type error at the point the event is invented.
  */
 const PERSON_EVENT_LABELS = {
+  "match.toss_reminder": "The toss has happened",
+  "match.result_published": "Your match result is ready",
+  "match.award_won": "You received a match award",
+  "player.claim_invited": "Sign in to see your match stats",
+  "player.claim_offered": "A scorer thinks you played as their guest — is it you?",
+  "match.confirm_requested": "Please confirm the match result",
+  "match.quiet": "Scoring has gone quiet — check on your live match",
   "auth.login.otp": "Signed in with a one-time code",
   "auth.login.email": "Signed in with a code sent to your email",
   // The FIRST line of an email-anchored account's ledger. Deliberately not
@@ -75,6 +82,7 @@ const PERSON_EVENT_LABELS = {
   "profile.player.updated": "Player profile updated",
   "privacy.erasure.requested": "You asked for your account to be deleted",
   "privacy.erasure.withdrawn": "You withdrew your account deletion request",
+  "auth.login.refused_suspended": "A sign-in was refused because the account is suspended",
 } satisfies Record<SecurityAction, string>;
 
 /**

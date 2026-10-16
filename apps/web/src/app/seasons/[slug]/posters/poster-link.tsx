@@ -1,10 +1,17 @@
 import type { PlayerPoster } from "@desiauction/core";
 
-import { mix, withAlpha } from "./poster-color";
+import { mix, WHITE, withAlpha } from "./poster-color";
 import { Backlight, Coin, Number3D, Portrait, depthFor, metalText } from "./poster-depth";
 import { DISPLAY, FIGURES, SERIF } from "./poster-fonts";
-import { BrandLockup, contextFor, vis, type PosterRenderOptions } from "./poster-kit";
-import { CAPS, ITALIC, ResultPanel, fit, type PanelMetrics } from "./poster-player";
+import {
+  BrandLockup,
+  contextFor,
+  noPhotoFigure,
+  silhouetteFor,
+  vis,
+  type PosterRenderOptions,
+} from "./poster-kit";
+import { CAPS, ITALIC, ResultPanel, displayLine, fit, type PanelMetrics } from "./poster-player";
 
 /**
  * THE LINK CARD — the player poster, laid landscape for a link preview.
@@ -36,7 +43,7 @@ const PANEL: PanelMetrics = {
 
 export function renderPlayerLinkCard(
   model: PlayerPoster,
-  options: Pick<PosterRenderOptions, "brandMarkSrc">,
+  options: Pick<PosterRenderOptions, "brandMarkSrc" | "noPhoto" | "teamBadge">,
 ) {
   const ctx = contextFor(
     {
@@ -47,14 +54,21 @@ export function renderPlayerLinkCard(
       brandMarkSrc: options.brandMarkSrc,
       prices: true,
       sponsor: null,
+      ...(options.noPhoto === undefined ? {} : { noPhoto: options.noPhoto }),
+      ...(options.teamBadge === undefined ? {} : { teamBadge: options.teamBadge }),
     },
     model.teamColor,
   );
+  const photo = model.photoUrl ?? noPhotoFigure(ctx);
   const { palette } = ctx.skin;
   const depth = depthFor(ctx.skin);
   const { width, height } = LINK_CARD_SIZE;
   const column = { left: 560, width: width - 560 - 60 };
-  const lastSize = fit(model.lastName.toUpperCase(), column.width, CAPS, 128, 64);
+  const last = displayLine(
+    model.lastName,
+    fit(model.lastName.toUpperCase(), column.width, CAPS, 128, 64),
+  );
+  const lastSize = last.fontSize;
   const firstSize =
     model.firstName === null ? 0 : fit(model.firstName, column.width, ITALIC, 64, 36);
   // The panel sits on the foot of the card; its top is measured from there.
@@ -74,7 +88,7 @@ export function renderPlayerLinkCard(
       }}
     >
       <Backlight ctx={ctx} depth={depth} centerX={280} centerY={300} radius={300} />
-      {model.photoUrl === null ? (
+      {photo === null ? (
         <Number3D
           ctx={ctx}
           text={model.heroNumber ?? model.monogram}
@@ -101,7 +115,7 @@ export function renderPlayerLinkCard(
           )}
           <Portrait
             ctx={ctx}
-            src={model.photoUrl}
+            src={photo}
             left={70}
             top={130}
             width={420}
@@ -186,6 +200,7 @@ export function renderPlayerLinkCard(
             fontWeight: 800,
             fontSize: lastSize,
             lineHeight: 0.86,
+            ...(last.marginTop === undefined ? {} : { marginTop: last.marginTop }),
             textShadow: "0 14px 40px rgba(0,0,0,0.5)",
           }}
         >
@@ -240,7 +255,7 @@ export interface TeamLinkCard {
  */
 export function renderTeamLinkCard(
   card: TeamLinkCard,
-  options: Pick<PosterRenderOptions, "brandMarkSrc">,
+  options: Pick<PosterRenderOptions, "brandMarkSrc" | "noPhoto" | "teamBadge">,
 ) {
   const ctx = contextFor(
     {
@@ -250,15 +265,23 @@ export function renderTeamLinkCard(
       brandMarkSrc: options.brandMarkSrc,
       prices: true,
       sponsor: null,
+      ...(options.noPhoto === undefined ? {} : { noPhoto: options.noPhoto }),
+      ...(options.teamBadge === undefined ? {} : { teamBadge: options.teamBadge }),
     },
     card.teamColor,
   );
+  // A face with no photo, in a season that chose the cricketer (0107).
+  const faceFigure = options.noPhoto === "silhouette" ? silhouetteFor(ctx, WHITE) : null;
   const { palette } = ctx.skin;
   const depth = depthFor(ctx.skin);
   const { width, height } = LINK_CARD_SIZE;
   const teamColour = card.teamColor ?? palette.accent;
   const nameRoom = width - 60 - 300;
-  const nameSize = fit(card.teamName.toUpperCase(), nameRoom, CAPS, 118, 60);
+  const name = displayLine(
+    card.teamName,
+    fit(card.teamName.toUpperCase(), nameRoom, CAPS, 118, 60),
+  );
+  const nameSize = name.fontSize;
   const faces = card.faces.slice(0, 7);
   const cell = (label: string, value: string, metal: boolean, sub: string | null = null) => (
     <div
@@ -372,6 +395,7 @@ export function renderTeamLinkCard(
           colour={teamColour}
           label={card.teamMonogram}
           src={card.teamCrestUrl}
+          team
         />
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div
@@ -393,6 +417,7 @@ export function renderTeamLinkCard(
               fontWeight: 800,
               fontSize: nameSize,
               lineHeight: 0.9,
+              ...(name.marginTop === undefined ? {} : { marginTop: name.marginTop }),
               textShadow: "0 14px 40px rgba(0,0,0,0.5)",
             }}
           >
@@ -416,6 +441,7 @@ export function renderTeamLinkCard(
                       size={52}
                       colour={mix(teamColour, palette.surface, 0.35)}
                       label={face.monogram}
+                      src={faceFigure}
                     />
                   ) : (
                     <img

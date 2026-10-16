@@ -14,6 +14,7 @@ import {
 } from "@desiauction/db";
 import { and, asc, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
 
+import { isRealAuction } from "@desiauction/auction";
 import { messageLanguagesOf } from "@desiauction/messaging/language";
 
 import { env } from "../../env";
@@ -76,7 +77,8 @@ export async function auctionOutcomeMessages(
     .from(auctions)
     .innerJoin(competitions, eq(competitions.id, auctions.competitionId))
     .innerJoin(organizations, eq(organizations.id, competitions.orgId))
-    .where(eq(auctions.id, input.auctionId))
+    // A practice has no results to send: no context, no mail.
+    .where(and(eq(auctions.id, input.auctionId), isRealAuction()))
     .limit(1);
   if (context === undefined) {
     return { mails: [], texts: [] };

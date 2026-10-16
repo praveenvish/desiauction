@@ -56,6 +56,10 @@ ENGINE_SECRET=dev-engine-secret
 # run the web tier under the non-BYPASSRLS app role exactly like production:
 # DATABASE_URL=postgres://desiauction_app:local-app@localhost:5433/desiauction
 # SYSTEM_DATABASE_URL=postgres://desiauction_system:local-system@localhost:5433/desiauction
+
+# apps/live (pnpm --filter @desiauction/live dev) reads only through its own
+# least-privilege role (F07):
+LIVE_DATABASE_URL=postgres://desiauction_live:local-live@localhost:5433/desiauction
 `,
   );
   console.log("✓ .env.local generated with local defaults");
@@ -121,10 +125,11 @@ const roles = capture(
   "docker compose exec -T db psql -U desiauction -d desiauction " +
     "-v app_password='local-app' -v system_password='local-system' " +
     "-v engine_password='local-engine' -v runner_password='local-runner' " +
+    "-v live_password='local-live' " +
     "< ops/db/create-app-role.sql",
 );
 if (roles.code !== 0) fail("role bootstrap failed", roles.out.slice(-400));
-console.log("✓ migrations applied · four-role recipe in place (app/system/engine/runner)");
+console.log("✓ migrations applied · five-role recipe in place (app/system/engine/runner/live)");
 
 // 6 · Demo data ---------------------------------------------------------------
 step("6/7 demo data (repeatable)");

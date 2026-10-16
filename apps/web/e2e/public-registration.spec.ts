@@ -29,7 +29,8 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
     timeout: 30_000,
   });
   const code = await latestOtp(phone);
-  await page.getByLabel("6-digit code").fill(code);
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(code);
   await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).not.toHaveURL(/\/login/);
 }
@@ -234,7 +235,8 @@ test("player journey: discover → multi-step register with draft recovery → t
     await expect(player.getByTestId("register-verify-form")).toHaveAttribute("data-step", "code", {
       timeout: 30_000,
     });
-    await player.getByLabel("6-digit code").fill(await latestOtp(PLAYER));
+    await player.getByLabel("6-digit code").clear();
+    await player.getByLabel("6-digit code").pressSequentially(await latestOtp(PLAYER));
     await player.getByRole("button", { name: "Verify and continue" }).click();
     await expect(player).toHaveURL(registerHere, { timeout: 30_000 });
 
@@ -356,7 +358,7 @@ test("an email-only account adds its mobile in place and finishes — the share 
     await player.getByTestId("email-login-address").fill(address);
     await player.getByTestId("register-verify-cta").click();
     await expect(player.getByTestId("email-login-code")).toBeVisible({ timeout: 20_000 });
-    await player.getByTestId("email-login-code").fill(await latestOtp(address));
+    await player.getByTestId("email-login-code").pressSequentially(await latestOtp(address));
     await player.getByTestId("email-login-verify").click();
 
     // Back on the register page, not /onboarding or /account — ref and all.
@@ -367,7 +369,7 @@ test("an email-only account adds its mobile in place and finishes — the share 
     );
     await player.getByLabel("Mobile number").fill(LATE_PHONE);
     await player.getByTestId("register-phone-send").click();
-    await player.getByLabel("Six-digit code").fill(await latestOtp(LATE_PHONE));
+    await player.getByLabel("Six-digit code").pressSequentially(await latestOtp(LATE_PHONE));
     await player.getByTestId("register-phone-confirm").click();
 
     // The page re-reads the session and the wizard simply carries on.

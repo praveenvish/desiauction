@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { env } from "../../../../env";
+import { recordJobRun } from "../../../../server/jobs/job-runs";
 import { sweepDemoReminders } from "../../../../server/marketing/demo-reminders";
 import {
   purgeExpiredDemoData,
@@ -68,6 +69,9 @@ async function handle(request: Request): Promise<NextResponse> {
  * watching when they run, so "which delivery did that error belong to" has to
  * be answerable afterwards from the log alone.
  */
-export function POST(request: Request): Promise<NextResponse> {
-  return withRequestId(request.headers, () => handle(request));
+export function POST(request: Request): Promise<Response> {
+  // Every run, and how it went, lands in job_runs for /admin (AC-1.1).
+  return withRequestId(request.headers, () =>
+    recordJobRun("demo-reminders", () => handle(request)),
+  );
 }

@@ -62,7 +62,16 @@ const STATUS_WORD: Record<string, string> = {
   abandoned: "Abandoned",
 };
 
-export function EnginePanel({ slug, record }: { slug: string; record?: EngineRecord }) {
+export function EnginePanel({
+  slug,
+  auctionId,
+  record,
+}: {
+  slug: string;
+  /** The auction this page shows; Recover goes to it and no other (0101). */
+  auctionId?: string;
+  record?: EngineRecord;
+}) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -119,7 +128,7 @@ export function EnginePanel({ slug, record }: { slug: string; record?: EngineRec
     setConfirmOpen(false);
     setBusy(true);
     const ack = await release(
-      submitAuctionCommand(slug, crypto.randomUUID(), "RecoverAuction", {}),
+      submitAuctionCommand(slug, crypto.randomUUID(), "RecoverAuction", {}, auctionId),
       () => {
         setBusy(false);
       },

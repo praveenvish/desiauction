@@ -26,7 +26,7 @@ function BrandTile({ size }: { size: number }) {
   return <img src={BRAND_MARK_URI} width={size} height={size} alt="" />;
 }
 
-const C = {
+export const SHARE_CARD_COLORS = {
   surface: "#0B1018",
   surfaceRaised: "#101623",
   borderSubtle: "#2C3A52",
@@ -41,6 +41,8 @@ const C = {
   onAccent: "#070A0F",
   open: "#3DD68C",
 } as const;
+
+const C = SHARE_CARD_COLORS;
 
 const TONE: Record<CompetitionShareCard["statusTone"], string> = {
   live: C.accent,

@@ -1,10 +1,11 @@
 import { sportPackFor } from "@desiauction/core";
-import type { Db } from "@desiauction/db";
+import { matches, type Db } from "@desiauction/db";
+import { eq } from "drizzle-orm";
 
 import { istCalendarDate } from "../../lib/format-date";
 import { teamsOf, type CompetitionSummary } from "./competitions";
 import { PUBLIC_FIXTURE_STATUSES, competitionTimeline, fixtureStats } from "./fixtures";
-import { resultsOf, standingsOf } from "./results";
+import { resultsOf, standingsOf, type ResultAudience } from "./results";
 
 /*
  * THE SEASON CHAPTER — the matches and the table, for the Reports page and
@@ -16,6 +17,8 @@ import { resultsOf, standingsOf } from "./results";
 
 export interface SeasonMatchLine {
   fixtureId: string;
+  fixtureNumber: string;
+  livePage: boolean;
   kickoffAt: string | null;
   homeName: string | null;
   awayName: string | null;
@@ -62,17 +65,27 @@ export async function seasonPlayIn(
   db: Db,
   competition: Pick<CompetitionSummary, "id" | "sport">,
   today: string = istCalendarDate(),
+  audience: ResultAudience = "console",
 ): Promise<SeasonPlay> {
   const shape = sportPackFor(competition.sport).fixtureShape === "lobby" ? "lobby" : "duel";
-  const [stats, timeline, results, standings, teamRows] = await Promise.all([
+  const [stats, timeline, results, standings, teamRows, scoringMatches] = await Promise.all([
     fixtureStats(db, competition.id, PUBLIC_FIXTURE_STATUSES, today),
     competitionTimeline(db, competition.id, PUBLIC_FIXTURE_STATUSES),
-    resultsOf(db, competition.id),
-    shape === "duel" ? standingsOf(db, competition.id) : Promise.resolve(null),
+    resultsOf(db, competition.id, audience),
+    shape === "duel" ? standingsOf(db, competition.id, today, audience) : Promise.resolve(null),
     teamsOf(db, competition.id),
+    db
+      .select({ fixtureId: matches.fixtureId })
+      .from(matches)
+      .where(eq(matches.competitionId, competition.id)),
   ]);
+  const scored = new Set(scoringMatches.map((match) => match.fixtureId));
   const line = (fixture: (typeof timeline)[number]): SeasonMatchLine => ({
     fixtureId: fixture.id,
+    fixtureNumber: fixture.number,
+    livePage:
+      Boolean(sportPackFor(competition.sport).scoring) &&
+      (scored.has(fixture.id) || fixture.status === "published"),
     kickoffAt: fixture.kickoffAt,
     homeName: fixture.homeTeamName,
     awayName: fixture.awayTeamName,

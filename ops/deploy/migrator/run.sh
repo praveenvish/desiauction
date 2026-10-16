@@ -4,8 +4,8 @@
 #   migrator live-window   refuse (exit 1/2) while any auction is live or paused,
 #                          or announced to start within the freeze window
 #   migrator migrate       apply the web and engine migration sets, in order
-#   migrator roles         create/refresh the four runtime roles and their grants
-#   migrator grants        assert the four runtime roles still match the manifest
+#   migrator roles         create/refresh the five runtime roles and their grants
+#   migrator grants        assert the five runtime roles still match the manifest
 #   migrator preflight     cross-service production env check over /env/*.env
 #
 # DATABASE_URL (migrator.env) is the database OWNER. DEPLOY_ANYWAY=1 is passed
@@ -29,7 +29,7 @@ case "${1:-}" in
     # it is idempotent (roles are created only if missing), and the runbook
     # already says to re-run it after any migration that adds a table — so a
     # first deploy onto an empty database no longer fails at `grants` waiting
-    # for a hand step. The four passwords are read from the service env files
+    # for a hand step. The five passwords are read from the service env files
     # already mounted for the preflight, never typed a second time, and the
     # role in each URL is checked against the role it is meant to be.
     role_pw() { # file key expected-role
@@ -49,6 +49,7 @@ case "${1:-}" in
     SYSTEM_PW="$(role_pw /env/web.env SYSTEM_DATABASE_URL desiauction_system)"
     ENGINE_PW="$(role_pw /env/engine.env DATABASE_URL desiauction_engine)"
     RUNNER_PW="$(role_pw /env/runner.env DATABASE_URL desiauction_runner)"
+    LIVE_PW="$(role_pw /env/live.env LIVE_DATABASE_URL desiauction_live)"
     # --single-transaction: the script GRANTS broadly and then REVOKES what
     # must not be held (append-only tables, personal content). Statement by
     # statement, a failure between the two left the wide grants standing until
@@ -56,6 +57,7 @@ case "${1:-}" in
     exec psql "$DATABASE_URL" -q --single-transaction -v ON_ERROR_STOP=1 \
       -v app_password="$APP_PW" -v system_password="$SYSTEM_PW" \
       -v engine_password="$ENGINE_PW" -v runner_password="$RUNNER_PW" \
+      -v live_password="$LIVE_PW" \
       -f /repo/ops/db/create-app-role.sql
     ;;
   grants)
@@ -63,7 +65,7 @@ case "${1:-}" in
     ;;
   preflight)
     exec node scripts/preflight-production.mjs \
-      --env=/env/web.env --engine-env=/env/engine.env --runner-env=/env/runner.env
+      --env=/env/web.env --engine-env=/env/engine.env --runner-env=/env/runner.env --live-env=/env/live.env
     ;;
   *)
     echo "usage: migrator live-window|migrate|roles|grants|preflight" >&2

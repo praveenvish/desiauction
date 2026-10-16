@@ -1,3 +1,4 @@
+import { homeIntentPath } from "../../lib/start-intent";
 import { LoadingState } from "@desiauction/ui";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -19,6 +20,11 @@ import { OrganizerHome } from "./organizer-home";
 import { OwnerHome } from "./owner-home";
 import { PlayerHome } from "./player-home";
 import "./home.css";
+import {
+  homeResponsibilities,
+  type HomeResponsibilities,
+} from "../../server/home/responsibilities";
+import { ResponsibilityHome } from "./responsibility-home";
 
 export const metadata = { title: "Home" };
 
@@ -46,11 +52,12 @@ export default async function HomePage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const [session, params] = await Promise.all([currentSession(), searchParams]);
+  const homePath = homeIntentPath(params);
   if (session === null) {
-    redirect("/login?next=/home");
+    redirect(`/login?next=${encodeURIComponent(homePath)}`);
   }
   if (session.name === null || session.name.trim() === "") {
-    redirect("/onboarding");
+    redirect(`/onboarding?next=${encodeURIComponent(homePath)}`);
   }
   // `?start=club` — the landing CTA's intent, carried through sign-in.
   const startClub = params.start === "club";
@@ -75,8 +82,16 @@ export default async function HomePage({
  * The founder's "they should know exactly what they have". Roles in the same
  * precedence order as the menu, so the sentence and the rail agree.
  */
-function identityLine(roles: PersonRoles, entries: readonly MyRegistration[]): string {
+function identityLine(
+  roles: PersonRoles,
+  entries: readonly MyRegistration[],
+  responsibilities: HomeResponsibilities,
+): string {
   const parts: string[] = [];
+  if (responsibilities.scorer) parts.push("Scoring appointment");
+  if (responsibilities.manager) parts.push("Team manager");
+  if (responsibilities.finance) parts.push("Finance responsibility");
+  if (responsibilities.operator) parts.push("Platform assignment");
   if (roles.organizes.length > 0) {
     const club = roles.organizes[0];
     parts.push(
@@ -137,6 +152,7 @@ async function HomeBody({
   startClub: boolean;
 }) {
   const roles = await rolesOf(personId);
+  const responsibilities = await homeResponsibilities(personId, roles);
   const manages = roles.organizes.length > 0;
   /*
    * WHICH SECTIONS, decided by the pure ruling in ./home-router — which is what
@@ -149,6 +165,11 @@ async function HomeBody({
       conducts: roles.conducts.length > 0,
       plays: roles.plays,
       belongsToClub: roles.memberOf.length > 0,
+      scores: responsibilities.scorer,
+      managesTeam: responsibilities.manager,
+      finance: responsibilities.finance,
+      operator: responsibilities.operator,
+      hasDocuments: responsibilities.hasDocuments,
     }),
   );
   const newcomer = sections.has("newcomer");
@@ -158,6 +179,10 @@ async function HomeBody({
     ...(roles.owns.length > 0 ? (["owner"] as const) : []),
     ...(roles.conducts.length > 0 ? (["auctioneer"] as const) : []),
     ...(roles.plays ? (["player"] as const) : []),
+    ...(responsibilities.scorer ? (["scorer"] as const) : []),
+    ...(responsibilities.manager ? (["manager"] as const) : []),
+    ...(responsibilities.finance ? (["finance"] as const) : []),
+    ...(responsibilities.operator ? (["operator"] as const) : []),
   ];
 
   /*
@@ -182,12 +207,19 @@ async function HomeBody({
       ownedTeam: team,
       managedLive: input.managedLive,
       attention: input.attention,
-      latestEntry: null,
+      tasks: responsibilities.tasks,
+      latestEntry: entries.at(-1) ?? null,
       brandNew: newcomer,
       conducting:
-        roles.conducts.find(
-          (row) => row.auctionStatus !== "completed" && row.auctionStatus !== "reconciled",
-        ) ?? null,
+        [...roles.conducts]
+          .sort(
+            (a, b) =>
+              Number(["live", "paused"].includes(b.auctionStatus ?? "")) -
+                Number(["live", "paused"].includes(a.auctionStatus ?? "")) ||
+              a.competitionSlug.localeCompare(b.competitionSlug),
+          )
+          .find((row) => row.auctionStatus !== "completed" && row.auctionStatus !== "reconciled") ??
+        null,
     });
 
   /*
@@ -201,7 +233,11 @@ async function HomeBody({
    * would have met the same question asked twice in a row.
    */
   const standaloneStep =
-    sections.has("organizer") || sections.has("newcomer")
+    sections.has("newcomer") ||
+    (sections.has("organizer") &&
+      !responsibilities.tasks.some((task) =>
+        ["conduct-live", "score-held", "owner-live", "today"].includes(task.priority),
+      ))
       ? null
       : nextStepFor({ managedLive: null, attention: [] });
 
@@ -214,10 +250,10 @@ async function HomeBody({
           `lead` the shell drops, and the name stays. */}
       <PageTitle
         {...greetingProps(greetingParts(new Date(), firstNameOf(name)))}
-        subtitle={identityLine(roles, entries)}
+        subtitle={identityLine(roles, entries, responsibilities)}
       />
       {/* Said once, when the menu actually changed under them (RN-1 §3.6). */}
-      <RoleChangeNotice held={heldRoles} />
+      <RoleChangeNotice held={heldRoles} personId={personId} />
       {standaloneStep !== null ? (
         <NextStepBanner
           step={standaloneStep}
@@ -225,12 +261,17 @@ async function HomeBody({
           hero={standaloneStep.key.startsWith("auctioneer-")}
         />
       ) : null}
+      <ResponsibilityHome responsibilities={responsibilities} />
       {sections.has("newcomer") ? <NewcomerHome startClub={startClub} /> : null}
       {sections.has("owner") ? <OwnerHome teams={roles.owns} /> : null}
       {sections.has("auctioneer") ? <AuctioneerHome seasons={roles.conducts} /> : null}
       {sections.has("organizer") ? (
         <Suspense fallback={<LoadingState variant="page" />}>
-          <OrganizerHome personId={personId} focusSlug={focusSlug} nextStepFor={nextStepFor} />
+          <OrganizerHome
+            personId={personId}
+            focusSlug={focusSlug}
+            nextStepFor={standaloneStep ? () => null : nextStepFor}
+          />
         </Suspense>
       ) : null}
       {sections.has("player") ? (

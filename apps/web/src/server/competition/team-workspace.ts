@@ -1,3 +1,4 @@
+import { isRealAuction } from "@desiauction/auction";
 import { sportPackFor } from "@desiauction/core";
 import {
   auctionOwnerInvites,
@@ -7,7 +8,7 @@ import {
   registrations,
   type Db,
 } from "@desiauction/db";
-import { and, asc, eq, isNotNull, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, isNull, ne } from "drizzle-orm";
 
 import { personLabel } from "../../lib/person-label";
 import { resolvedLots, rulesOf } from "../auction/live-summary";
@@ -99,6 +100,11 @@ export interface TeamsWorkspaceOptions {
    * phone numbers otherwise live.
    */
   roster: boolean;
+  /**
+   * `competition.manage`: may type in the results of an auction held outside
+   * the app (0105). Omitted → false.
+   */
+  manage?: boolean;
 }
 
 export interface TeamRosterRow {
@@ -114,6 +120,11 @@ export interface TeamRosterRow {
   isIcon: boolean;
   isCaptain: boolean;
   isRetained: boolean;
+  /**
+   * The price typed for a player placed by hand (paise, null = none given).
+   * Present only while results are being entered by hand, for an organiser.
+   */
+  handPrice?: number | null;
 }
 
 export interface TeamCard {
@@ -144,6 +155,7 @@ export interface TeamCard {
 }
 
 export interface TeamsWorkspace {
+  teamFormation?: CompetitionSummary["teamFormation"];
   competitionName: string;
   /**
    * The season's roles, in the pack's order, as plain {key,label} pairs.
@@ -164,6 +176,26 @@ export interface TeamsWorkspace {
    * Where the purse and squad rules were set, so the figure has a provenance
    * the screen can link to. Null before an auction exists.
    */
+  /**
+   * Results of an auction held outside the app (0105), for an organiser:
+   * `open` while the season has no auction in the app and players can be
+   * placed by hand; `published` once those results were published. Omitted
+   * otherwise.
+   */
+  handEntry?: "open" | "published";
+  /**
+   * 0110: `imported` — the season said up front its auction is held outside
+   * the app. The Teams tab is then where results are typed in, and must not
+   * send the organiser to "Create the auction" (which refuses such a season).
+   */
+  auctionSource: CompetitionSummary["auctionSource"];
+  /**
+   * The purse an earlier auction set up here declared (paise), for the
+   * "points each team started with" box when typed-in results are published:
+   * a club that switched a scheduled auction to offline results already told
+   * us the number. Null when there was none.
+   */
+  suggestedPurse?: number | null;
   rulesSource: {
     auctionExists: boolean;
     locked: boolean;
@@ -188,9 +220,24 @@ export async function teamsWorkspace(
     teamsOf(db, competition.id),
     registrationStats(db, competition.id),
     db
-      .select({ id: auctions.id, status: auctions.status, config: auctions.config })
+      .select({
+        id: auctions.id,
+        status: auctions.status,
+        config: auctions.config,
+        enteredByHand: auctions.enteredByHand,
+      })
       .from(auctions)
-      .where(eq(auctions.competitionId, competition.id))
+      // An aborted auction is no auction: the one-real-auction index (0029)
+      // and `publishResultsByHand` both ignore it, and so must the Teams tab —
+      // otherwise aborting a scheduled night to type the results in instead
+      // left hand entry shut for good.
+      .where(
+        and(
+          eq(auctions.competitionId, competition.id),
+          isRealAuction(),
+          ne(auctions.status, "abandoned"),
+        ),
+      )
       .limit(1),
     // Everyone approved and placed on a squad. The names and phones are read
     // here but only LEAVE this function when `options.roster` says they may.
@@ -206,6 +253,7 @@ export async function teamsWorkspace(
         phone: people.phone,
         photoKey: shownPhotoKey,
         photoConsentAt: shownPhotoConsentAt,
+        handPrice: registrations.offlinePrice,
       })
       .from(registrations)
       .innerJoin(people, eq(people.id, registrations.personId))
@@ -221,7 +269,18 @@ export async function teamsWorkspace(
   const auction = auctionRows[0];
   const rules = auction !== undefined ? rulesOf(auction.config) : null;
   const purseTotal = rules?.pursePerTeam ?? 0;
-  const squadMax = rules?.squadMax ?? null;
+  // Squad bounds on a hand-entered auction only hold the squads that exist —
+  // no rule was set, so there is no cap to show.
+  const squadMax = auction?.enteredByHand === true ? null : (rules?.squadMax ?? null);
+  const handEntry =
+    options.manage !== true ||
+    (competition.teamFormation !== undefined && competition.teamFormation !== "auction")
+      ? undefined
+      : auction === undefined
+        ? ("open" as const)
+        : auction.enteredByHand
+          ? ("published" as const)
+          : undefined;
 
   // registrationId → buy price, from the resolved lots (the only place a hammer
   // price lives). Pre-signed players never appear here and stay priceless.
@@ -305,6 +364,7 @@ export async function teamsWorkspace(
       isIcon: row.isIcon,
       isCaptain: row.isCaptain,
       isRetained: row.isRetained,
+      ...(handEntry === "open" ? { handPrice: row.handPrice } : {}),
     });
     rosterByTeam.set(row.teamId, list);
   }
@@ -352,6 +412,7 @@ export async function teamsWorkspace(
 
   return {
     competitionName: competition.name,
+    teamFormation: competition.teamFormation ?? "auction",
     sportAttributes: sportPackFor(competition.sport).attributes.map((attribute) => ({
       key: attribute.key,
       label: attribute.label,
@@ -361,8 +422,14 @@ export async function teamsWorkspace(
       label: value.label,
     })),
     teams: cards,
-    ...(options.money ? { purseTotal, squadMax } : {}),
+    ...(options.money &&
+    (competition.teamFormation === undefined || competition.teamFormation === "auction")
+      ? { purseTotal, squadMax }
+      : {}),
     approvedPlayers: stats.approved,
+    ...(handEntry !== undefined ? { handEntry } : {}),
+    auctionSource: competition.auctionSource,
+    ...(handEntry === "open" ? { suggestedPurse: await suggestedPurseOf(db, competition.id) } : {}),
     // `createTeamAction` locks the team set the moment the auction leaves
     // `scheduled` (DA-07). The Teams tab now says so BEFORE the form, instead
     // of the server's refusal arriving as an error on the name field.
@@ -378,4 +445,16 @@ export async function teamsWorkspace(
               auction.status === "abandoned",
           },
   };
+}
+
+/** The newest real auction's declared purse, whatever became of it; null if none. */
+async function suggestedPurseOf(db: Db, competitionId: string): Promise<number | null> {
+  const [row] = await db
+    .select({ config: auctions.config })
+    .from(auctions)
+    .where(and(eq(auctions.competitionId, competitionId), isRealAuction()))
+    .orderBy(desc(auctions.createdAt))
+    .limit(1);
+  const purse = row === undefined ? 0 : rulesOf(row.config).pursePerTeam;
+  return purse > 0 ? purse : null;
 }

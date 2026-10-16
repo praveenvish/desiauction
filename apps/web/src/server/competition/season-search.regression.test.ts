@@ -148,7 +148,7 @@ describe("SEASON SEARCH (0099)", () => {
       .where(eq(registrations.id, unknownAge));
     expect(await publicSquadListing(seasonId, true)).toEqual({ indexable: true });
     entry = (await publicSeasonSitemap()).find((season) => season.slug === slug);
-    expect(entry?.squadSlugs).toEqual([teamSlugOf(`${MARK} Strikers`)]);
+    expect(entry?.squadSlugs).toEqual([teamSlugOf({ id: "", name: `${MARK} Strikers` })]);
 
     // Approving a minor anywhere takes every squad of the season back out.
     await db

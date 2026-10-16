@@ -43,16 +43,18 @@ import {
   createCompetition,
   createTeam,
   resolveCompetition,
+  setCompetitionNoPhotoStyle,
   tournamentsOf,
   createTournament,
   setTeamCoach,
   teamsOf,
 } from "./competitions";
 import { registrationsOf, submitRegistration } from "./registrations";
-import { transition, transitionBatch } from "./registration-aggregate";
+import { confirmAdults, transition, transitionBatch } from "./registration-aggregate";
 import { ForbiddenError } from "../orgs/authz";
 import { outcomesProjection } from "../admin/views";
 import { purgeOrg } from "../test-support/purge-org";
+import { seasonNoPhotoStyle } from "./season-no-photo";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
@@ -886,7 +888,7 @@ describe("PRR P0-2 — a minor's data is never on a public surface (DPDP §9)", 
 
     // Two approved players, both with a photo AND photo consent on file, so the
     // ONLY thing that can withhold the minor's photo is the age gate itself.
-    const minor = { id: newId(), phone: `+9193${RUN}01`, name: `Minor ${RUN}` };
+    const minor = { id: newId(), phone: `+9193${RUN}01`, name: "Minor Player" };
     const adult = { id: newId(), phone: `+9193${RUN}02`, name: `Adult ${RUN}` };
     await db.insert(people).values([
       { ...minor, photoUrl: `k/${minor.id}.jpg`, photoConsentAt: new Date() },
@@ -916,7 +918,9 @@ describe("PRR P0-2 — a minor's data is never on a public surface (DPDP §9)", 
     ]);
 
     const pool = await publicShowcase(competition.slug);
-    const minorRow = pool?.players.find((p) => p.name === minor.name);
+    const minorRow = pool?.players.find((p) => p.number === `MN${RUN.slice(-3)}001`);
+    expect(minorRow?.name).toBe("MP");
+    expect(pool?.players.some((p) => p.name === minor.name)).toBe(false);
     const adultRow = pool?.players.find((p) => p.name === adult.name);
 
     // The minor: no age, no photo — even though consent is on file.
@@ -928,5 +932,97 @@ describe("PRR P0-2 — a minor's data is never on a public surface (DPDP §9)", 
 
     await db.delete(registrationsTable).where(eq(registrationsTable.competitionId, competition.id));
     await db.delete(people).where(inArray(people.id, [minor.id, adult.id]));
+  });
+
+  it("0106: a photo with no date of birth shows only once the club confirmed 18+", async () => {
+    const competition = await createCompetition(db, orgX.id, owner, {
+      sport: "cricket",
+      name: `Adults ${RUN}`,
+    });
+    await db
+      .update(competitionsTable)
+      .set({ visibility: "public" })
+      .where(eq(competitionsTable.id, competition.id));
+
+    // All three have a photo and consent; only age and the club's word differ.
+    const unsaid = { id: newId(), phone: `+9193${RUN}03`, name: `Unsaid ${RUN}` };
+    const said = { id: newId(), phone: `+9193${RUN}04`, name: `Said ${RUN}` };
+    const child = { id: newId(), phone: `+9193${RUN}05`, name: "Child Player" };
+    const ids = [unsaid.id, said.id, child.id];
+    await db.insert(people).values(
+      [unsaid, said, child].map((p) => ({
+        ...p,
+        photoUrl: `k/${p.id}.jpg`,
+        photoConsentAt: new Date(),
+      })),
+    );
+    const regs = [unsaid, said, child].map((p, at) => ({
+      id: newId(),
+      orgId: orgX.id,
+      competitionId: competition.id,
+      personId: p.id,
+      role: "batter" as const,
+      status: "approved" as const,
+      registrationNumber: `AD${RUN.slice(-3)}00${String(at + 1)}`,
+      // The child's date says 11; the other two have none, like a name-only import.
+      dateOfBirth: p === child ? "2015-01-01" : null,
+    }));
+    await db.insert(registrationsTable).values(regs);
+
+    // The club says "18 or older" for the second and the third.
+    const confirmed = await confirmAdults(
+      db,
+      orgX.id,
+      competition.id,
+      [regs[1]?.id ?? "", regs[2]?.id ?? ""],
+      owner,
+      new Date(),
+    );
+    expect(confirmed).toBe(2);
+
+    const pool = await publicShowcase(competition.slug);
+    const photoOf = (name: string) => pool?.players.find((p) => p.name === name)?.photoUrl;
+    expect(photoOf(unsaid.name), "no date, nobody said: hidden").toBeNull();
+    expect(photoOf(said.name), "no date, the club said 18+: shown").not.toBeNull();
+    expect(pool?.players.find((p) => p.number === regs[2]?.registrationNumber)?.name).toBe("CP");
+    expect(photoOf("CP"), "a date that says 11 wins over the tick").toBeNull();
+    expect(pool?.players.some((p) => p.name === child.name)).toBe(false);
+
+    await db.delete(registrationsTable).where(eq(registrationsTable.competitionId, competition.id));
+    await db.delete(people).where(inArray(people.id, ids));
+  });
+});
+
+describe("0107 — how a season draws a player with no photo", () => {
+  it("defaults to initials, saves the organizer's choice with an audit row, refuses anything else", async () => {
+    const season = await createCompetition(db, orgX.id, owner, {
+      sport: "cricket",
+      name: `Silhouette ${RUN}`,
+    });
+    expect(await seasonNoPhotoStyle(season.slug)).toBe("initials");
+
+    await setCompetitionNoPhotoStyle(db, season, owner, "silhouette");
+    expect(await seasonNoPhotoStyle(season.slug)).toBe("silhouette");
+    const [audit] = await db
+      .select({ action: auditLog.action, actor: auditLog.actor })
+      .from(auditLog)
+      .where(
+        and(
+          eq(auditLog.subject, season.id),
+          eq(auditLog.action, "competition.no_photo_style_changed"),
+        ),
+      );
+    expect(audit?.actor).toBe(owner);
+
+    // The database, not just the action, refuses a third style.
+    await expect(
+      db
+        .update(competitionsTable)
+        .set({ noPhotoStyle: "grey-person" })
+        .where(eq(competitionsTable.id, season.id)),
+    ).rejects.toMatchObject({ cause: { constraint_name: "competitions_no_photo_style_check" } });
+
+    // An unknown season reads the default rather than failing a layout.
+    expect(await seasonNoPhotoStyle(`no-such-season-${RUN}`)).toBe("initials");
   });
 });

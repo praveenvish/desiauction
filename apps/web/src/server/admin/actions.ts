@@ -4,7 +4,7 @@ import type { OutcomeMetrics } from "@desiauction/core";
 
 import { systemDb } from "../db";
 import { webFinopsDeps } from "../financial-operations/deps";
-import type { PlatformCapability } from "./capabilities";
+import { PLATFORM_CAPABILITY_SETS, type PlatformCapability } from "./capabilities";
 import { heldPlatformCapabilities, platformAdminGate } from "./authz";
 import { deskQueue, desksHeld, type DeskItem } from "./desk-queue";
 import {
@@ -16,6 +16,7 @@ import {
   sportCatalogueProjection,
   personExists,
   platformHealth,
+  platformRoles,
   platformOverview,
   userDetail,
   userDirectory,
@@ -26,6 +27,7 @@ import {
   type OrgFilter,
   type PlatformHealth,
   type PlatformOverview,
+  type PlatformRolesView,
   type SportCatalogueRow,
   type UserDetail,
   type UserDirectory,
@@ -141,11 +143,34 @@ export async function adminUsers(
   return userDirectory(systemDb, query ?? "", after, filter ?? "all");
 }
 
-export async function adminUser(personId: string): Promise<UserDetail | null> {
-  if ((await platformAdminGate()) === null) {
+export async function adminUser(
+  personId: string,
+): Promise<(UserDetail & { canManage: boolean; operatorId: string }) | null> {
+  const operator = await platformAdminGate();
+  if (operator === null) {
     return null;
   }
-  return userDetail(systemDb, personId);
+  const detail = await userDetail(systemDb, personId);
+  if (detail === null) {
+    return null;
+  }
+  // AC-1.2: the superadmin's buttons are drawn only for a superadmin — and
+  // every one of them asks the server again (platform-ops' operatorFor).
+  const held = await heldPlatformCapabilities();
+  return { ...detail, canManage: held.has("platform.grant"), operatorId: operator.personId };
+}
+
+/** /admin/roles — the superadmin's page (AC-1.2). */
+export async function adminRoles(): Promise<PlatformRolesView | null> {
+  if (!(await heldPlatformCapabilities()).has("platform.grant")) {
+    return null;
+  }
+  return platformRoles(systemDb, PLATFORM_CAPABILITY_SETS);
+}
+
+/** Whether the viewer may manage people (draws the Invite button). */
+export async function adminCanManagePeople(): Promise<boolean> {
+  return (await heldPlatformCapabilities()).has("platform.grant");
 }
 
 export async function adminAudit(filters: AuditFilters): Promise<AuditPage | null> {

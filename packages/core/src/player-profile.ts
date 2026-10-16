@@ -170,10 +170,20 @@ export function isMinor(dateOfBirth: string | null, now: Date): boolean {
  * share card. Only a known, adult age publishes a photo; unknown or
  * unparseable is withheld. The organizer's capability-gated desks still show
  * it (consent alone decides there — `consentedPhotoUrl`).
+ *
+ * `adultConfirmed` is the organizer's statement that the player is 18 or older
+ * (`registrations.adult_confirmed_at`, 0106) — the club's word stands in for a
+ * date of birth it never collected. It only fills that gap: a date of birth,
+ * when there is one, decides on its own, so a stated under-18 age is never
+ * overridden by a tick.
  */
-export function mayPublishPhoto(dateOfBirth: string | null, now: Date): boolean {
+export function mayPublishPhoto(
+  dateOfBirth: string | null,
+  now: Date,
+  adultConfirmed = false,
+): boolean {
   const age = deriveAge(dateOfBirth, now);
-  return age !== null && age >= MINOR_AGE_THRESHOLD;
+  return age === null ? adultConfirmed : age >= MINOR_AGE_THRESHOLD;
 }
 
 // --- Person-level profile (PI-1) ---------------------------------------------

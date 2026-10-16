@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { SPORTS } from "@desiauction/core";
 import { env } from "../env";
 import { JsonLd } from "../components/seo/json-ld";
-import { SOCIAL_ACCOUNTS } from "../content/social";
+import { ORGANIZATION_PROFILES } from "../content/social";
 import { SUPPORT_EMAIL } from "../content/support";
 import {
   organizationJsonLd,
@@ -76,7 +76,7 @@ export default function LandingPage() {
             organizationJsonLd({
               base: env.PUBLIC_BASE_URL,
               supportEmail: SUPPORT_EMAIL,
-              profiles: SOCIAL_ACCOUNTS.map((account) => account.href),
+              profiles: ORGANIZATION_PROFILES,
             }),
             webSiteJsonLd(env.PUBLIC_BASE_URL),
             softwareApplicationJsonLd({ base: env.PUBLIC_BASE_URL, description }),

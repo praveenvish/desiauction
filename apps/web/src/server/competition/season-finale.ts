@@ -1,3 +1,4 @@
+import { persistSeasonAwards } from "../insights/season";
 import { auditLog, newId, teams, type Db } from "@desiauction/db";
 import { messageLanguagesOf } from "@desiauction/messaging/language";
 import { and, desc, eq, sql } from "drizzle-orm";
@@ -118,6 +119,7 @@ export async function announceChampion(
     .limit(1);
   if (team === undefined) return { ok: false, reason: "not_a_team" };
   const championId = team.id.trim();
+  await persistSeasonAwards(db, input.competitionId, input.actorId);
 
   await db.insert(auditLog).values({
     id: newId(),

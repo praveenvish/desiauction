@@ -231,6 +231,7 @@ describe("validateDemoRequest", () => {
     // request either.
     expect(valid({ source: "<script>" }).source).toBe("other");
     expect(valid({ source: "pricing" }).source).toBe("pricing");
+    expect(valid({ source: "founding-25" }).source).toBe("founding-25");
   });
 
   it("trims and caps the free text, and stores an empty note as absent", () => {

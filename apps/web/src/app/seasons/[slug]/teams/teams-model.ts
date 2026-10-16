@@ -48,6 +48,11 @@ export function captainOf<T extends Pick<TeamRosterRow, "isCaptain">>(
   return roster.find((row) => row.isCaptain) ?? null;
 }
 
+/** The squad's Icon players, in roster order — a team may have none, one or two. */
+export function iconsOf<T extends Pick<TeamRosterRow, "isIcon">>(roster: readonly T[]): T[] {
+  return roster.filter((row) => row.isIcon);
+}
+
 /** Everyone who joined without being bid for — captain first, then icons, then retained. */
 export function preSigned<T extends Pick<TeamRosterRow, "isCaptain" | "isIcon" | "isRetained">>(
   roster: readonly T[],
@@ -59,7 +64,7 @@ export function preSigned<T extends Pick<TeamRosterRow, "isCaptain" | "isIcon" |
 }
 
 export interface SetupStep {
-  readonly key: "owner" | "captain" | "coach";
+  readonly key: "owner" | "captain" | "icon" | "coach";
   readonly done: boolean;
   /** The fact when done ("Owner · Aarav Shah"), the ask when not. */
   readonly label: string;
@@ -71,10 +76,15 @@ export interface SetupStep {
  * What a team still needs before auction night. The owner can only be
  * invited once the auction exists (the invite is to its paddle), so until
  * then that line says when, not "Invite".
+ *
+ * The Icon line names the team's marquee player(s) the way the captain line
+ * names the captain. It is optional — a club without icons is not a team with
+ * something missing — so, like the coach, it never counts as "to set".
  */
 export function setupSteps(
   team: { ownerName: string | null; coachName: string | null },
   captain: { name: string | null } | null,
+  icons: readonly { name: string | null }[],
   auctionExists: boolean,
   canManage: boolean,
 ): SetupStep[] {
@@ -98,6 +108,19 @@ export function setupSteps(
           key: "captain",
           done: false,
           label: "Captain",
+          action: canManage ? { label: "Pick", hash: "" } : null,
+        },
+    icons.length > 0
+      ? {
+          key: "icon",
+          done: true,
+          label: `Icon · ${icons.map((icon) => icon.name ?? "Unnamed").join(", ")}`,
+          action: null,
+        }
+      : {
+          key: "icon",
+          done: false,
+          label: "Icon (optional)",
           action: canManage ? { label: "Pick", hash: "" } : null,
         },
     team.coachName !== null

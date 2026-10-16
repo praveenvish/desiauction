@@ -32,7 +32,8 @@
 -- for migrations 0046-0048 that needed nothing (2026-09-07); `pnpm --filter
 -- @desiauction/web grants:verify` is the check that settles it either way.
 --
--- ALL FOUR PASSWORDS, ALWAYS. The script sets ON_ERROR_STOP, so a two-variable
+-- ALL FIVE PASSWORDS, ALWAYS (live_password since F07). The script sets
+-- ON_ERROR_STOP, so a two-variable
 -- invocation ABORTS at the engine role and silently leaves the deployment with
 -- no desiauction_engine, no desiauction_runner and none of the append-only
 -- revokes. That is exactly what the docs and the nightly workflow did, which is
@@ -43,6 +44,7 @@
 --     -v ON_ERROR_STOP=1 \
 --     -v app_password='<app-pw>' -v system_password='<system-pw>' \
 --     -v engine_password='<engine-pw>' -v runner_password='<runner-pw>' \
+--     -v live_password='<live-pw>' \
 --     < ops/db/create-app-role.sql
 --
 -- Then prove it: pnpm --filter @desiauction/web grants:verify
@@ -95,6 +97,12 @@ alter default privileges in schema public
 grant select, update on invites to desiauction_system;
 grant select on organizations to desiauction_system;
 grant insert on org_members, grants, audit_log to desiauction_system;
+-- AC-1.2: revoking a PLATFORM grant (/admin/people, and `seed:admin --revoke`)
+-- stamps revoked_at — and RLS lets no other role touch a platform-scoped row.
+-- One column: the system role can end a grant, never change whose or what it
+-- is, and never delete one (the history stays). Before this, the seed's
+-- --revoke worked only on a laptop, where it connects as the owner.
+grant update (revoked_at) on grants to desiauction_system;
 -- acceptInvite/acceptOwnerJoin tolerate an existing membership (ON CONFLICT
 -- DO NOTHING needs SELECT to detect the conflict target under postgres).
 grant select on org_members to desiauction_system;
@@ -122,7 +130,7 @@ grant select on fixtures, grounds, venues to desiauction_system;
 --
 -- The tension is real and belongs in the open: this role is BYPASSRLS, so its
 -- read surface crosses every tenant. What contains it is that only the admin
--- explorer and the named token paths use this pool, `admin-is-read-only` is
+-- explorer and the named token paths use this pool, `admin-writes-only-through-platform-ops` is
 -- machine-enforced by depcruise, and grants:verify pins the write list. The
 -- right long-term shape is those org-scoped reads moving to the tenant pool
 -- inside a withTenantDb boundary, leaving this role the platform surface it
@@ -227,7 +235,7 @@ grant insert on finops_events to desiauction_app;
 -- perf scripts, which run as the OWNER and are unaffected. journal_postings and
 -- journal_legs are deliberately NOT here: they are projections rebuilt from
 -- events by settlement recovery, so they must stay deletable.
-revoke update, delete on auction_events, settlement_events, finops_events, audit_log
+revoke update, delete on auction_events, settlement_events, finops_events, audit_log, match_events, match_awards
   from desiauction_app, desiauction_engine, desiauction_runner, desiauction_system;
 
 -- PRIVATE PER-TEAM PLANS (WR-1 "My plan", migration 0041).
@@ -279,5 +287,50 @@ revoke all on provider_template_mappings, provider_template_status, provider_tem
 revoke all on sessions, otp_codes, otp_inbox, passkey_credentials,
   email_verifications, push_subscriptions, email_sends
   from desiauction_engine, desiauction_runner;
+-- 0103: platform invitations hold the phone or email of someone who is not a
+-- user yet. Only the web tier (the admin writer, and sign-in applying them)
+-- reads them.
+revoke all on platform_invites from desiauction_engine, desiauction_runner;
+
+-- 0108/0109: moving a tournament (or one season of it) between clubs. The one cross-club write, so it is
+-- a SECURITY DEFINER function that checks the superadmin grant itself; only
+-- the web tier may call it, nobody else (PUBLIC's default EXECUTE is revoked).
+revoke all on function platform_move_tournament(char, char, char, text, char, char, char, text) from public;
+grant execute on function platform_move_tournament(char, char, char, text, char, char, char, text)
+  to desiauction_app;
 
 \echo 'roles ready: desiauction_app (nobypassrls) · desiauction_system (bypassrls, least-privilege)'
+
+-- LS-1 scoring belongs to the web tier, never the auction engine or runner.
+revoke all on matches, match_events, match_live_state, match_player_lines, match_awards
+  from desiauction_engine, desiauction_runner;
+
+-- LS-1: external history is person-scoped web data.
+revoke all on player_previous_careers from desiauction_engine, desiauction_runner;
+
+-- LS-1: confirmation projections remain in the web tenant boundary.
+revoke all on match_confirmations from desiauction_engine, desiauction_runner;
+
+-- LS-1: team entries belong to the web tenant boundary.
+revoke all on team_entries from desiauction_engine, desiauction_runner;
+revoke all on ball_facts from desiauction_engine, desiauction_runner;
+
+-- LS-1 (0125): team managers and match officials are web-tier scoring data.
+revoke all on team_managers, fixture_officials from desiauction_engine, desiauction_runner;
+
+-- F07 (0127): the live service. Internet-facing, so it reads no table at all:
+-- NOBYPASSRLS, no table grants, EXECUTE on the two P-1 functions only. LISTEN
+-- needs no rights. The functions run as desiauction_system (BYPASSRLS,
+-- read-only), never as the superuser that created them.
+select format(
+  'create role desiauction_live login password %L nosuperuser nobypassrls nocreatedb nocreaterole',
+  :'live_password')
+where not exists (select 1 from pg_roles where rolname = 'desiauction_live')
+\gexec
+grant usage on schema public to desiauction_live;
+revoke all on all tables in schema public from desiauction_live;
+revoke all on all sequences in schema public from desiauction_live;
+alter function live_snapshot(char, text, text) owner to desiauction_system;
+alter function live_history_entry(char, text, text, int) owner to desiauction_system;
+grant execute on function live_snapshot(char, text, text) to desiauction_live;
+grant execute on function live_history_entry(char, text, text, int) to desiauction_live;

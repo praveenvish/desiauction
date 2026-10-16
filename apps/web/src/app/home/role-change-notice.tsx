@@ -14,9 +14,9 @@ function subscribe(onChange: () => void): () => void {
   };
 }
 
-function readSeen(): string | null {
+function readSeen(key: string): string | null {
   try {
-    return window.localStorage.getItem(KEY);
+    return window.localStorage.getItem(key);
   } catch {
     // Private mode, blocked site data. A courtesy that cannot be remembered
     // simply is not shown — which is the right failure for a sentence.
@@ -41,19 +41,24 @@ function readSeen(): string | null {
  * the tab without navigating shows it one more time, which is the right price
  * for a sentence.
  */
-export function RoleChangeNotice({ held }: { held: RoleToken[] }) {
-  const seen = useSyncExternalStore(subscribe, readSeen, () => null);
+export function RoleChangeNotice({ held, personId }: { held: RoleToken[]; personId: string }) {
+  const key = `${KEY}:${personId}`;
+  const seen = useSyncExternalStore(
+    subscribe,
+    () => readSeen(key),
+    () => null,
+  );
   const signature = signatureOf(held);
 
   useEffect(
     () => () => {
       try {
-        window.localStorage.setItem(KEY, signature);
+        window.localStorage.setItem(key, signature);
       } catch {
         /* See readSeen: unavailable storage is not an error here. */
       }
     },
-    [signature],
+    [signature, key],
   );
 
   const change = roleChangeFor(held, seen);

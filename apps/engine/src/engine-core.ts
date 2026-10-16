@@ -5,6 +5,7 @@ import {
   acceptOwnerInvite,
   claimPaddle,
   closeLot,
+  addOwnerToPractice,
   grantPaddle,
   inviteOwner,
   revokeOwnerInvite,
@@ -647,6 +648,7 @@ export class AuctionEngine {
         name: auctions.name,
         status: auctions.status,
         config: auctions.config,
+        kind: auctions.kind,
       })
       .from(auctions)
       .where(eq(auctions.id, auctionId))
@@ -833,6 +835,17 @@ export class AuctionEngine {
 
   private async execute(state: AuctionState, envelope: QueuedCommand): Promise<CommandAck> {
     const { db } = this.deps;
+    // A scheduled auction is never evicted, so its cached record can outlive a
+    // platform move of its season to another club (platform_move_tournament,
+    // migration 0108) and stamp the next event with the OLD org. Re-read it
+    // while it is scheduled; that path is the lobby, never the bidding hot
+    // path, and the move refuses live and paused auctions outright.
+    if (state.record.status === "scheduled") {
+      const fresh = await this.loadRecord(state.record.id);
+      if (fresh !== null) {
+        state.record = fresh;
+      }
+    }
     const auction = state.record;
     const actor = envelope.actor;
     const accept = (extra: Partial<CommandAck> = {}): CommandAck => ({
@@ -1036,6 +1049,15 @@ export class AuctionEngine {
           return rejected("invalid_payload");
         }
         const result = await grantPaddle(db, auction, actor, teamId, personId);
+        return result.ok ? accept() : rejected(result.reason);
+      }
+      case "PracticeAddOwner": {
+        const teamId = this.str(envelope.payload, "teamId");
+        const personId = this.str(envelope.payload, "personId");
+        if (teamId === null || personId === null) {
+          return rejected("invalid_payload");
+        }
+        const result = await addOwnerToPractice(db, auction, actor, teamId, personId);
         return result.ok ? accept() : rejected(result.reason);
       }
       // Compensating undo (doc 41): conduct is not enough — the web gate must

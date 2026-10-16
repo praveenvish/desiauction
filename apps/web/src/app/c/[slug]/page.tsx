@@ -30,6 +30,7 @@ import { seasonDescription, seasonTitle } from "../../../server/seo/season-copy"
 import { JsonLd } from "../../../components/seo/json-ld";
 import { IconCalendar, IconMapPin, IconUsers } from "../../../components/marketing/icons";
 import {
+  HeroBanner,
   HeroFact,
   PageBody,
   PageHero,
@@ -295,9 +296,11 @@ export default async function PublicCompetitionPage({
       <PageHero
         size="compact"
         cover={view.coverUrl === null ? null : { src: view.coverUrl }}
-        /* No stock art without a cover: the same bat twelve times across the
-           site read as "no content yet". The copy takes the width instead. */
-        {...(view.coverUrl === null ? {} : { sport: view.sport })}
+        /* The banner the organizer uploaded, whole, where the sport's stock bat
+           used to sit in an empty frame — it read as a page still loading,
+           and the banner itself (behind it, 400ing) never showed. No cover,
+           no art: the copy takes the width. */
+        {...(view.coverUrl === null ? {} : { art: <HeroBanner src={view.coverUrl} /> })}
         status={
           <>
             {live ? <Badge tone="live">Live now</Badge> : null}
@@ -539,6 +542,14 @@ export default async function PublicCompetitionPage({
                           {match.groundName ?? "Being played now"}
                         </span>
                       </span>
+                      {match.livePage ? (
+                        <Link
+                          href={`/c/${view.slug}/m/${encodeURIComponent(match.fixtureNumber)}`}
+                          className="public-season-more"
+                        >
+                          Open match
+                        </Link>
+                      ) : null}
                     </li>
                   ))}
                   {/* Played days with no result yet: said, not dropped (census 9). */}
@@ -557,6 +568,14 @@ export default async function PublicCompetitionPage({
                         </span>
                         <span className="public-match-meta">Result to come</span>
                       </span>
+                      {match.livePage ? (
+                        <Link
+                          href={`/c/${view.slug}/m/${encodeURIComponent(match.fixtureNumber)}`}
+                          className="public-season-more"
+                        >
+                          Open match
+                        </Link>
+                      ) : null}
                     </li>
                   ))}
                   {play.upcoming.map((match) => (
@@ -578,6 +597,14 @@ export default async function PublicCompetitionPage({
                             .join(" · ") || "Time to be announced"}
                         </span>
                       </span>
+                      {match.livePage ? (
+                        <Link
+                          href={`/c/${view.slug}/m/${encodeURIComponent(match.fixtureNumber)}`}
+                          className="public-season-more"
+                        >
+                          Open match
+                        </Link>
+                      ) : null}
                     </li>
                   ))}
                   {play.recent.map((match) => {
@@ -591,6 +618,14 @@ export default async function PublicCompetitionPage({
                             {said.rest}
                           </span>
                         </span>
+                        {match.livePage ? (
+                          <Link
+                            href={`/c/${view.slug}/m/${encodeURIComponent(match.fixtureNumber)}`}
+                            className="public-season-more"
+                          >
+                            Scorecard
+                          </Link>
+                        ) : null}
                       </li>
                     );
                   })}
@@ -705,7 +740,7 @@ export default async function PublicCompetitionPage({
                   primaryColor: team.primaryColor,
                   logoUrl: team.logoUrl,
                   coachName: team.coachName,
-                  href: `/c/${view.slug}/t/${teamSlugOf(team.name)}`,
+                  href: `/c/${view.slug}/t/${teamSlugOf(team)}`,
                 }))}
               />
             )}
@@ -733,6 +768,14 @@ export default async function PublicCompetitionPage({
                     {fixture.groundName !== null ? ` · ${fixture.groundName}` : ""}
                     {fixture.venueName !== null ? `, ${fixture.venueName}` : ""}
                   </span>
+                  {sportPackFor(view.sport).scoring ? (
+                    <Link
+                      href={`/c/${view.slug}/m/${encodeURIComponent(fixture.number)}`}
+                      className="public-hint"
+                    >
+                      Open match
+                    </Link>
+                  ) : null}
                 </li>
               ))}
             </ul>

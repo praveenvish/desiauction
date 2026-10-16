@@ -4,19 +4,27 @@ import {
   IconPlay,
   IconUser,
   Pill,
+  SectionCard,
   ToastProvider,
   type KitTone,
 } from "@desiauction/ui";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PageTitle } from "../../../../components/shell/page-title";
 import { auctionDashboard } from "../../../../server/auction/actions";
 import { auctioneerPanelView } from "../../../../server/auction/auctioneer-actions";
+import { practiceCardView } from "../../../../server/auction/practice-actions";
 import { appointmentsPanelView } from "../../../../server/competition/appointment-actions";
 import { requireOnboarded } from "../../../../server/auth/onboarding-gate";
 import { standingsView } from "../../../../server/competition/fixture-actions";
+import { teamsWorkspaceView } from "../../../../server/competition/actions";
+import { OfflinePublish, OfflineResultsSheet } from "./offline-results";
+import { OfflineSwitch } from "./offline-switch";
+import "../teams/teams.css";
 import { AuctionPanel } from "./auction-panel";
 import { AuctioneerPanel } from "./auctioneer-panel";
+import { PracticeCard } from "./practice-card";
 import "../../seasons.css";
 // The hub renders <BroadcastLinks>, and every rule that dresses it —
 // `.broadcast-row`, `.share-auction-button`, `.broadcast-url` — lives in
@@ -61,7 +69,7 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
   const { slug } = await params;
   // See /seasons: `auction/spectate` next door is public, so no gate layout.
   await requireOnboarded();
-  const [dashboard, auctioneers, appointments, table] = await Promise.all([
+  const [dashboard, auctioneers, appointments, table, practice] = await Promise.all([
     auctionDashboard(slug),
     auctioneerPanelView(slug),
     // Captains & icons still to be told — null unless this viewer may set them.
@@ -69,6 +77,8 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
     // How the squads are doing since the night (census 18) — the same read as
     // the Table tab, so the two cannot disagree.
     standingsView(slug),
+    // The practice auction (0101) — the season's managers only, before the night.
+    practiceCardView(slug),
   ]);
   if (dashboard === null) {
     notFound();
@@ -79,6 +89,28 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
   // "Go live" leads to a room that is actually open. Before that there is
   // nothing to watch, and after it there is nothing to bid on.
   const inProgress = status === "live" || status === "paused";
+  // 0110: declared in Season details — the night happens somewhere else, so
+  // there is no room to set up here, only results to type in.
+  const imported =
+    dashboard.competition.auctionSource === "imported" &&
+    (status === null || status === "abandoned");
+  // A season run offline types its results in HERE: the Auction tab used to
+  // say "go to the Teams tab", a dead end on the one tab named for the job
+  // (founder, 2026-10-06). The same list as Teams → "Type results in one list".
+  const resultsDesk =
+    imported && dashboard.viewer.canManage ? await teamsWorkspaceView(slug) : null;
+  const typing =
+    resultsDesk !== null &&
+    resultsDesk.handEntry === "open" &&
+    resultsDesk.viewer.canSeeRoster &&
+    resultsDesk.teams.length > 0
+      ? resultsDesk
+      : null;
+  const showSwitch =
+    (status === null || status === "scheduled" || status === "abandoned") &&
+    !imported &&
+    dashboard.viewer.canManage;
+  const leadCard = showSwitch || (practice !== null && status === "scheduled");
   const rows = table?.standings.rows ?? [];
   const standing = rows.some((row) => row.played > 0)
     ? Object.fromEntries(
@@ -95,11 +127,24 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
           {/* An auction renames the surface — the tab still says "Auction",
               the title says what is happening on it, which is not always
               "live". */}
-          {title !== null ? <PageTitle title={title} /> : null}
+          {/* A season switched to offline results ended its scheduled auction
+              on purpose: "Auction abandoned" in red would read as an accident. */}
+          {imported ? (
+            <PageTitle title="Auction results" />
+          ) : title !== null ? (
+            <PageTitle title={title} />
+          ) : null}
           {/* Before an auction exists every control here is absent, and the
               empty header drew a stray rule and a blank band at the top. */}
-          {status !== null ? (
-            <header className="auc-head">
+          {status !== null && !imported ? (
+            <header
+              className={
+                // A card leads the page (the offline switch, the practice):
+                // the head takes its own row instead of being pinned into the
+                // tab strip's corner, where it landed on the card.
+                leadCard ? "auc-head auc-head-row" : "auc-head"
+              }
+            >
               {pill !== null ? (
                 <span className="auc-status">
                   <Pill tone={pill.tone} dot testId="auction-status">
@@ -157,17 +202,97 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
               </div>
             </header>
           ) : null}
-          <AuctionPanel
-            slug={slug}
-            dashboard={dashboard}
-            appointments={appointments}
-            {...(standing !== undefined ? { standing } : {})}
-            auctioneersSlot={
-              auctioneers !== null ? (
-                <AuctioneerPanel key="auctioneers" slug={slug} view={auctioneers} />
-              ) : null
-            }
-          />
+          {/* The fork in the road, first: a night that has not started can
+              still be held offline instead (switchToOfflineResultsAction). */}
+          {showSwitch ? <OfflineSwitch slug={slug} scheduled={status === "scheduled"} /> : null}
+          {practice !== null && status === "scheduled" ? (
+            <PracticeCard slug={slug} card={practice} />
+          ) : null}
+          {/* Posters exist before the hammer too (the season poster and each
+              team's "meet the squad"), but every door to them used to open
+              only after a finished night. */}
+          {(status === null || status === "scheduled" || status === "abandoned") &&
+          !imported &&
+          dashboard.viewer.canPoster ? (
+            <p className="auc-hand-hint" data-testid="auction-posters-door">
+              <Link href={`/seasons/${slug}/posters`}>Make posters</Link> — the season poster and
+              each team&apos;s squad, ready to share before the auction.
+            </p>
+          ) : null}
+          {typing !== null ? (
+            <>
+              <OfflineResultsSheet
+                slug={slug}
+                teams={typing.teams.map((team) => ({
+                  id: team.id,
+                  name: team.name,
+                  color: team.color,
+                }))}
+                roleLabels={Object.fromEntries(typing.roles.map((role) => [role.key, role.label]))}
+                heading="Auction results"
+              />
+              <OfflinePublish
+                slug={slug}
+                teams={typing.teams}
+                imported
+                inList
+                suggestedPurse={typing.suggestedPurse ?? null}
+              />
+              {dashboard.viewer.canPoster ? (
+                <p className="auc-hand-hint" data-testid="auction-posters-door">
+                  <Link href={`/seasons/${slug}/posters`}>Make posters</Link> — squad posters and
+                  player cards update as you type the results in.
+                </p>
+              ) : null}
+            </>
+          ) : imported ? (
+            <SectionCard
+              icon={<IconGavel />}
+              title="Auction held outside DesiAuction"
+              description="Add each team's players and prices on the Teams tab. The public squad pages show them as you go; publish when every team is complete to finish the season's results. To run the auction here instead, change it in Season details."
+              data-testid="auction-imported"
+            >
+              <span className="date-row">
+                <ButtonLink href={`/seasons/${slug}/teams`} size="sm">
+                  <IconUser size={16} />
+                  Add results on the Teams tab
+                </ButtonLink>
+              </span>
+            </SectionCard>
+          ) : dashboard.view?.auction.enteredByHand === true ? (
+            /* No room ran, so there is no bidding to review — just what was
+               typed in, and where it is used. */
+            <SectionCard
+              icon={<IconGavel />}
+              title="Results entered by hand"
+              description={`This auction was held outside the app. ${String(dashboard.view.lotStats.sold)} player${dashboard.view.lotStats.sold === 1 ? "" : "s"} bought with a price, ${String(dashboard.view.lotStats.unsold)} unsold. The squads are final.`}
+              data-testid="auction-by-hand"
+            >
+              <span className="date-row">
+                <ButtonLink href={`/seasons/${slug}/teams`} variant="secondary" size="sm">
+                  <IconUser size={16} />
+                  See the teams
+                </ButtonLink>
+                {dashboard.viewer.canPoster ? (
+                  <ButtonLink href={`/seasons/${slug}/posters`} size="sm">
+                    Make posters
+                  </ButtonLink>
+                ) : null}
+              </span>
+            </SectionCard>
+          ) : (
+            <AuctionPanel
+              slug={slug}
+              dashboard={dashboard}
+              appointments={appointments}
+              {...(standing !== undefined ? { standing } : {})}
+              auctioneersSlot={
+                auctioneers !== null ? (
+                  <AuctioneerPanel key="auctioneers" slug={slug} view={auctioneers} />
+                ) : null
+              }
+            />
+          )}
         </div>
       </main>
     </ToastProvider>

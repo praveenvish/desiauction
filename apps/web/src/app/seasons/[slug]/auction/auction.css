@@ -3987,3 +3987,170 @@ details.squad-team[open] .squad-team-caret {
     border-top: 1px solid var(--border-subtle);
   }
 }
+
+/* --- the practice bar (0101) ---------------------------------------------- */
+/* One strip that tells a room it is a rehearsal, on every screen of it. Amber,
+   the colour of "not for real", never the green of a live night. */
+.practice-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--warning-base);
+  border-radius: var(--radius-md);
+  background: var(--warning-subtle);
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+}
+.practice-bar[data-room="real"] {
+  border-color: var(--border-subtle);
+  background: var(--surface-raised);
+}
+.practice-bar-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.practice-bar-tag {
+  padding: 0 var(--space-2);
+  border: 1px solid var(--warning-base);
+  border-radius: var(--radius-sm);
+  color: var(--warning-strong);
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.practice-bar-switch {
+  display: flex;
+  gap: var(--space-1);
+}
+
+/* --- the practice card (0101) --------------------------------------------- */
+.practice-setup,
+.practice-running {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+}
+.practice-size {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.practice-size-label {
+  margin-inline-end: var(--space-1);
+  font-weight: 600;
+}
+.practice-sum {
+  margin: 0;
+}
+.practice-teams {
+  display: grid;
+  gap: var(--space-2);
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.practice-teams li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-block: var(--space-1);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.practice-team-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.practice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* 0105: the pointer to entering results by hand, before any auction exists. */
+.auc-hand-hint {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.auc-hand-hint a {
+  color: var(--text-accent);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* "Switch to offline results?" — what is kept, what comes next, what ends. */
+.auc-switch-list {
+  margin: 0;
+  padding-left: 1.2em;
+  display: grid;
+  gap: var(--space-2);
+  color: var(--text-primary);
+}
+
+/* Task identity stays compact above the room; operational status remains in
+   the existing shell strip and the bid/gavel action retains its own bar. */
+.auction-task-context {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+.auction-task-identity {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-3);
+  row-gap: var(--space-1);
+}
+.auction-task-identity strong {
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+.auction-task-identity span,
+.auction-task-context p {
+  margin: 0;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+.auction-recovery-card {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-inline-start: var(--space-1) solid var(--accent-line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+  overflow-wrap: anywhere;
+}
+.auction-recovery-card h2 {
+  margin: 0;
+  color: var(--text-heading);
+  font-family: var(--font-text);
+  font-size: var(--text-base-size);
+}
+.auction-recovery-card p {
+  margin: 0 0 var(--space-2);
+  color: var(--text-secondary);
+  max-width: 75ch;
+}
+.auction-recovery-card button {
+  min-height: 44px;
+  max-width: 100%;
+  white-space: normal;
+}

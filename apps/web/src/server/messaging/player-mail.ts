@@ -1,3 +1,4 @@
+import { initialsOf } from "@desiauction/core";
 import type { MessageLanguage } from "@desiauction/messaging/email-templates";
 
 import { roleLabelIn, sportPackFor } from "@desiauction/core";
@@ -555,25 +556,8 @@ export interface SeasonFacts {
 }
 
 /** "Malad Cricket Club" → "MC"; one word → its first two letters. */
-const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: "grapheme" });
-
-/** The first `count` letters as a reader sees them — a Hindi conjunct stays whole. */
-function firstLetters(word: string, count: number): string {
-  return Array.from(GRAPHEMES.segment(word), (part) => part.segment)
-    .slice(0, count)
-    .join("");
-}
-
 export function monogramOf(name: string): string {
-  const words = name
-    .trim()
-    .split(/\s+/)
-    .filter((word) => word !== "");
-  const letters =
-    words.length >= 2
-      ? `${firstLetters(words[0] ?? "", 1)}${firstLetters(words[1] ?? "", 1)}`
-      : firstLetters(words[0] ?? "", 2);
-  return letters.toUpperCase() || "DA";
+  return initialsOf(name, { words: "first-two", singleWord: 2 }) || "DA";
 }
 
 export function seasonBand(facts: SeasonFacts): EmailBand {

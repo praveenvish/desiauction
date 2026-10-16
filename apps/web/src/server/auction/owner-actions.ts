@@ -13,6 +13,7 @@ import {
   people,
   teams,
 } from "@desiauction/db";
+import { isRealAuction } from "@desiauction/auction";
 import type { MoneyUnit } from "@desiauction/core";
 import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import { after } from "next/server";
@@ -312,7 +313,7 @@ async function resolveOwnerJoinLanding(
     .innerJoin(competitions, eq(competitions.id, auctions.competitionId))
     .innerJoin(teams, eq(teams.id, auctionOwnerInvites.teamId))
     .innerJoin(organizations, eq(organizations.id, auctionOwnerInvites.orgId))
-    .where(eq(auctionOwnerInvites.tokenHash, hashToken(token)))
+    .where(and(eq(auctionOwnerInvites.tokenHash, hashToken(token)), isRealAuction()))
     .limit(1);
   if (row === undefined) {
     return { state: "invalid" };
@@ -449,6 +450,7 @@ export async function acceptOwnerJoin(token: string): Promise<AcceptOwnerJoinRes
     .where(
       and(
         eq(auctionOwnerInvites.tokenHash, hashToken(token)),
+        isRealAuction(),
         isNull(auctionOwnerInvites.revokedAt),
       ),
     )

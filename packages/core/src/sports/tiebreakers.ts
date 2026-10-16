@@ -182,3 +182,36 @@ export function summariseFields(
       return formatter === undefined ? String(raw) : formatter(raw);
     });
 }
+
+/**
+ * Prefer recorded net-run-rate inputs; older aggregates fall back to actual
+ * runs and balls. `preferredNumerator` (cricket: `nrr_runs`) carries the runs
+ * credited under a revised target; without it the plain numerator is used.
+ */
+export function netRateWithFallback(
+  numerator: string,
+  preferred: string,
+  fallback: string,
+  per: number,
+  label: string,
+  options: TiebreakerOptions & { readonly preferredNumerator?: string } = {},
+): TiebreakerSpec {
+  const preferredNumerator = options.preferredNumerator;
+  const side = (totals: SideTotals, which: "scored" | "conceded"): number | null => {
+    const bottom = totals[which][preferred] ?? totals[which][fallback] ?? 0;
+    const top =
+      (preferredNumerator === undefined ? undefined : totals[which][preferredNumerator]) ??
+      value(totals, which, numerator);
+    return bottom === 0 ? null : (top / bottom) * per;
+  };
+  return {
+    key: options.key ?? `net_${numerator}_rate`,
+    label,
+    precision: options.precision ?? 3,
+    compute: (totals) => {
+      const scored = side(totals, "scored");
+      const conceded = side(totals, "conceded");
+      return scored === null || conceded === null ? null : scored - conceded;
+    },
+  };
+}

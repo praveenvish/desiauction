@@ -76,6 +76,13 @@ grants, swaps the engine first so its single-writer lease is handed over
 cleanly, and fails the job unless `/readyz` answers on the new engine and web
 within 180 s. ops/deploy/README "How a deploy runs" has the step list.
 
+On a production deploy that has passed `/readyz`, the last step tells IndexNow
+(Bing, Yandex, Seznam, Naver) what the release changed: every page that is new
+or whose sitemap `<lastmod>` moved since the snapshot taken before the swap,
+plus the homepage (`scripts/indexnow-announce.mjs`). It exits 0 on every path,
+so it can never fail a deploy. Season pages are announced by the app itself
+when an organizer publishes or unpublishes them.
+
 **The first deploy onto an empty database** passes the freeze on its own: an
 unmigrated database has no `auctions` table, which the check reads as "nothing
 can be live" (any other error is still a refusal). Create the four roles
@@ -117,6 +124,7 @@ protection is what keeps a red commit off `main` in the first place.
    psql -v ON_ERROR_STOP=1 \
      -v app_password=… -v system_password=… \
      -v engine_password=… -v runner_password=… \
+     -v live_password=… \
      -f ops/db/create-app-role.sql
    ```
 
@@ -158,7 +166,13 @@ with `pnpm env:check`). Web: `DATABASE_URL` (app role), `SYSTEM_DATABASE_URL`
 Engine: `DATABASE_URL` (writer credential), `ENGINE_SECRET`, `PORT`,
 `SENTRY_DSN`. Runner: `DATABASE_URL` (writer credential), `RUNNER_TICK_MS`,
 `SENTRY_DSN`, `FINOPS_*`, and the mailer — `EMAIL_API_ENDPOINT`, `EMAIL_API_KEY`,
-`EMAIL_FROM` (optionally `EMAIL_PROVIDER`). The runner drains `dispatch.send`, so
+`EMAIL_FROM` (optionally `EMAIL_PROVIDER`). Live: `LIVE_DATABASE_URL` (the
+`desiauction_live` role — it reads only through `live_snapshot` /
+`live_history_entry`, migration 0127), `LIVE_ALLOWED_ORIGINS`,
+`TRUSTED_PROXY_COUNT`, `LIVE_MAX_SOCKETS`. **Hosts created before F07** replace
+`SYSTEM_DATABASE_URL` in `live.env` with `LIVE_DATABASE_URL` and a new password
+(`openssl rand -hex 24`); the next deploy's `migrator roles` creates the role
+from it, and the preflight refuses a `live.env` still on the system role. The runner drains `dispatch.send`, so
 it is the process that emails every receipt, invoice and correction; a
 production runner refuses to boot without all three or with
 `EMAIL_PROVIDER=dev` (the filesystem outbox that used to swallow every document).

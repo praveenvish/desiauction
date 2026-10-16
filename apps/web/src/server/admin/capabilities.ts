@@ -62,7 +62,8 @@ export type PlatformCapability =
   | "platform.demo"
   | "platform.privacy"
   | "platform.support"
-  | "platform.moderate";
+  | "platform.moderate"
+  | "platform.grant";
 
 export type PlatformCapabilitySet =
   | "platform:admin"
@@ -70,7 +71,8 @@ export type PlatformCapabilitySet =
   | "platform:demo"
   | "platform:privacy"
   | "platform:support"
-  | "platform:moderation";
+  | "platform:moderation"
+  | "platform:superadmin";
 
 const SETS: Record<PlatformCapabilitySet, readonly PlatformCapability[]> = {
   "platform:admin": ["platform.admin"],
@@ -130,9 +132,31 @@ const SETS: Record<PlatformCapabilitySet, readonly PlatformCapability[]> = {
    * both structural locks unchanged.
    */
   "platform:moderation": ["platform.moderate"],
+  /**
+   * THE SEVENTH SET (AC-1.1): the superadmin, who gives and takes the six
+   * above. One power, like every set here: seeing the console is
+   * `platform:admin`'s, and a superadmin who needs it holds both — on the
+   * record, the way an operator with two desks always has.
+   *
+   * The app has no path that grants or revokes THIS set: only `seed:admin`
+   * mints one, and the seed refuses to revoke the last. Same two structural
+   * locks as every set above.
+   */
+  "platform:superadmin": ["platform.grant"],
 };
 
 export const PLATFORM_CAPABILITY_SETS: readonly PlatformCapabilitySet[] = [
+  "platform:admin",
+  "platform:billing",
+  "platform:demo",
+  "platform:privacy",
+  "platform:support",
+  "platform:moderation",
+  "platform:superadmin",
+];
+
+/** The sets a superadmin may grant and revoke in the app: every one but its own. */
+export const GRANTABLE_PLATFORM_SETS: readonly PlatformCapabilitySet[] = [
   "platform:admin",
   "platform:billing",
   "platform:demo",

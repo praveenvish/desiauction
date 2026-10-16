@@ -29,7 +29,8 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   // before reading the inbox — the login.spec idiom; a bare read races the mint.
   await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code", COLD);
   const code = await latestOtp(phone);
-  await page.getByLabel("6-digit code").fill(code);
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(code);
   await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).not.toHaveURL(/\/login/, COLD);
   // PX-3: the name gate now guards every console route, not just /home — a
@@ -272,6 +273,7 @@ const PNG_1PX = Buffer.from(
 test("an organizer adds one player by hand, then imports their photo by filename", async ({
   page,
 }) => {
+  test.setTimeout(180_000);
   /*
    * SCOPED TO THIS TEST, and that is the fix.
    *
@@ -291,12 +293,13 @@ test("an organizer adds one player by hand, then imports their photo by filename
   await page.getByTestId("new-org").click();
   await page.getByLabel("Club name").filter({ visible: true }).fill(`Hand Org ${STAMP}`);
   await page.getByRole("button", { name: "Create club" }).click();
-  await expect(page.getByTestId("org-name")).toBeVisible();
+  await expect(page.getByTestId("org-name")).toBeVisible(COLD);
 
   await page.goto("/seasons");
   await page.getByTestId("new-season").click();
   await page.getByLabel("Season name").filter({ visible: true }).fill(`Hand Cup ${STAMP}`);
   await page.getByRole("button", { name: "Create season" }).click();
+  await expect(page.getByTestId("competition-status")).toHaveText("draft", COLD);
   await page.getByTestId("open-dashboard").click();
   await expect(page.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true", COLD);
 
@@ -323,8 +326,11 @@ test("an organizer adds one player by hand, then imports their photo by filename
   await expect(page.getByTestId("photo-match-table")).toContainText("Hand Added Player");
   await expect(page.getByTestId("photo-match-table")).toContainText("by reg. number");
   await page.getByTestId("photo-upload-all").click();
-  // A clean batch closes the dialog itself, and the row swaps initials for the
-  // uploaded image — which only renders once consent was recorded (DPDP §5).
+  // The list stays for a last look at the faces, with a Remove on each; Done
+  // closes it, and the row swaps initials for the uploaded image — which only
+  // renders once consent was recorded (DPDP §5).
+  await expect(page.getByTestId("photo-remove-uploaded-0")).toBeVisible({ timeout: 20_000 });
+  await page.getByTestId("photo-done").click();
   await expect(page.getByTestId("photo-match-table")).toBeHidden({ timeout: 20_000 });
   await expect(page.getByTestId("reg-table").locator("img").first()).toBeVisible();
 });

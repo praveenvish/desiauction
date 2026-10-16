@@ -95,11 +95,11 @@ export interface LiveBoardView extends LiveBoard {
   readonly engine: Readonly<Record<string, EngineRoom>>;
 }
 
-export async function adminLiveBoard(): Promise<LiveBoardView | null> {
+export async function adminLiveBoard(page: unknown = 1): Promise<LiveBoardView | null> {
   if ((await platformAdminGate()) === null) {
     return null;
   }
-  return withEngine(await liveAuctionBoard(systemDb, Date.now()), ENGINE_PROBE_CAP);
+  return withEngine(await liveAuctionBoard(systemDb, Date.now(), page), ENGINE_PROBE_CAP);
 }
 
 /** The board plus the engine's view of its first `cap` running rooms. */

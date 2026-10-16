@@ -1,4 +1,5 @@
 "use client";
+import { redactSupportPath } from "../../lib/support-path";
 
 import { Button, Dialog, Field, Select } from "@desiauction/ui";
 import {
@@ -58,10 +59,7 @@ function takeSnapshot(): Snapshot {
     // The server strips the query string, fragment and token segments; the
     // pathname shown in the dialog is stripped the same way for display.
     pageUrl: window.location.href,
-    pathname: window.location.pathname.replace(
-      /\/(join|owner-join|demo|review)\/[^/]+/,
-      "/$1/[redacted]",
-    ),
+    pathname: redactSupportPath(window.location.pathname),
     context: {
       viewport: `${String(window.innerWidth)}×${String(window.innerHeight)} @${String(window.devicePixelRatio)}x`,
       userAgent: navigator.userAgent,

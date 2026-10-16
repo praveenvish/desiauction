@@ -123,7 +123,7 @@ export async function unaskedParticipants(
     owners as (
       select distinct pd.person_id, 'owner' as role, null::text as reg_dob
       from paddles pd
-      join auctions a on a.id = pd.auction_id
+      join auctions a on a.id = pd.auction_id and a.kind = 'real'
       where ${wantOwners} and a.competition_id = ${competitionId}
     ),
     everyone as (
@@ -213,7 +213,7 @@ export async function askBreakdown(
     owners as (
       select distinct pd.person_id, 'owner' as role, null::text as reg_dob
       from paddles pd
-      join auctions a on a.id = pd.auction_id
+      join auctions a on a.id = pd.auction_id and a.kind = 'real'
       where a.competition_id = ${competitionId}
     ),
     everyone as (

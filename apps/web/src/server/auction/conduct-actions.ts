@@ -29,7 +29,7 @@ import { ledgerPlayers, type LedgerPlayers } from "../../lib/ledger-players";
 import { storage } from "../media";
 import { engineWsUrl } from "./engine-client";
 import { fetchEngineDiagnostics, fetchEngineSnapshot } from "./engine-reads";
-import { auctionMemberGate, liveGate } from "./live-actions";
+import { auctionMemberGate, liveGate, type PracticeRoom } from "./live-actions";
 import { ownerAcceptancesOf } from "./owner-acceptances";
 import {
   preSignedPlayers,
@@ -115,30 +115,43 @@ export interface CockpitView {
    */
   lotMedia: Record<string, LotMedia>;
   rules: AuctionRules;
+  /** The season's practice, when one is running (see `LiveAuctionView.practice`). */
+  practice: PracticeRoom | null;
+}
+
+function emptyOwnerBoard(): OwnerBoard {
+  return { invites: [], grants: [] };
 }
 
 /** The cockpit seed — conductors only (the organizer's control room). */
 export async function cockpitView(slug: string): Promise<CockpitView | null> {
-  const gate = await liveGate(slug);
+  const gate = await liveGate(slug, { room: true });
   if (gate === null || !gate.canConduct) {
     return null;
   }
+  // A practice has no owner links of its own and no pre-signed squads: its
+  // owners came from the real auction, and its squads start empty.
+  const inPractice = gate.practice?.inPractice === true;
   const [view, owners, teamRows, preSigned, resolved, ownerAcceptances, lotMedia] = await inGateOrg(
     gate,
     (db) =>
       Promise.all([
         auctionView(db, gate.auction),
-        ownerBoard(db, gate.auction),
+        inPractice ? Promise.resolve(emptyOwnerBoard()) : ownerBoard(db, gate.auction),
         db
           .select(TEAM_IDENTITY)
           .from(teams)
           .where(eq(teams.competitionId, gate.competition.id))
           .orderBy(asc(teams.name)),
-        preSignedPlayers(db, gate.competition.id, (key) => storage.readUrl(key)),
+        inPractice
+          ? Promise.resolve([])
+          : preSignedPlayers(db, gate.competition.id, (key) => storage.readUrl(key)),
         resolvedLots(db, gate.auction.id),
-        ownerAcceptancesOf(db, gate.auction.id, gate.competition.orgId, {
-          fullContact: gate.canManage,
-        }),
+        inPractice
+          ? Promise.resolve([])
+          : ownerAcceptancesOf(db, gate.auction.id, gate.competition.orgId, {
+              fullContact: gate.canManage,
+            }),
         lotMediaOf(db, gate.auction.id, (key) => storage.readUrl(key)),
       ]),
   );
@@ -163,6 +176,7 @@ export async function cockpitView(slug: string): Promise<CockpitView | null> {
     resolved,
     lotMedia,
     rules: rulesOf(gate.auction.config),
+    practice: gate.practice,
   };
 }
 
@@ -541,7 +555,7 @@ export type DiagnosticsResult =
 
 /** The recovery dashboard's feed — a conduct-gated proxy to the engine. */
 export async function engineDiagnosticsAction(slug: string): Promise<DiagnosticsResult> {
-  const gate = await liveGate(slug);
+  const gate = await liveGate(slug, { room: true });
   if (gate === null || !gate.canConduct) {
     return { ok: false, reason: "not_authorized" };
   }

@@ -21,13 +21,15 @@ import {
   teams,
   type DbHandle,
 } from "@desiauction/db";
-import { inArray } from "drizzle-orm";
+import { inArray, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { env } from "../../env";
 import { purgeOrg } from "../test-support/purge-org";
 import {
   ACTIVE_WINDOW_MS,
+  LIVE_BOARD_PAGE_SIZE,
+  liveBoardPage,
   STALE_AFTER_MS,
   auctionPulse,
   liveAuctionBoard,
@@ -40,7 +42,7 @@ const db = handle.db;
 const MARK = "LIVEBOARD-REGRESSION";
 const MIN = 60_000;
 const HOUR = 60 * MIN;
-const NOW = Date.now();
+let NOW = Date.now();
 
 let orgId = "";
 /** The season of the auction created last — the busy room's, while it is seeded. */
@@ -159,6 +161,18 @@ async function bid(
 }
 
 beforeAll(async () => {
+  // A populated validation database legitimately has newer closed auctions.
+  // Keep our logical board clock and all relative assertions independent of
+  // those records, without altering the process clock or production limit.
+  const [clock] = await db
+    .select({ maxAtMs: sql<string | null>`max(${auctionEvents.atMs})` })
+    .from(auctionEvents);
+  const maxExistingAtMs =
+    clock?.maxAtMs === null || clock?.maxAtMs === undefined ? null : Number(clock.maxAtMs);
+  if (maxExistingAtMs !== null && !Number.isSafeInteger(maxExistingAtMs))
+    throw new Error("Invalid persisted auction clock");
+  NOW = Math.max(Date.now(), maxExistingAtMs === null ? 0 : maxExistingAtMs + HOUR + MIN);
+  if (!Number.isSafeInteger(NOW)) throw new Error("Invalid test auction clock");
   creator = await person("Organizer");
   orgId = newId();
   await db.insert(organizations).values({
@@ -235,9 +249,53 @@ describe("roomState", () => {
   });
 });
 
+async function completeBoard() {
+  const first = await liveAuctionBoard(db, NOW);
+  const running = [...first.running];
+  const stale = [...first.stale];
+  let page = first;
+  while (page.pagination?.hasNext) {
+    page = await liveAuctionBoard(db, NOW, page.pagination.page + 1);
+    running.push(...page.running);
+    stale.push(...page.stale);
+  }
+  return { ...first, running, stale };
+}
+
 describe("liveAuctionBoard", () => {
+  it("normalizes invalid pages without unsafe offsets", () => {
+    for (const value of [0, -1, NaN, Infinity, "2x", ["2"], Number.MAX_SAFE_INTEGER])
+      expect(liveBoardPage(value)).toBe(1);
+    expect(liveBoardPage("2")).toBe(2);
+  });
+
+  it("traverses more than 200 qualifying rooms with bounded pages and no omissions", async () => {
+    const ids: string[] = [];
+    for (let index = 0; index < 205; index += 1) {
+      const id = await auction("live", `Paged ${String(index)}`);
+      await event(id, 1, "AuctionOpened", NOW + index);
+      ids.push(id);
+    }
+    let page = 1;
+    const seen: string[] = [];
+    for (;;) {
+      const board = await liveAuctionBoard(db, NOW + 205, page);
+      const rows = [...board.running, ...board.stale];
+      expect(rows.length).toBeLessThanOrEqual(LIVE_BOARD_PAGE_SIZE);
+      expect(board.pagination?.page).toBe(page);
+      seen.push(...rows.map((row) => row.auctionId));
+      if (!board.pagination?.hasNext) break;
+      page += 1;
+    }
+    expect(page).toBeGreaterThan(4);
+    expect(new Set(seen).size).toBe(seen.length);
+    expect(ids.every((id) => seen.includes(id))).toBe(true);
+    const seededOrder = seen.filter((id) => ids.includes(id));
+    expect(seededOrder).toEqual([...ids].reverse());
+  }, 30000);
+
   it("puts each auction in the list its own clock says it belongs to", async () => {
-    const board = await liveAuctionBoard(db, NOW);
+    const board = await completeBoard();
     const running = board.running.find((row) => row.auctionId === busy);
     expect(running?.state).toBe("active");
     expect(board.stale.map((row) => row.auctionId)).toContain(silent);
@@ -247,7 +305,7 @@ describe("liveAuctionBoard", () => {
   });
 
   it("counts the room from its own rows", async () => {
-    const board = await liveAuctionBoard(db, NOW);
+    const board = await completeBoard();
     const row = board.running.find((entry) => entry.auctionId === busy);
     expect(row?.lots).toEqual({ total: 6, sold: 2, unsold: 1, remaining: 2 });
     expect(row?.moneyMoved).toBe(800_000_00);
@@ -260,9 +318,28 @@ describe("liveAuctionBoard", () => {
   });
 
   it("names when a closed auction ended, from its log", async () => {
-    const board = await liveAuctionBoard(db, NOW);
+    const board = await completeBoard();
     const ended = board.ended.find((row) => row.auctionId === closedRecently);
     expect(ended?.endedAtMs).toBe(NOW - HOUR);
+  });
+
+  it("returns exactly the ten newest qualifying ended auctions", async () => {
+    const endedIds: string[] = [];
+    for (let index = 0; index < 11; index += 1) {
+      const id = await auction("completed", `Bounded ended ${String(index)}`);
+      await event(id, 1, "AuctionOpened", NOW - 2 * HOUR);
+      await event(id, 2, "AuctionClosed", NOW - (index + 1) * MIN);
+      endedIds.push(id);
+    }
+    const board = await completeBoard();
+    expect(board.ended).toHaveLength(10);
+    expect(board.ended.map((row) => row.auctionId)).toEqual(endedIds.slice(0, 10));
+    expect(board.ended.map((row) => row.endedAtMs)).toEqual(
+      Array.from({ length: 10 }, (_, index) => NOW - (index + 1) * MIN),
+    );
+    expect(board.ended.map((row) => row.auctionId)).not.toContain(endedIds[10]);
+    expect(board.ended.map((row) => row.auctionId)).not.toContain(closedLongAgo);
+    // afterAll purges only this spec's own organization and people.
   });
 });
 

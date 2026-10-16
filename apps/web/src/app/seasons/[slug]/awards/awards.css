@@ -1,0 +1,184 @@
+.season-awards {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  color: var(--text-primary);
+}
+.season-awards > *,
+.season-award-person > div {
+  min-width: 0;
+}
+.season-award-person strong {
+  overflow-wrap: anywhere;
+}
+.season-awards-cards {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.season-award-card {
+  padding: 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  background: var(--surface-raised);
+}
+.season-award-card h2 {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.season-award-card strong {
+  font-size: 20px;
+}
+.season-award-card p {
+  color: var(--text-secondary);
+}
+.season-awards-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.season-awards-tabs a,
+.season-awards button,
+.season-awards summary {
+  min-height: 44px;
+  padding: 12px 16px;
+}
+.season-awards-tabs a[aria-current="page"] {
+  background: var(--surface-sunken);
+}
+.season-awards-table {
+  overflow-x: auto;
+}
+.season-awards table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.season-awards th,
+.season-awards td {
+  text-align: left;
+  padding: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.season-awards details {
+  padding: 16px;
+  background: var(--surface-raised);
+  border-radius: 16px;
+}
+@media (max-width: 680px) {
+  .season-awards-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.season-award-featured {
+  grid-column: 1;
+  grid-row: span 3;
+  border-color: var(--identity-accent);
+  background: var(--identity-field-deep);
+  color: var(--identity-glyph);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.season-award-featured h2 {
+  color: var(--identity-accent);
+}
+.season-award-featured strong {
+  font-size: 32px;
+}
+.season-award-featured p {
+  color: var(--identity-glyph);
+}
+.season-award-person {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.season-award-person > :first-child {
+  position: relative;
+  inset: auto;
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+}
+.season-award-featured .season-award-person > :first-child {
+  width: 96px;
+  height: 96px;
+}
+.season-award-card p {
+  margin-block: 8px;
+}
+.season-award-person p {
+  margin-block: 4px;
+}
+.season-award-unqualified {
+  color: var(--text-secondary);
+}
+.season-awards th small {
+  display: block;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+.season-awards-filters fieldset {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+}
+.season-awards select {
+  min-height: 44px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 8px;
+  color: var(--text-primary);
+  background: var(--surface-raised);
+  font: inherit;
+}
+.season-awards button {
+  border: 1px solid var(--accent-line);
+  border-radius: 8px;
+  color: var(--accent-ink);
+  background: var(--accent-subtle);
+  cursor: pointer;
+  font: inherit;
+}
+.season-awards :focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+@media (max-width: 1000px) {
+  .season-awards-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .season-award-featured {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+}
+@media (max-width: 680px) {
+  .season-awards-cards {
+    grid-template-columns: 1fr;
+  }
+  .season-award-featured strong {
+    font-size: 26px;
+  }
+}
+
+.season-awards-return {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  justify-self: start;
+  color: var(--text-heading);
+}
+.season-award-card {
+  overflow-wrap: anywhere;
+}
+.season-awards-table th,
+.season-awards-table td {
+  font-variant-numeric: tabular-nums;
+}

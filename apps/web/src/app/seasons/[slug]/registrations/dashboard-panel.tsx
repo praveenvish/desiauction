@@ -36,6 +36,7 @@ import {
   useToast,
   VisuallyHidden,
 } from "@desiauction/ui";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 
 import { useMoney } from "../../../../components/money-unit";
@@ -54,8 +55,10 @@ import { personContact, personLabel } from "../../../../lib/person-label";
 import { useHydrated } from "../../../../lib/use-hydrated";
 import {
   advanceCompetitionAction,
+  bulkConfirmAdultAction,
   bulkTriageAction,
   registrationDetailAction,
+  registrationWriteStateAction,
   selectAllMatchingAction,
   triageRegistrationAction,
   type RegistrationDashboard,
@@ -74,9 +77,14 @@ import { ExportDialog } from "../_players/export-dialog";
 import { canTriage, FEE_LABEL, PAST_TENSE, REASON_LABEL, type Row } from "../_players/labels";
 import { decisionToast, PlayerSheet } from "../_players/player-sheet";
 import { useMutate } from "../_players/use-mutate";
+import {
+  acquireWrite,
+  changeWrite,
+  releaseWrite,
+  useWriteStatus,
+} from "../_players/use-write-scope";
 import { useRoster } from "../_players/use-roster";
 import { AddPlayerDialog } from "./add-player-dialog";
-import { ImportDialog } from "./import-dialog";
 import { RegistrationStatusGlyph } from "../../../../components/status/registration-status-glyph";
 import "../_players/players-desk.css";
 import { release, releaseIfLost } from "../../../../lib/release";
@@ -157,8 +165,27 @@ interface Filters {
   fee: string;
   team: string;
   role: string;
+  /** "photo" | "phone" | "role" — players still missing that detail ("" for all). */
+  missing: string;
   sort: string;
 }
+
+/** The "fix it later" list's three questions, as the filter offers them. */
+const MISSING_LABEL: Record<string, string> = {
+  photo: "No photo",
+  phone: "No phone",
+  role: "No role",
+};
+
+/*
+ * The import dialog — column mapping, value mapping, the Drive photo step —
+ * is the heaviest thing this page owns and most visits never open it. Loaded
+ * on the first press of "Import players" instead of with the page, which keeps
+ * the route inside its first-load budget (bundle-budget.json).
+ */
+const ImportDialog = dynamic(() => import("./import-dialog").then((mod) => mod.ImportDialog), {
+  ssr: false,
+});
 
 export function RegistrationDashboardPanel({
   slug,
@@ -201,8 +228,8 @@ export function RegistrationDashboardPanel({
   const toast = useToast();
   const hydrated = useHydrated();
   const [navigating, startNavigation] = useTransition();
-  const roster = useRoster(page.rows);
-  const mutate = useMutate(roster);
+  const roster = useRoster(page.rows, slug);
+  const mutate = useMutate(roster, slug);
   const rows = roster.rows;
   /*
    * DOES THIS SEASON TAKE ENTRY FEES AT ALL? Nothing in the schema says so, so
@@ -218,11 +245,13 @@ export function RegistrationDashboardPanel({
     rows.some((row) => row.feeAmountPaise !== null);
 
   const [selected, setSelected] = useState<Map<string, Picked>>(new Map());
-  const [bulkBusy, setBulkBusy] = useState<TriageAction | "select" | null>(null);
+  const [bulkBusy, setBulkBusy] = useState<TriageAction | "select" | "adult" | null>(null);
   const [approveAllOpen, setApproveAllOpen] = useState(false);
   const [approvingAll, setApprovingAll] = useState(false);
   const [search, setSearch] = useState(filters.search);
   const [importOpen, setImportOpen] = useState(false);
+  // Mounted from the first open on, so closing and reopening keeps its state.
+  const [importMounted, setImportMounted] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [bulkDecline, setBulkDecline] = useState(false);
@@ -234,8 +263,8 @@ export function RegistrationDashboardPanel({
   /* A player the sheet shows who is not on this page — a link, an orphan in
      the warning list. Kept in its own tiny roster so edits stay optimistic. */
   const [detachedRows, setDetachedRows] = useState<Row[]>([]);
-  const detached = useRoster(detachedRows);
-  const mutateDetached = useMutate(detached);
+  const detached = useRoster(detachedRows, slug);
+  const mutateDetached = useMutate(detached, slug);
 
   const onPage = sheetId === null ? undefined : rows.find((row) => row.id === sheetId);
   /*
@@ -386,6 +415,7 @@ export function RegistrationDashboardPanel({
         fee: filters.fee,
         team: filters.team,
         role: filters.role,
+        missing: filters.missing,
         sort: filters.sort === "recent" ? "" : filters.sort,
         ...patch,
       };
@@ -451,6 +481,7 @@ export function RegistrationDashboardPanel({
     filters.fee !== "" ||
     filters.team !== "" ||
     filters.role !== "" ||
+    filters.missing !== "" ||
     filters.sort !== "recent";
 
   /* --- Selection & bulk ----------------------------------------------- */
@@ -480,6 +511,7 @@ export function RegistrationDashboardPanel({
         ...(filters.fee !== "" ? { fee: filters.fee } : {}),
         ...(filters.team !== "" ? { teamId: filters.team } : {}),
         ...(filters.role !== "" ? { role: filters.role } : {}),
+        ...(filters.missing !== "" ? { missing: filters.missing } : {}),
       }),
       () => {
         setBulkBusy(null);
@@ -502,7 +534,12 @@ export function RegistrationDashboardPanel({
     });
   };
 
-  const runBulk = async (action: TriageAction, reason?: string, note?: string) => {
+  const runBulkUnlocked = async (
+    recordTargets: (ids: string[]) => void,
+    action: TriageAction,
+    reason?: string,
+    note?: string,
+  ) => {
     if (selected.size === 0) {
       return;
     }
@@ -519,6 +556,7 @@ export function RegistrationDashboardPanel({
     const undoes = rows
       .filter((row) => selected.has(row.id))
       .map((row) => roster.apply(row.id, { status: target }));
+    recordTargets(ids);
     const result = await release(bulkTriageAction(slug, ids, action, reason, note), () => {
       setBulkBusy(null);
     });
@@ -543,6 +581,42 @@ export function RegistrationDashboardPanel({
   };
 
   /**
+   * "MARK 18+": the organizer's word that the selected players are adults, so
+   * a photo with no date of birth behind it may show on the public page (0106).
+   * A player whose date of birth says under 18 stays hidden whatever this says.
+   */
+  const confirmAdultsUnlocked = async (recordTargets: (ids: string[]) => void) => {
+    if (selected.size === 0) {
+      return;
+    }
+    setBulkBusy("adult");
+    const ids = [...selected.keys()];
+    const undoes = rows
+      .filter((row) => selected.has(row.id))
+      .map((row) => roster.apply(row.id, { adultConfirmed: true }));
+    recordTargets(ids);
+    const result = await release(bulkConfirmAdultAction(slug, ids), () => {
+      setBulkBusy(null);
+    });
+    if (!result.ok) {
+      undoes.forEach((undo) => {
+        undo();
+      });
+      toast({ title: result.error, tone: "danger" });
+      return;
+    }
+    toast({
+      title:
+        result.confirmed > 0
+          ? `${String(result.confirmed)} marked 18+ · their photos can show on the public page`
+          : "Already marked 18+",
+      tone: "success",
+    });
+    setSelected(new Map());
+    roster.settle();
+  };
+
+  /**
    * APPROVE EVERYONE WAITING, in one decision.
    *
    * An organizer who imported their own list has already decided about every
@@ -551,7 +625,7 @@ export function RegistrationDashboardPanel({
    * through the triage rules and the approval messages — scoped to the
    * submitted players on every page, not just the one on screen.
    */
-  const approveAllSubmitted = async () => {
+  const approveAllSubmittedUnlocked = async (recordTargets: (ids: string[]) => void) => {
     setApprovingAll(true);
     const found = await releaseIfLost(
       selectAllMatchingAction(slug, { status: "submitted" }),
@@ -564,6 +638,7 @@ export function RegistrationDashboardPanel({
       toast({ title: found.error, tone: "danger" });
       return;
     }
+    recordTargets(found.rows.map((row) => row.id));
     const result = await release(
       bulkTriageAction(
         slug,
@@ -589,6 +664,56 @@ export function RegistrationDashboardPanel({
     });
     roster.settle();
   };
+
+  const bulkScopeStatus = useWriteStatus(slug, "", null);
+  const exclusiveBulk = async (work: (recordTargets: (ids: string[]) => void) => Promise<void>) => {
+    const lease = acquireWrite(slug, [], [], [], true);
+    if (!lease) {
+      toast({
+        title: "Wait for the current change to be checked before starting a bulk action.",
+        tone: "danger",
+      });
+      return;
+    }
+    let ids: string[] = [];
+    const recordTargets = (targets: string[]) => {
+      ids = [...new Set(targets)];
+      for (const id of ids) roster.begin(id);
+    };
+    try {
+      await work(recordTargets);
+      if (ids.length === 0) {
+        releaseWrite(slug, lease);
+        return;
+      }
+      changeWrite(slug, lease, "checking");
+      const observed = await registrationWriteStateAction(slug, ids);
+      if (!observed.ok) throw new Error("Read refused");
+      for (const item of observed.rows) roster.apply(item.id, item);
+      for (const id of ids) roster.end(id);
+      releaseWrite(slug, lease);
+      roster.settle();
+    } catch {
+      if (ids.length === 0) {
+        releaseWrite(slug, lease);
+        toast({
+          title: "Couldn't read the selected players. No bulk change was sent.",
+          tone: "danger",
+        });
+        return;
+      }
+      changeWrite(slug, lease, "unconfirmed");
+      toast({
+        title:
+          "Couldn't confirm the bulk change. Reload to check the saved records before retrying.",
+        tone: "danger",
+      });
+    }
+  };
+  const runBulk = (action: TriageAction, reason?: string, note?: string) =>
+    exclusiveBulk((recordTargets) => runBulkUnlocked(recordTargets, action, reason, note));
+  const confirmAdults = () => exclusiveBulk(confirmAdultsUnlocked);
+  const approveAllSubmitted = () => exclusiveBulk(approveAllSubmittedUnlocked);
 
   /* --- One row -------------------------------------------------------- */
   const decideRow = async (row: Row, action: TriageAction) => {
@@ -688,6 +813,22 @@ export function RegistrationDashboardPanel({
 
   return (
     <div className="pd-desk" data-sheet-open={sheetRow !== null ? "true" : undefined}>
+      {bulkScopeStatus === "unconfirmed" ? (
+        <p role="alert" className="pd-callout">
+          Couldn't confirm the bulk change. Reloading replaces local edits with saved records.{" "}
+          <button
+            type="button"
+            className="pd-link"
+            onClick={() => {
+              window.location.reload();
+            }}
+          >
+            Reload saved records
+          </button>
+        </p>
+      ) : bulkScopeStatus ? (
+        <p role="status">Checking bulk changes…</p>
+      ) : null}
       {/* The page head's lede and actions. The shell draws the trail, the one
           <h1> and — in the top bar — the season's status pill. The two derived
           figures (auction pool, fees) ride the lede as facts, not tiles: they
@@ -729,6 +870,7 @@ export function RegistrationDashboardPanel({
             variant="secondary"
             data-testid="open-import"
             onClick={() => {
+              setImportMounted(true);
               setImportOpen(true);
             }}
           >
@@ -797,8 +939,10 @@ export function RegistrationDashboardPanel({
         }
       >
         <p>
-          They join the auction pool, and each one gets their approval message. Waitlisted players
-          are left as they are.
+          {desk.teamFormation === "auction"
+            ? "They join the auction pool, and each one gets their approval message."
+            : "Their registrations are approved, and each one gets their approval message."}{" "}
+          Waitlisted players are left as they are.
         </p>
       </Dialog>
 
@@ -813,10 +957,13 @@ export function RegistrationDashboardPanel({
         >
           <p>
             <strong>
-              {orphanPreSigned.length} pre-signed player
-              {orphanPreSigned.length === 1 ? " is" : "s are"} in no auction and no squad.
+              {orphanPreSigned.length} {desk.teamFormation === "auction" ? "pre-signed" : "marked"}{" "}
+              player
+              {orphanPreSigned.length === 1 ? " has" : "s have"} no team.
             </strong>{" "}
-            They skip the auction but have no team. Pick one, or clear the mark.
+            {desk.teamFormation === "auction"
+              ? "They skip the auction but have no team. Pick one, or clear the mark."
+              : "Pick a team, or clear the recorded squad mark."}
           </p>
           <ul className="pd-alert-list">
             {orphanPreSigned.map((player) => (
@@ -871,7 +1018,7 @@ export function RegistrationDashboardPanel({
         desk.auctionDone ? (
           <OutcomeStrip stats={stats} />
         ) : (
-          <PoolStrip stats={stats} roles={desk.roles} />
+          <PoolStrip stats={stats} roles={desk.roles} formation={desk.teamFormation} />
         )
       ) : null}
 
@@ -1033,6 +1180,16 @@ export function RegistrationDashboardPanel({
                 Role: {labelOf(desk.roles, filters.role)}
               </ToolbarChip>
             ) : null}
+            {filters.missing !== "" ? (
+              <ToolbarChip
+                removeLabel="Remove missing-details filter"
+                onRemove={() => {
+                  changeFilter({ missing: "" });
+                }}
+              >
+                {MISSING_LABEL[filters.missing] ?? filters.missing}
+              </ToolbarChip>
+            ) : null}
             {filters.team !== "" ? (
               <ToolbarChip
                 removeLabel="Remove team filter"
@@ -1060,7 +1217,15 @@ export function RegistrationDashboardPanel({
                 data-testid="filters-reset"
                 onClick={() => {
                   setSearch("");
-                  changeFilter({ q: "", status: "", fee: "", team: "", role: "", sort: "" });
+                  changeFilter({
+                    q: "",
+                    status: "",
+                    fee: "",
+                    team: "",
+                    role: "",
+                    missing: "",
+                    sort: "",
+                  });
                 }}
               >
                 Clear all
@@ -1074,8 +1239,26 @@ export function RegistrationDashboardPanel({
             </span>
             <FilterMenu
               testId="filters-menu"
-              activeCount={[filters.role, filters.team, filters.fee].filter((v) => v !== "").length}
+              activeCount={
+                [filters.role, filters.team, filters.fee, filters.missing].filter((v) => v !== "")
+                  .length
+              }
             >
+              {/* The "fix it later" list: after a name-only import, the players
+                  still waiting for a photo, a phone or a role — each row opens
+                  the sheet where that detail is added. */}
+              <FilterSelect
+                label="Missing"
+                visibleLabel
+                value={filters.missing}
+                onChange={(value) => {
+                  changeFilter({ missing: value });
+                }}
+                options={[
+                  { value: "", label: "Anything" },
+                  ...Object.entries(MISSING_LABEL).map(([value, label]) => ({ value, label })),
+                ]}
+              />
               {desk.roles.length > 0 ? (
                 <FilterSelect
                   label="Role"
@@ -1365,6 +1548,17 @@ export function RegistrationDashboardPanel({
             </Button>
             <Button
               size="sm"
+              variant="secondary"
+              onClick={() => void confirmAdults()}
+              loading={bulkBusy === "adult"}
+              disabled={bulkBusy !== null}
+              title="You confirm these players are 18 or older. Their photos can then show on the public page."
+              data-testid="bulk-adult"
+            >
+              Mark 18+
+            </Button>
+            <Button
+              size="sm"
               variant="danger"
               onClick={() => {
                 setBulkDecline(true);
@@ -1438,14 +1632,16 @@ export function RegistrationDashboardPanel({
         />
       ) : null}
 
-      <ImportDialog
-        slug={slug}
-        open={importOpen}
-        onClose={() => {
-          setImportOpen(false);
-        }}
-        registrationOpen={registrationOpen}
-      />
+      {importMounted ? (
+        <ImportDialog
+          slug={slug}
+          open={importOpen}
+          onClose={() => {
+            setImportOpen(false);
+          }}
+          registrationOpen={registrationOpen}
+        />
+      ) : null}
 
       <ExportDialog
         slug={slug}
@@ -1464,6 +1660,7 @@ export function RegistrationDashboardPanel({
                 ...(filters.fee !== "" ? { fee: filters.fee } : {}),
                 ...(filters.team !== "" ? { teamId: filters.team } : {}),
                 ...(filters.role !== "" ? { role: filters.role } : {}),
+                ...(filters.missing !== "" ? { missing: filters.missing } : {}),
               },
             }
           : {})}
@@ -1635,8 +1832,11 @@ function NextStep({
   } else if (orphans.length > 0) {
     const first = orphans[0];
     eyebrow = "Fix";
-    title = `${String(orphans.length)} pre-signed player${orphans.length === 1 ? " has" : "s have"} no team`;
-    why = "They skip the auction, so without a team they are in no squad at all.";
+    title = `${String(orphans.length)} ${desk.teamFormation === "auction" ? "pre-signed" : "marked"} player${orphans.length === 1 ? " has" : "s have"} no team`;
+    why =
+      desk.teamFormation === "auction"
+        ? "They skip the auction, so without a team they are in no squad at all."
+        : "Choose a team, or clear the recorded squad mark.";
     action =
       first === undefined ? null : (
         <Button
@@ -1648,6 +1848,20 @@ function NextStep({
           Pick a team <IconArrowRight size={16} className="icon-trail" />
         </Button>
       );
+  } else if (desk.teamFormation !== "auction") {
+    eyebrow = "Teams and matches";
+    title = "Review team assignments before scheduling";
+    why = "Everyone is reviewed. Check the teams; choose each match lineup separately.";
+    action = (
+      <div className="pd-next-actions">
+        <ButtonLink variant="secondary" href={`/seasons/${slug}/teams`}>
+          Review teams <IconArrowRight size={16} className="icon-trail" />
+        </ButtonLink>
+        <ButtonLink variant="ghost" href={`/seasons/${slug}/fixtures`}>
+          Open match schedule
+        </ButtonLink>
+      </div>
+    );
   } else if (teamsCount < 2) {
     eyebrow = "Teams";
     title = "Add the teams that will bid";
@@ -1761,22 +1975,33 @@ function OutcomeStrip({ stats }: { stats: RegistrationStats }) {
 function PoolStrip({
   stats,
   roles,
+  formation,
 }: {
   stats: RegistrationStats;
   roles: readonly { key: string; label: string }[];
+  formation: PlayerDeskContext["teamFormation"];
 }) {
   const parts = stats.poolByRole.filter((entry) => entry.count > 0);
   return (
-    <section className="pd-pool" aria-label="Auction pool" data-testid="stat-auction-pool">
+    <section
+      className="pd-pool"
+      aria-label={formation === "auction" ? "Auction pool" : "Approved without squad marks"}
+      data-testid="stat-auction-pool"
+    >
       <div className="pd-pool-figure">
         <span className="pd-pool-eyebrow">
-          <IconGavel size={14} weight="duotone" aria-hidden /> Auction pool
+          <IconGavel size={14} weight="duotone" aria-hidden />{" "}
+          {formation === "auction" ? "Auction pool" : "Approved without squad marks"}
         </span>
         <span className="pd-pool-value">
           <span className="stat-value">{stats.auctionPool}</span>
           <span className="pd-pool-of"> of {stats.total} registered</span>
         </span>
-        <span className="pd-pool-hint stat-hint">{poolHint(stats)}</span>
+        <span className="pd-pool-hint stat-hint">
+          {formation === "auction"
+            ? poolHint(stats)
+            : "Approved registrations without captain, icon or retained marks. Team assignments are shown on each player."}
+        </span>
       </div>
       {parts.length > 0 ? (
         <div className="pd-pool-roles">

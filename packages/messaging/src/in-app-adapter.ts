@@ -1,6 +1,6 @@
-import { auditLog, newId, paddles, type Db } from "@desiauction/db";
+import { auctions, auditLog, newId, paddles, type Db } from "@desiauction/db";
 import type { DeliveryPort } from "@desiauction/financial-operations";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 /**
  * IN-APP DELIVERY THAT ACTUALLY DELIVERS.
@@ -39,6 +39,9 @@ import { eq } from "drizzle-orm";
 /** What the inbox will render. Kept here so the label map has one thing to match. */
 export const FINANCE_DOCUMENT_ISSUED = "finance.document.issued";
 
+// A practice auction's paddles (0101) do not make anyone a team's owner.
+const realPaddle = sql`${paddles.auctionId} in (select ${auctions.id} from ${auctions} where ${auctions.kind} = 'real')`;
+
 /**
  * A dispatch's `recipientRef` → the people who can be told.
  *
@@ -55,7 +58,7 @@ export async function ownersOfRecipient(db: Db, recipientRef: string): Promise<s
   const owners = await db
     .selectDistinct({ personId: paddles.personId })
     .from(paddles)
-    .where(eq(paddles.teamId, teamId));
+    .where(and(eq(paddles.teamId, teamId), realPaddle));
   return owners.map((owner) => owner.personId);
 }
 
@@ -75,7 +78,7 @@ export function createPersonInAppAdapter(db: Db): DeliveryPort {
       const owners = await db
         .selectDistinct({ personId: paddles.personId })
         .from(paddles)
-        .where(eq(paddles.teamId, teamId));
+        .where(and(eq(paddles.teamId, teamId), realPaddle));
       if (owners.length === 0) {
         // Nobody claimed a paddle for this team, so there is no person to tell.
         // Retryable: an owner may accept and claim after the document is issued.

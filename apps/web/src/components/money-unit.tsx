@@ -36,3 +36,23 @@ export function useMoney(): MoneyFormat {
   const unit = useContext(MoneyUnitContext);
   return useMemo(() => moneyFormat(unit), [unit]);
 }
+
+/**
+ * Count in `unit` below this point, or in the season's own unit when `unit` is
+ * null. Always rendered, so switching a room between a practice (points) and
+ * the night (the season's unit) changes a VALUE, not the tree — a different
+ * wrapper element would remount the whole room, its toasts and its state with
+ * it, at the exact moment the room most needs to say what just happened.
+ */
+export function MoneyUnitOverride({
+  unit,
+  children,
+}: {
+  unit: MoneyUnit | null;
+  children: ReactNode;
+}) {
+  const inherited = useContext(MoneyUnitContext);
+  return (
+    <MoneyUnitContext.Provider value={unit ?? inherited}>{children}</MoneyUnitContext.Provider>
+  );
+}

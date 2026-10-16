@@ -1,5 +1,6 @@
+import { isRealAuction } from "@desiauction/auction";
 import { auctions, withTenantDb } from "@desiauction/db";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import { dbHandle } from "../db";
 import { canSettlement } from "./authz";
@@ -44,7 +45,7 @@ export async function seasonStandings(
       db
         .select({ competitionId: auctions.competitionId, status: auctions.status })
         .from(auctions)
-        .where(eq(auctions.orgId, orgId))
+        .where(and(eq(auctions.orgId, orgId), isRealAuction()))
         .orderBy(desc(auctions.createdAt)),
     ]);
     const auctionOf = new Map<string, string>();

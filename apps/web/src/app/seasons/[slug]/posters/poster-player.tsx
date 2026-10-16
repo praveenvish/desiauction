@@ -1,4 +1,10 @@
-import { monogramOf, POSTER_SIZES, type PlayerPoster, type PosterSize } from "@desiauction/core";
+import {
+  hasDevanagari,
+  monogramOf,
+  POSTER_SIZES,
+  type PlayerPoster,
+  type PosterSize,
+} from "@desiauction/core";
 
 import { mix, WHITE, withAlpha } from "./poster-color";
 import {
@@ -15,7 +21,14 @@ import {
   type Depth,
 } from "./poster-depth";
 import { DISPLAY, FIGURES, SERIF } from "./poster-fonts";
-import { contextFor, shown, vis, type PosterContext, type PosterRenderOptions } from "./poster-kit";
+import {
+  contextFor,
+  noPhotoFigure,
+  shown,
+  vis,
+  type PosterContext,
+  type PosterRenderOptions,
+} from "./poster-kit";
 
 /**
  * THE PLAYER POSTER, v3.
@@ -167,6 +180,24 @@ export const ITALIC = 0.44;
 export function fit(text: string, room: number, ratio: number, max: number, min: number): number {
   const wanted = Math.floor(room / Math.max(1, text.length * ratio));
   return Math.max(min, Math.min(max, wanted));
+}
+
+/**
+ * A display-caps name line, adjusted when the name is Hindi.
+ *
+ * The display lines are set tight (0.86–0.9) for Latin capitals, which have
+ * nothing above the cap height. Devanagari has a headline AND marks above it —
+ * ि's loop, a reph, the anusvara dot — so at the same size it stands taller,
+ * and its marks rose into the line above ("हार्दिक" over "पंड्या" read as
+ * "हा●र्दिक"). A Hindi name is set a step smaller, with room above for its
+ * marks: the block keeps the height an English name has.
+ */
+export function displayLine(text: string, size: number): { fontSize: number; marginTop?: number } {
+  if (!hasDevanagari(text)) {
+    return { fontSize: size };
+  }
+  const fontSize = Math.round(size * 0.85);
+  return { fontSize, marginTop: Math.round(fontSize * 0.22) };
 }
 
 /** The panel's sentence, per outcome. */
@@ -361,6 +392,7 @@ export function ResultPanel({
             label={monogramOf(model.teamName ?? "")}
             src={model.teamCrestUrl}
             layer="stamp"
+            team
           />
           <div
             style={{
@@ -398,6 +430,7 @@ export function ResultPanel({
             label={monogramOf(model.teamName ?? "")}
             src={model.teamCrestUrl}
             layer="stamp"
+            team
           />
           <div
             style={{
@@ -476,11 +509,15 @@ export function renderPlayerPoster(model: PlayerPoster, options: PosterRenderOpt
   const layout = LAYOUT[options.size];
   const { width, height } = POSTER_SIZES[options.size];
   const contentWidth = width - 2 * layout.pad;
-  const photo = model.photoUrl;
+  const photo = model.photoUrl ?? noPhotoFigure(ctx);
   const stageMid = layout.stage.left + layout.stage.width / 2;
   const heroText = model.heroNumber ?? model.monogram;
   const n = layout.name;
-  const lastSize = fit(model.lastName.toUpperCase(), n.width, CAPS, n.lastMax, n.lastMin);
+  const last = displayLine(
+    model.lastName,
+    fit(model.lastName.toUpperCase(), n.width, CAPS, n.lastMax, n.lastMin),
+  );
+  const lastSize = last.fontSize;
   const firstSize =
     model.firstName === null
       ? 0
@@ -622,6 +659,7 @@ export function renderPlayerPoster(model: PlayerPoster, options: PosterRenderOpt
             fontWeight: 800,
             fontSize: lastSize,
             lineHeight: 0.86,
+            ...(last.marginTop === undefined ? {} : { marginTop: last.marginTop }),
             letterSpacing: -lastSize * 0.01,
             color: palette.heading,
             // Left out on paper rather than "none" — see the stat tile in poster-kit.

@@ -11,6 +11,7 @@ import {
 } from "@desiauction/db";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { DEFAULT_SPORT_KEY } from "@desiauction/core";
+import { isRealAuction } from "@desiauction/auction";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 
@@ -321,6 +322,7 @@ async function countsFor(
       .where(
         and(
           inArray(auctions.competitionId, competitionIds),
+          isRealAuction(),
           inArray(auctions.status, ["completed", "reconciled"]),
         ),
       ),

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildPlayerPoster,
+  buildResultPoster,
   buildSeasonPoster,
   buildTeamPoster,
   buildTopBuysPoster,
@@ -19,9 +20,14 @@ import {
   shortNameOf,
   splitName,
   type PlayerPosterInput,
+  type ResultPosterInput,
+  type PosterMark,
   type TeamPosterInput,
   type TeamPosterMember,
   type TopBuyInput,
+  roleTagOf,
+  squadSpotlight,
+  seasonTeamColours,
 } from "./poster";
 
 const PLAYER: PlayerPosterInput = {
@@ -37,6 +43,73 @@ const PLAYER: PlayerPosterInput = {
   competitionLogoUrl: null,
   unit: "inr",
 };
+
+describe("result poster", () => {
+  const result: ResultPosterInput = {
+    competitionName: "MPL 2026",
+    competitionLogoUrl: null,
+    fixtureNumber: "7",
+    headline: "Royals win",
+    margin: "by 6 wickets",
+    trustLabel: "Unverified",
+    teams: [
+      { name: "Marwar Royals", score: "158/4 (18.2)", color: "#a23" },
+      { name: "Jodhpur Strikers", score: "154/8 (20)", color: null },
+    ],
+    playerOfMatch: {
+      name: "Neel Mehta",
+      photoUrl: null,
+      figures: "58* (37) · 2 for 27",
+      shots: [
+        { angle: 90, runs: 4 },
+        { angle: 220, runs: 6 },
+      ],
+    },
+  };
+  it("keeps the actual result, trust, scores and recorded winning-player shots", () => {
+    const poster = buildResultPoster(result);
+    expect(poster.fixtureLabel).toBe("MATCH 7");
+    expect(poster.teams[0]).toEqual({
+      name: "Marwar Royals",
+      score: "158/4 (18.2)",
+      color: "#AA2233",
+    });
+    expect(poster.trustLabel).toBe("Unverified");
+    expect(poster.playerOfMatch).toEqual({ ...result.playerOfMatch, monogram: "NM" });
+    expect(result.teams[0]?.color).toBe("#a23");
+  });
+  it("does not invent a winner, face or wagon when the award is unavailable", () => {
+    expect(
+      buildResultPoster({ ...result, headline: "No result", playerOfMatch: null }).playerOfMatch,
+    ).toBeNull();
+    const minor = buildResultPoster({
+      ...result,
+      playerOfMatch: { name: "NM", photoUrl: null, figures: "58 (37)", shots: [] },
+    });
+    expect(minor.playerOfMatch?.name).toBe("NM");
+    expect(minor.playerOfMatch?.photoUrl).toBeNull();
+    expect(minor.playerOfMatch?.shots).toEqual([]);
+  });
+  it("bounds long copy and excludes unusable shot coordinates without adding synthetic shots", () => {
+    const poster = buildResultPoster({
+      ...result,
+      headline: "Winner ".repeat(30),
+      playerOfMatch: {
+        name: "Neel",
+        photoUrl: null,
+        figures: "58 (37)",
+        shots: [
+          { angle: NaN, runs: 4 },
+          { angle: 20, runs: 0 },
+          { angle: 10, runs: 1 },
+        ],
+      },
+    });
+    expect(poster.headline.endsWith("…")).toBe(true);
+    expect(poster.playerOfMatch?.shots).toEqual([{ angle: 10, runs: 1 }]);
+    expect(POSTER_KIND_SIZES.result).toEqual(["square", "portrait", "story"]);
+  });
+});
 
 describe("player poster", () => {
   it("renders the sale: stamp, price and the buying team", () => {
@@ -409,6 +482,50 @@ describe("season poster", () => {
     expect(p.spentLabel).toBe("25,000 pts");
     expect(p.squads[0]?.spentLabel).toBe("25,000 pts");
   });
+
+  it("is the results sheet unless told otherwise", () => {
+    const p = buildSeasonPoster({
+      competitionName: "BSCB-5",
+      competitionLogoUrl: null,
+      unit: "inr",
+      squads: [{ teamName: "Alpha XI", teamCrestUrl: null, members: [], spentPaise: 0 }],
+    });
+    expect(p.stage).toBe("after");
+  });
+
+  it("before the night, counts the teams by the captains and icons they already have", () => {
+    const member = (name: string, marks: PosterMark[]): TeamPosterMember => ({
+      name,
+      role: "batter",
+      pricePaise: null,
+      marks,
+      photoUrl: null,
+    });
+    const p = buildSeasonPoster({
+      competitionName: "BSCB-5",
+      competitionLogoUrl: null,
+      unit: "inr",
+      stage: "before",
+      squads: [
+        {
+          teamName: "Alpha XI",
+          teamCrestUrl: null,
+          members: [member("A", ["captain", "icon"]), member("B", ["icon"])],
+          spentPaise: 0,
+        },
+        {
+          teamName: "Beta United",
+          teamCrestUrl: null,
+          members: [member("C", ["captain"])],
+          spentPaise: 0,
+        },
+        { teamName: "Gamma", teamCrestUrl: null, members: [], spentPaise: 0 },
+      ],
+    });
+    expect(p.stage).toBe("before");
+    expect(p.countLine).toBe("3 teams · 2 captains · 2 icons");
+    expect(p.squads[0]?.rows[0]?.badges).toEqual(["C", "ICON"]);
+  });
 });
 
 describe("player poster — the v3 name, number and pool", () => {
@@ -482,5 +599,107 @@ describe("player poster — a points season's pool card", () => {
     });
     expect(p.basePriceLabel).toBe("50 pts");
     expect(p.basePriceLabel).not.toContain("₹");
+  });
+});
+
+describe("squadSpotlight — who gets a big card on the squad sheet", () => {
+  const member = (
+    name: string,
+    marks: ("captain" | "icon" | "retained")[],
+    price: number | null,
+  ) => ({
+    name,
+    role: "batter",
+    pricePaise: price,
+    marks,
+    photoUrl: null,
+  });
+  const poster = (members: ReturnType<typeof member>[]) =>
+    buildTeamPoster({
+      teamName: "Tigers",
+      teamCrestUrl: null,
+      competitionName: "BPL-4",
+      competitionLogoUrl: null,
+      members,
+      spentPaise: 0,
+      pursePaise: 0,
+      unit: "inr",
+    });
+
+  it("the captain and icons first, then the top buy", () => {
+    const { rows, topBuyLabel } = poster([
+      member("Buy A", [], 900000),
+      member("Cap", ["captain"], null),
+      member("Icon", ["icon"], null),
+      member("Buy B", [], 500000),
+    ]);
+    const { spotlight, rest } = squadSpotlight(rows, { prices: true });
+    expect(spotlight.map((card) => [card.row.name, card.badge])).toEqual([
+      ["Cap", "CAPTAIN"],
+      ["Icon", "ICON"],
+      ["Buy A", "TOP BUY"],
+    ]);
+    expect(rest.map((row) => row.name)).toEqual(["Buy B"]);
+    expect(topBuyLabel).toContain("9,000");
+  });
+
+  it("without prices the filled card carries no TOP BUY badge", () => {
+    const { rows } = poster([member("Cap", ["captain"], null), member("Buy A", [], 900000)]);
+    const { spotlight } = squadSpotlight(rows, { prices: false });
+    expect(spotlight.map((card) => card.badge)).toEqual(["CAPTAIN", null]);
+  });
+
+  it("a pre-auction squad is its captain and icon, and nothing else", () => {
+    const { rows, topBuyLabel } = poster([
+      member("Cap", ["captain"], null),
+      member("Icon", ["icon"], null),
+    ]);
+    const { spotlight, rest } = squadSpotlight(rows, { prices: true });
+    expect(spotlight).toHaveLength(2);
+    expect(rest).toEqual([]);
+    expect(topBuyLabel).toBeNull();
+  });
+
+  it("role tags fit a list row", () => {
+    expect(roleTagOf("all_rounder")).toBe("AR");
+    expect(roleTagOf("wicket_keeper")).toBe("WK");
+    expect(roleTagOf(null)).toBe("");
+  });
+});
+
+describe("seasonTeamColours — every team its own colour", () => {
+  it("gives ten teams with no colour ten different colours", () => {
+    const teams = Array.from({ length: 10 }, (_, index) => ({
+      id: `01TEAM${String(index).padStart(20, "0")}`,
+      color: null,
+    }));
+    const colours = seasonTeamColours(teams);
+    expect(new Set(colours.values()).size).toBe(10);
+  });
+
+  it("keeps an organizer's colour, and never deals it to another team", () => {
+    const colours = seasonTeamColours([
+      { id: "01A", color: null },
+      { id: "01B", color: "#14b8a6" },
+      { id: "01C", color: null },
+    ]);
+    expect(colours.get("01B")).toBe("#14B8A6");
+    expect(colours.get("01A")).not.toBe("#14B8A6");
+    expect(colours.get("01C")).not.toBe("#14B8A6");
+    expect(colours.get("01A")).not.toBe(colours.get("01C"));
+  });
+
+  it("does not move a team's colour when a later team is added", () => {
+    const before = seasonTeamColours([
+      { id: "01A", color: null },
+      { id: "01B", color: null },
+    ]);
+    const after = seasonTeamColours([
+      { id: "01A", color: null },
+      { id: "01B", color: null },
+      { id: "01C", color: null },
+    ]);
+    expect(after.get("01A")).toBe(before.get("01A"));
+    expect(after.get("01B")).toBe(before.get("01B"));
   });
 });

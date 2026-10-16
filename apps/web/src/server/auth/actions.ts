@@ -17,7 +17,8 @@ import { eq } from "drizzle-orm";
 
 import { env } from "../../env";
 import { clientIp } from "../../lib/client-ip";
-import { db, dbHandle } from "../db";
+import { db, dbHandle, systemDb } from "../db";
+import { applyPlatformInvites } from "../platform-ops/people";
 import { sendAccountAlert } from "../messaging/account-alert";
 import { openChallenge, sealChallenge } from "./challenge-cookie";
 import { authCodeSecret } from "./auth-secret";
@@ -68,11 +69,13 @@ import {
   signedInRecently,
   revokeSession,
   revokeSessionByToken,
+  isSuspended,
+  SUSPENDED_MESSAGE,
   type SessionSummary,
 } from "./sessions";
 import { describeUserAgent } from "./user-agent";
 import { cache } from "react";
-import { isStartClub } from "../../lib/start-intent";
+import { homeIntentFromNext } from "../../lib/start-intent";
 
 /**
  * SECURE, EXCEPT ON THE REHEARSAL SERVER — which is not a server that serves people.
@@ -185,6 +188,13 @@ async function issueSessionCookie(personId: string): Promise<void> {
     await revokeSessionByToken(db, replaced);
   }
   const session = await createSession(db, personId, agent);
+  // A platform role a superadmin invited this phone or email to (AC-1.2)
+  // attaches now that the contact is proven. Never allowed to fail a sign-in.
+  try {
+    await applyPlatformInvites(db, systemDb, personId);
+  } catch (error) {
+    logger().error({ err: error }, "platform_invites.apply_failed");
+  }
   // A sign-in moves this browser onto the current name for good.
   clearSessionCookies(store);
   store.set(SESSION_NAME, session.token, {
@@ -369,6 +379,15 @@ export async function verifyOtpAction(
             } left.`,
     };
   }
+  if (await isSuspended(db, result.personId)) {
+    await logSecurityEvent(result.personId, "auth.login.refused_suspended");
+    return {
+      step: "phone",
+      phone: previous.phone,
+      ...(previous.next !== undefined ? { next: previous.next } : {}),
+      error: SUSPENDED_MESSAGE,
+    };
+  }
   await logSecurityEvent(result.personId, "auth.login.otp");
   // PI-1 P2: the login form carries the terms/privacy notice; this records the
   // acceptance once per person per notice version. The same try/catch
@@ -393,8 +412,9 @@ export async function verifyOtpAction(
     }
     // "Create your tournament" rides through onboarding: the name gate in the
     // /home layout cannot see a query string, and would drop it.
-    if (isStartClub(target)) {
-      redirect(`/onboarding?next=${encodeURIComponent(target)}`);
+    const homeIntent = homeIntentFromNext(target);
+    if (homeIntent !== null) {
+      redirect(`/onboarding?next=${encodeURIComponent(homeIntent)}`);
     }
   }
   redirect(target);
@@ -506,6 +526,10 @@ export async function verifyEmailLoginAction(
             } left.`,
     };
   }
+  if (await isSuspended(db, result.personId)) {
+    await logSecurityEvent(result.personId, "auth.login.refused_suspended");
+    return { ...previous, error: SUSPENDED_MESSAGE };
+  }
   await logSecurityEvent(
     result.personId,
     result.created ? "auth.signup.email" : "auth.login.email",
@@ -531,8 +555,9 @@ export async function verifyEmailLoginAction(
     if (target === "/home") {
       redirect("/onboarding");
     }
-    if (isStartClub(target)) {
-      redirect(`/onboarding?next=${encodeURIComponent(target)}`);
+    const homeIntent = homeIntentFromNext(target);
+    if (homeIntent !== null) {
+      redirect(`/onboarding?next=${encodeURIComponent(homeIntent)}`);
     }
   }
   redirect(target);
@@ -627,6 +652,10 @@ export async function finishPasskeyLoginAction(
     return { ok: false };
   }
   if (!result.ok) {
+    return { ok: false };
+  }
+  if (await isSuspended(db, result.personId)) {
+    await logSecurityEvent(result.personId, "auth.login.refused_suspended");
     return { ok: false };
   }
   await issueSessionCookie(result.personId);
@@ -895,7 +924,8 @@ export async function updateProfileAction(
     // onboarding that is a page they had never opened, and (nameless) not the
     // step they owe the product. `/home` remains the only invented default
     // (PX-1 01 §5); this is the page the person was on, not a new landing.
-    redirect(fromOnboarding ? "/login?next=/onboarding" : "/login?next=/account");
+    const resume = `/onboarding?next=${encodeURIComponent(safeNext(formString(formData, "next")))}`;
+    redirect(fromOnboarding ? `/login?next=${encodeURIComponent(resume)}` : "/login?next=/account");
   }
   const raw = formString(formData, "name");
   const name = raw.trim().replace(/\s+/g, " ");

@@ -124,7 +124,7 @@ jobs:
             echo "::warning::NEXT_SERVER_ACTIONS_ENCRYPTION_KEY is not set for this environment — pages open during this deploy must be reloaded before their forms work again"
             echo "⚠️ No \`NEXT_SERVER_ACTIONS_ENCRYPTION_KEY\` secret for **${{ inputs.environment }}**: every page open during this deploy must be reloaded before its forms and bids work again. Add one (\`openssl rand -base64 32\`) to the environment's secrets." >> "$GITHUB_STEP_SUMMARY"
           fi
-          for app in web engine finops-runner; do
+          for app in web engine live finops-runner; do
             EXTRA=""
             if [ "$app" = web ]; then EXTRA="$WEB_SECRET"; fi
             # $EXTRA is unquoted on purpose: it is either empty or two words.
@@ -191,6 +191,15 @@ jobs:
           source: "ops/deploy/docker-compose.production.yml,ops/deploy/site.caddy,ops/deploy/jobs,ops/deploy/postgresql.conf.d"
           target: /srv/apps/desiauction/${{ inputs.environment }}
           strip_components: 2
+
+      # The sitemap as the OLD site serves it, so the announce step after the
+      # swap can tell search engines only what this release changed
+      # (scripts/indexnow-announce.mjs). Production only: it is the one host
+      # with an IndexNow key. Read-only, and it can never fail a deploy.
+      - name: Snapshot the sitemap before the swap
+        if: ${{ inputs.environment == 'production' }}
+        continue-on-error: true
+        run: node scripts/indexnow-announce.mjs snapshot https://desiauction.in "$RUNNER_TEMP/sitemap-before.xml"
 
       # --- On the host: gate, migrate, swap, prove ---------------------------
       #
@@ -368,6 +377,7 @@ jobs:
             wait_ready engine 4000 180
             docker compose up -d
             wait_ready web 3000 180
+            wait_ready live 4100 180
             # No port to probe on these two; "running, not restarting" is the
             # claim that can be checked.
             sleep 10
@@ -418,7 +428,7 @@ jobs:
               local registry ref
               registry="$(envval REGISTRY)"
               [ -n "$registry" ] || return 0
-              for repo in web engine finops-runner migrator; do
+              for repo in web engine live finops-runner migrator; do
                 docker image ls --format '{{.Repository}}:{{.Tag}}' "${registry}/${repo}" \
                   | while read -r ref; do
                       case "$ref" in
@@ -432,3 +442,17 @@ jobs:
             docker logout ghcr.io >/dev/null
             trap - ERR
             echo "deployed ${NEW_TAG} (previous: ${PREV_TAG})"
+
+      # --- Tell search engines what this release changed ---------------------
+      #
+      # Runs only once the swap above has passed /readyz. Submits to IndexNow
+      # (Bing, Yandex, Seznam, Naver) every page that is new or whose sitemap
+      # <lastmod> moved, plus the homepage, whose footer and schema no page
+      # date reflects. Google does not take part; it reads the sitemap.
+      # Season pages are already announced by the app when they change
+      # (apps/web/src/server/seo/indexnow.ts). It never fails a deploy that
+      # has succeeded: the script exits 0 on every path.
+      - name: Announce changed pages to IndexNow
+        if: ${{ inputs.environment == 'production' }}
+        continue-on-error: true
+        run: node scripts/indexnow-announce.mjs announce https://desiauction.in "$RUNNER_TEMP/sitemap-before.xml"

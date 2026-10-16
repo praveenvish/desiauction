@@ -104,6 +104,30 @@ export function useHoldGate({
     frame.current = requestAnimationFrame(tick);
   }, [abort, durationMs, stop]);
 
+  /**
+   * The press ENDED (pointer up, key up) — as opposed to being abandoned
+   * (leave, cancel, blur), which always stops. The hold is judged on the
+   * clock, not on how many frames happened to land: a busy device that drew
+   * no frame in the last stretch of a full hold must still confirm on
+   * release, or a 900ms hold under load closes nothing (the WebKit nightly's
+   * multi-window auction specs, every night). A short press still stops.
+   */
+  const release = useCallback(() => {
+    const begun = startedAt.current;
+    if (begun === null) {
+      return;
+    }
+    if (keyRef.current !== startedKey.current) {
+      abort();
+      return;
+    }
+    const held = performance.now() - begun >= durationMs;
+    stop();
+    if (held) {
+      confirmRef.current();
+    }
+  }, [abort, durationMs, stop]);
+
   const start = useCallback(() => {
     if (disabled || startedAt.current !== null) {
       return;
@@ -135,7 +159,7 @@ export function useHoldGate({
     progress,
     bind: {
       onPointerDown: start,
-      onPointerUp: stop,
+      onPointerUp: release,
       onPointerLeave: stop,
       onPointerCancel: stop,
       onBlur: stop,
@@ -146,7 +170,7 @@ export function useHoldGate({
       },
       onKeyUp: (event) => {
         if (event.key === " " || event.key === "Enter") {
-          stop();
+          release();
         }
       },
     },

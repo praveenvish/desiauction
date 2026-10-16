@@ -1,5 +1,6 @@
 "use client";
 
+import { SignOutDialog } from "../sign-out-dialog";
 import {
   AppShell,
   Breadcrumb,
@@ -41,10 +42,13 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { AdminSectionNav } from "../../app/admin/admin-section-nav";
 import { recordRecentCompetition } from "../../app/home/home-shortcuts";
+import { HAS_CASE_STUDIES } from "../../content/case-studies";
 import { LEGAL_IDENTITY } from "../../content/company";
+import { START_CLUB_LOGIN } from "../../lib/start-intent";
 import { UNREAD_CAP } from "../../lib/inbox-cap";
 import { NewsletterForm } from "../../components/marketing/newsletter-form";
 import { personContact, personLabel } from "../../lib/person-label";
+import { promptInstall, useInstallOffer } from "../../lib/pwa";
 import { track } from "../../lib/telemetry";
 import { BrandMark, BrandWordmark } from "./brand";
 import { SocialLinks } from "./social-links";
@@ -94,6 +98,7 @@ export interface ShellOrg {
 }
 
 export interface ShellCompetition {
+  teamFormation?: "auction" | "organizer" | "team_entry";
   slug: string;
   name: string;
   orgName: string;
@@ -270,7 +275,8 @@ function toShellItem(item: NavItem): ShellNavItem {
 const QUIET_FOOTER_PATHS: ReadonlySet<string> = new Set([
   "/careers",
   "/blog",
-  "/case-studies",
+  // A placeholder only until the first real story (content/case-studies.ts).
+  ...(HAS_CASE_STUDIES ? [] : ["/case-studies"]),
   "/api-docs",
 ]);
 
@@ -319,10 +325,27 @@ export function ProductShell({
 }: ProductShellProps) {
   const pathname = usePathname();
   const router = useRouter();
+  /*
+   * "Install app", offered only where it can happen: the browser's own dialog
+   * where one is ready, the Share → Add to Home Screen steps on an iPhone, and
+   * nothing once installed or in a browser that cannot install.
+   */
+  const appInstallOffer = useInstallOffer();
+  const openInstall = (from: "menu" | "drawer") => {
+    if (appInstallOffer === "prompt") {
+      void promptInstall().then((outcome) => {
+        track("app.install_prompted", { outcome, from });
+      });
+      return;
+    }
+    track("app.install_steps_opened", { from });
+    router.push("/account?section=notifications");
+  };
   // The drawer remembers WHERE it was opened, so it is open only on that page:
   // navigating anywhere closes it in the same render, with no effect needed to
   // notice the route changed.
   const [drawerOpenOn, setDrawerOpenOn] = useState<string | null>(null);
+  const [signOutOpen, setSignOutOpen] = useState(false);
   const drawerOpen = drawerOpenOn === pathname;
   const reportProblem = useReportProblem();
   const [titleOverride, setTitleOverride] = useState<ShellTitleOverride | null>(null);
@@ -452,6 +475,7 @@ export function ProductShell({
         label: `In ${currentCompetition.name}`,
         items: [
           ...seasonTabs(currentCompetition.slug, currentCompetition.seasonRole, {
+            teamFormation: currentCompetition.teamFormation ?? "auction",
             canSettle: currentCompetition.canSettle,
             ...(currentCompetition.ownTeamId !== undefined
               ? { ownTeamId: currentCompetition.ownTeamId }
@@ -770,7 +794,7 @@ export function ProductShell({
                 <Link className="shell-header-link" href="/login">
                   Sign in
                 </Link>
-                <Link className="shell-header-cta shell-desktop-only" href="/login">
+                <Link className="shell-header-cta shell-desktop-only" href={START_CLUB_LOGIN}>
                   Start free <IconArrowRight width={16} height={16} />
                 </Link>
               </>
@@ -788,6 +812,14 @@ export function ProductShell({
         // /case-studies, /api-docs and /careers are placeholders and are not
         // advertised anywhere until they have content.
         //
+        // TWELVE, NOT MORE (re-trimmed 2026-10-01 after it drifted to 17). A
+        // link earns a slot here only if the footer is its main way in: /for,
+        // /compare and /tools have no other inbound link (the sitemap aside),
+        // so they stay. Guides, Rules & guidelines and All policies (/legal)
+        // live in the header's Resources menu; Release notes is linked from
+        // /help and /support; Security from /features and /support. Adding a
+        // thirteenth means taking one out.
+        //
         // THE OPERATOR IDENTITY is not in the footer. It is published — as the
         // e-commerce and IT rules require — on /legal, /support and
         // /legal/grievances (`OperatorIdentityCard`), and every page's bottom
@@ -800,11 +832,16 @@ export function ProductShell({
             label: "Product",
             links: [
               { label: "Features", href: "/features" },
+              { label: "Pricing", href: "/pricing" },
+              { label: "Book a demo", href: "/schedule-demo" },
+            ],
+          },
+          {
+            label: "Explore",
+            links: [
               { label: "Sports", href: "/sports" },
               { label: "Who it's for", href: "/for" },
               { label: "Compare", href: "/compare" },
-              { label: "Pricing", href: "/pricing" },
-              { label: "Book a demo", href: "/schedule-demo" },
             ],
           },
           {
@@ -812,25 +849,15 @@ export function ProductShell({
             links: [
               { label: "Browse tournaments", href: "/c" },
               { label: "Try a mock auction", href: "/#playground" },
-              { label: "Rules & guidelines", href: "/rules-guidelines" },
               { label: "Free tools", href: "/tools" },
-            ],
-          },
-          {
-            label: "Help",
-            links: [
-              { label: "Help centre", href: "/help" },
-              { label: "Guides", href: "/guides" },
-              { label: "Contact support", href: "/support" },
-              { label: "Security", href: "/security" },
             ],
           },
           {
             label: "Company",
             links: [
               { label: "About us", href: "/about" },
-              { label: "Release notes", href: "/releases" },
-              { label: "All policies", href: "/legal" },
+              { label: "Help centre", href: "/help" },
+              { label: "Contact support", href: "/support" },
             ],
           },
         ]}
@@ -917,6 +944,7 @@ export function ProductShell({
     if (competition !== undefined) {
       seasonSwitcherFor = slug;
       const tabs = seasonTabs(slug, competition.seasonRole, {
+        teamFormation: competition.teamFormation ?? "auction",
         canSettle: competition.canSettle,
         ...(competition.ownTeamId !== undefined ? { ownTeamId: competition.ownTeamId } : {}),
       });
@@ -1102,6 +1130,17 @@ export function ProductShell({
                         router.push("/help");
                       },
                     },
+                    ...(appInstallOffer === "none"
+                      ? []
+                      : [
+                          {
+                            key: "install-app",
+                            label: "Install app",
+                            onSelect: () => {
+                              openInstall("menu");
+                            },
+                          },
+                        ]),
                     {
                       key: "report-problem",
                       label: "Report a problem",
@@ -1131,8 +1170,7 @@ export function ProductShell({
                       label: "Sign out",
                       danger: true,
                       onSelect: () => {
-                        track("auth.logout");
-                        void logout();
+                        setSignOutOpen(true);
                       },
                     },
                   ]}
@@ -1198,6 +1236,21 @@ export function ProductShell({
               <li className="shell-narrow-only">
                 <ThemeToggle variant="row" />
               </li>
+              {appInstallOffer === "none" ? null : (
+                <li>
+                  <button
+                    type="button"
+                    className="shell-drawer-link"
+                    data-testid="drawer-install-app"
+                    onClick={() => {
+                      setDrawerOpenOn(null);
+                      openInstall("drawer");
+                    }}
+                  >
+                    Install app
+                  </button>
+                </li>
+              )}
               <li>
                 <button
                   type="button"
@@ -1216,7 +1269,10 @@ export function ProductShell({
                 <button
                   type="button"
                   className="shell-drawer-link shell-drawer-danger"
-                  onClick={() => void logout()}
+                  onClick={() => {
+                    setDrawerOpenOn(null);
+                    setSignOutOpen(true);
+                  }}
                 >
                   Sign out
                 </button>
@@ -1224,6 +1280,16 @@ export function ProductShell({
             </ul>
           </Drawer>
         ) : null}
+        <SignOutDialog
+          open={signOutOpen}
+          onClose={() => {
+            setSignOutOpen(false);
+          }}
+          logout={logout}
+          onConfirm={() => {
+            track("auth.logout");
+          }}
+        />
       </ShellActionContext.Provider>
     </ShellTitleContext.Provider>
   );

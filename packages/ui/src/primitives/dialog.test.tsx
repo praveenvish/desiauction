@@ -6,6 +6,27 @@ import { Button } from "./button";
 import { Dialog } from "./dialog";
 
 describe("Dialog", () => {
+  it("keeps an irreversible operation's outcome visible until dismissal is enabled", () => {
+    const close = vi.fn();
+    const { rerender } = render(
+      <Dialog open closeDisabled onClose={close} title="Signing out">
+        <p>Clearing device data</p>
+      </Dialog>,
+    );
+    expect(screen.getByRole("button", { name: "Close Signing out" })).toBeDisabled();
+    const cancel = new Event("cancel", { cancelable: true });
+    fireEvent(screen.getByRole("dialog"), cancel);
+    expect(cancel.defaultPrevented).toBe(true);
+    fireEvent(screen.getByRole("dialog"), new Event("close"));
+    expect(close).not.toHaveBeenCalled();
+    rerender(
+      <Dialog open onClose={close} title="Signing out">
+        <p>Retry available</p>
+      </Dialog>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Close Signing out" }));
+    expect(close).toHaveBeenCalledOnce();
+  });
   it("opens as a modal with an accessible title", () => {
     render(
       <Dialog open onClose={() => undefined} title="Remove player?">

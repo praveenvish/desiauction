@@ -1,3 +1,4 @@
+import { RALLY_FORMAT_PRESETS } from "../scoring/rally/formats";
 import { optionsOf, termsOf, type TermDetail } from "./vocabulary";
 import { difference, summariseFields } from "./tiebreakers";
 
@@ -67,6 +68,13 @@ const TERMS: Terminology = {
 };
 
 export const PICKLEBALL: SportPack = {
+  scoring: {
+    family: "rally",
+    depth: 2,
+    formats: [RALLY_FORMAT_PRESETS.pickleball_bo3, RALLY_FORMAT_PRESETS.pickleball_rally_bo3],
+    defaultFormat: "pickleball_bo3",
+    awardTable: "pickleball-v1",
+  },
   key: "pickleball",
   label: "Pickleball",
   roles: ROLES,

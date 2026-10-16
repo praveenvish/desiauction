@@ -6,6 +6,7 @@ import {
 } from "@desiauction/core";
 import { lots, paddles, people, registrations, teams, type Db } from "@desiauction/db";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { inRealAuction } from "@desiauction/auction";
 import { preSignedSql } from "../competition/pre-signed";
 import {
   publicPhotoUrl,
@@ -139,6 +140,7 @@ export async function lotMediaOf(
       photoKey: shownPhotoKey,
       photoConsentAt: shownPhotoConsentAt,
       dateOfBirth: registrations.dateOfBirth,
+      adultConfirmedAt: registrations.adultConfirmedAt,
     })
     .from(lots)
     .innerJoin(registrations, eq(registrations.id, lots.registrationId))
@@ -184,6 +186,7 @@ export async function registrationPhotosOf(
       photoKey: shownPhotoKey,
       photoConsentAt: shownPhotoConsentAt,
       dateOfBirth: registrations.dateOfBirth,
+      adultConfirmedAt: registrations.adultConfirmedAt,
     })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
@@ -241,6 +244,7 @@ export async function preSignedPlayers(
       photoKey: shownPhotoKey,
       photoConsentAt: shownPhotoConsentAt,
       dateOfBirth: registrations.dateOfBirth,
+      adultConfirmedAt: registrations.adultConfirmedAt,
       role: registrations.role,
       teamId: registrations.teamId,
       isIcon: registrations.isIcon,
@@ -259,12 +263,12 @@ export async function preSignedPlayers(
         // A captain named AFTER the night is a player the room already sold:
         // `resolvedLots` lists them with their price, and listing them here
         // too would seat one person twice on the squad board.
-        sql`not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.status} = 'sold')`,
+        sql`not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.status} = 'sold' and ${inRealAuction(lots.auctionId)})`,
       ),
     )
     .orderBy(asc(shownName));
   const now = new Date();
-  return rows.flatMap(({ photoKey, photoConsentAt, dateOfBirth, ...row }) =>
+  return rows.flatMap(({ photoKey, photoConsentAt, dateOfBirth, adultConfirmedAt, ...row }) =>
     // A pre-signed marker without a team is an organizer mid-edit, not a squad
     // member: drop it rather than invent a franchise for them.
     row.teamId === null
@@ -273,7 +277,11 @@ export async function preSignedPlayers(
           {
             ...row,
             teamId: row.teamId,
-            photoUrl: publicPhotoUrl({ photoKey, photoConsentAt, dateOfBirth }, now, readUrl),
+            photoUrl: publicPhotoUrl(
+              { photoKey, photoConsentAt, dateOfBirth, adultConfirmedAt },
+              now,
+              readUrl,
+            ),
           },
         ],
   );

@@ -37,7 +37,7 @@ describe("the values a season cannot place", () => {
   it("reports a band vocabulary the season does not use, with its options", () => {
     const rows = canonical(
       "name,phone,role,base_price_band\n" +
-        "Rohit,9876543210,batter,Category 1\n" +
+        "Rohit,9876543201,batter,Category 1\n" +
         "Jasprit,9876543211,bowler,Category 1\n" +
         "Virat,9876543212,batter,Category 2",
     );
@@ -56,13 +56,13 @@ describe("the values a season cannot place", () => {
     // status — and a screen that listed those would be asking the organizer to
     // confirm what the parser had already got right.
     const rows = canonical(
-      "name,phone,role,fee_status,base_price_band\nRohit,9876543210,Batsman,done,A",
+      "name,phone,role,fee_status,base_price_band\nRohit,9876543201,Batsman,done,A",
     );
     expect(unplacedValues(rows, SEASON)).toEqual([]);
   });
 
   it("reports a team the season spells differently", () => {
-    const rows = canonical("name,phone,role,team\nRohit,9876543210,batter,Arrows");
+    const rows = canonical("name,phone,role,team\nRohit,9876543201,batter,Arrows");
     const unplaced = unplacedValues(rows, SEASON);
     expect(unplaced.map((entry) => entry.value)).toEqual(["Arrows"]);
     expect(unplaced[0]?.options.map((option) => option.value)).toEqual([
@@ -79,7 +79,7 @@ describe("the values a season cannot place", () => {
      * effect.
      */
     const rows = canonical(
-      "name,phone,role,base_price_band\nRohit,9876543210,batter,Category 1\nJas,9876543211,bowler,Category 2",
+      "name,phone,role,base_price_band\nRohit,9876543201,batter,Category 1\nJas,9876543211,bowler,Category 2",
     );
     const maps: ValueMaps = { base_price_band: { "category 1": "A" } };
     expect(unplacedValues(rows, SEASON, maps).map((entry) => entry.value)).toEqual(["Category 2"]);
@@ -89,7 +89,7 @@ describe("the values a season cannot place", () => {
     // A name, a note, a jersey number: any value is legal, so none can be
     // unplaceable. Offering a dropdown here would list every note ever written.
     const rows = canonical(
-      "name,phone,role,note,jersey_number\nRohit,9876543210,batter,Pays on the day,77",
+      "name,phone,role,note,jersey_number\nRohit,9876543201,batter,Pays on the day,77",
     );
     expect(unplacedValues(rows, SEASON)).toEqual([]);
   });
@@ -101,13 +101,13 @@ describe("the values a season cannot place", () => {
      * legal. Reporting every row would bury the screen under something no
      * dropdown could fix — there would be no options to offer.
      */
-    const rows = canonical("name,phone,role,batting_style\nRohit,9876543210,forward,Right hand");
+    const rows = canonical("name,phone,role,batting_style\nRohit,9876543201,forward,Right hand");
     const football: ImportVocabulary = { ...SEASON, pack: sportPackFor("football") };
     expect(unplacedValues(rows, football)).toEqual([]);
   });
 
   it("reads a yes/no column that says neither", () => {
-    const rows = canonical("name,phone,role,is_retained\nRohit,9876543210,batter,Keeping him");
+    const rows = canonical("name,phone,role,is_retained\nRohit,9876543201,batter,Keeping him");
     const unplaced = unplacedValues(rows, SEASON);
     expect(unplaced.map((entry) => entry.value)).toEqual(["Keeping him"]);
     expect(unplaced[0]?.options.map((option) => option.value)).toEqual(["yes", "no"]);
@@ -116,7 +116,7 @@ describe("the values a season cannot place", () => {
   it("puts the costliest value first, and is stable between reads", () => {
     const rows = canonical(
       "name,phone,role,base_price_band\n" +
-        "A,9876543210,batter,Zeta\n" +
+        "A,9876543201,batter,Zeta\n" +
         "B,9876543211,batter,Alpha\n" +
         "C,9876543212,batter,Alpha",
     );

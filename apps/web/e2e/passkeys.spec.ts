@@ -15,7 +15,8 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   // before reading the inbox — the login.spec idiom; a bare read races the mint.
   await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code");
   const code = await latestOtp(phone);
-  await page.getByLabel("6-digit code").fill(code);
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(code);
   await page.getByRole("button", { name: "Verify and continue" }).click();
   // PX-3: new accounts land on onboarding; security panels live on /account.
   // The name gate now guards /account like every other console route, so a
@@ -76,6 +77,7 @@ test("the founder journey: enroll passkey, sign out, passkey-only sign in", asyn
   await expect(page.getByTestId("events-panel")).toContainText("Passkey added");
 
   await page.getByRole("button", { name: "Sign out" }).click();
+  await page.getByTestId("sign-out-confirm").click();
   await expect(page).toHaveURL(/\/login/);
 
   await page.getByTestId("passkey-login").click();

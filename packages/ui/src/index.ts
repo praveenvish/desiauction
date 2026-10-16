@@ -117,6 +117,26 @@ export type { FillPaint, FillTextToken } from "./identity/fill-contrast";
 export { placeholderIdentity, initialsFor } from "./identity/placeholder";
 export type { PlaceholderIdentity, PlaceholderPattern } from "./identity/placeholder";
 export { PlayerImage } from "./identity/player-image";
+export { NoPhotoStyleProvider, useNoPhotoStyle } from "./identity/no-photo-style";
+export {
+  NO_PHOTO_STYLES,
+  isNoPhotoStyle,
+  silhouetteDataUri,
+  silhouetteSvg,
+} from "./identity/silhouette";
+export type { NoPhotoStyle } from "./identity/silhouette";
+export { TeamBadgeProvider, TeamShield, useTeamBadge } from "./identity/team-badge";
+export {
+  DEFAULT_TEAM_BADGE,
+  SHIELD_RATIO,
+  TEAM_BADGES,
+  isTeamBadge,
+  shieldColourFor,
+  shieldDataUri,
+  shieldSvg,
+  shieldTones,
+} from "./identity/team-shield";
+export type { TeamBadge } from "./identity/team-shield";
 export { PlayerPortrait } from "./identity/player-portrait";
 export type { PlayerPortraitProps } from "./identity/player-portrait";
 export { identityCardOf, IDENTITY_CARD_VIEW } from "./identity/identity-card";
@@ -165,3 +185,6 @@ export { BrandGlyph } from "./shell/icons";
 export * from "./icons/icons";
 // The sport glyphs live in their own module (see the note at its head).
 export * from "./icons/sports";
+
+export { TaskWorkspace, TaskState } from "./shell/task-workspace";
+export type { TaskWorkspaceProps, TaskStateProps } from "./shell/task-workspace";

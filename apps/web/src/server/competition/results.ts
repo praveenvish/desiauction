@@ -1,13 +1,23 @@
+import { persistedMatchEvent } from "../scoring/persisted-event";
 import {
   auditLog,
   competitions,
   fixtureParticipants,
   fixtureResults,
+  matches,
+  matchEvents,
   fixtures,
   newId,
   teams,
   type Db,
 } from "@desiauction/db";
+import {
+  placementEngine,
+  placementFormat,
+  placementTable,
+  type PlacementState,
+  parseSeasonScoringRules,
+} from "@desiauction/core/scoring";
 import { istCalendarDate } from "../../lib/format-date";
 import {
   buildStandings,
@@ -20,7 +30,7 @@ import {
   type ResultOutcome,
   type StandingsRow,
 } from "@desiauction/core";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, notExists, sql } from "drizzle-orm";
 
 /**
  * RESULTS, AND THE TABLE DERIVED FROM THEM.
@@ -66,7 +76,12 @@ export type RecordResultOutcome =
   | { ok: true; amended: boolean }
   | {
       ok: false;
-      reason: "unknown_fixture" | "not_played" | "impossible_score" | "winner_without_score";
+      reason:
+        | "unknown_fixture"
+        | "not_played"
+        | "impossible_score"
+        | "winner_without_score"
+        | "scored_match";
     };
 
 /**
@@ -126,7 +141,8 @@ export type RecordLobbyOutcome =
         | "not_played"
         | "incomplete"
         | "invalid_placement"
-        | "impossible_score";
+        | "impossible_score"
+        | "scored_fixture";
     };
 
 /**
@@ -152,6 +168,17 @@ export async function recordLobbyResult(
     placements: readonly LobbyResultEntry[];
   },
 ): Promise<RecordLobbyOutcome> {
+  await db
+    .select({ id: fixtures.id })
+    .from(fixtures)
+    .where(and(eq(fixtures.id, input.fixtureId), eq(fixtures.orgId, input.orgId)))
+    .for("update");
+  const [accepted] = await db
+    .select({ id: matchEvents.eventId })
+    .from(matchEvents)
+    .where(eq(matchEvents.fixtureId, input.fixtureId))
+    .limit(1);
+  if (accepted) return { ok: false, reason: "scored_fixture" };
   const [fixture] = await db
     .select({
       id: fixtures.id,
@@ -225,7 +252,7 @@ export async function recordLobbyResult(
     for (const entry of input.placements) {
       await tx
         .update(fixtureParticipants)
-        .set({ placement: entry.placement, score: entry.score ?? {} })
+        .set({ placement: entry.placement, score: entry.score ?? {}, source: "typed" })
         .where(
           and(
             eq(fixtureParticipants.fixtureId, input.fixtureId),
@@ -268,10 +295,17 @@ export async function recordFixtureResult(
     .from(fixtures)
     .innerJoin(competitions, eq(competitions.id, fixtures.competitionId))
     .where(and(eq(fixtures.id, input.fixtureId), eq(fixtures.orgId, input.orgId)))
-    .limit(1);
+    .limit(1)
+    .for("update", { of: fixtures });
   if (fixture === undefined) {
     return { ok: false, reason: "unknown_fixture" };
   }
+  const [scored] = await db
+    .select({ fixtureId: matches.fixtureId })
+    .from(matches)
+    .where(eq(matches.fixtureId, input.fixtureId))
+    .limit(1);
+  if (scored) return { ok: false, reason: "scored_match" };
   /*
    * A result belongs to a match that happened. `draft` and `scheduled` fixtures
    * have not been played, and recording a result against one would put a score
@@ -374,22 +408,68 @@ export interface ResultRow {
   readonly note: string | null;
 }
 
+/** Who a reader serves: the club's own console, or anyone on the public web. */
+export type ResultAudience = "console" | "public";
+
+/**
+ * P-3, the betting delay, applied to results. A scored result reaches the public
+ * web only once its match's delay has passed (season `publicDelaySeconds`,
+ * default 60) unless the match is verified. Without this the season page and
+ * its table published the final outcome the moment the scorer tapped Finish,
+ * ahead of the delayed live page. Typed results have no match row and pass.
+ */
+function releasedToPublic(db: Db, fixtureId: typeof fixtureResults.fixtureId | typeof fixtures.id) {
+  return notExists(
+    db
+      .select({ id: sql`1` })
+      .from(matches)
+      .innerJoin(competitions, eq(competitions.id, matches.competitionId))
+      .where(
+        and(
+          eq(matches.fixtureId, fixtureId),
+          sql`${matches.trustLevel} <> 'verified'`,
+          sql`${matches.finishedAt} is not null`,
+          sql`${matches.finishedAt} + make_interval(secs => coalesce((${competitions.scoringRules}->>'publicDelaySeconds')::int, 60)) > now()`,
+        ),
+      ),
+  );
+}
+
+/** Voided scored fixtures retain historical rows but contribute no authoritative result. */
+function notVoided(db: Db, fixtureId: typeof fixtureResults.fixtureId | typeof fixtures.id) {
+  return notExists(
+    db
+      .select({ id: sql`1` })
+      .from(matches)
+      .where(and(eq(matches.fixtureId, fixtureId), eq(matches.phase, "void"))),
+  );
+}
 /** One fixture's result, or null when it has not been recorded. */
 export async function resultOf(db: Db, fixtureId: string): Promise<ResultRow | null> {
   const [row] = await db
     .select()
     .from(fixtureResults)
-    .where(eq(fixtureResults.fixtureId, fixtureId))
+    .where(and(eq(fixtureResults.fixtureId, fixtureId), notVoided(db, fixtureResults.fixtureId)))
     .limit(1);
   return row === undefined ? null : toResultRow(row);
 }
 
 /** Every recorded result in a competition, keyed by fixture. */
-export async function resultsOf(db: Db, competitionId: string): Promise<Map<string, ResultRow>> {
+export async function resultsOf(
+  db: Db,
+  competitionId: string,
+  audience: ResultAudience = "console",
+): Promise<Map<string, ResultRow>> {
   const rows = await db
     .select()
     .from(fixtureResults)
-    .where(eq(fixtureResults.competitionId, competitionId));
+    .where(
+      and(
+        eq(fixtureResults.competitionId, competitionId),
+        notVoided(db, fixtureResults.fixtureId),
+        audience === "public" ? releasedToPublic(db, fixtureResults.fixtureId) : undefined,
+      ),
+    );
   return new Map(rows.map((row) => [row.fixtureId, toResultRow(row)]));
 }
 
@@ -491,10 +571,11 @@ export async function standingsOf(
   db: Db,
   competitionId: string,
   today: string = istCalendarDate(),
+  audience: ResultAudience = "console",
 ): Promise<StandingsView> {
   const todayStart = `${today.slice(0, 10)}T00:00`;
   const [seasonRow] = await db
-    .select({ sport: competitions.sport })
+    .select({ sport: competitions.sport, scoringRules: competitions.scoringRules })
     .from(competitions)
     .where(eq(competitions.id, competitionId))
     .limit(1);
@@ -513,7 +594,13 @@ export async function standingsOf(
         score: fixtureResults.score,
       })
       .from(fixtureResults)
-      .where(eq(fixtureResults.competitionId, competitionId)),
+      .where(
+        and(
+          eq(fixtureResults.competitionId, competitionId),
+          notVoided(db, fixtureResults.fixtureId),
+          audience === "public" ? releasedToPublic(db, fixtureResults.fixtureId) : undefined,
+        ),
+      ),
     db
       .select({
         id: fixtures.id,
@@ -527,6 +614,7 @@ export async function standingsOf(
         and(
           eq(fixtures.competitionId, competitionId),
           inArray(fixtures.status, ["published", "in_progress", "completed"]),
+          notVoided(db, fixtures.id),
         ),
       ),
   ]);
@@ -556,6 +644,7 @@ export async function standingsOf(
         teamId: fixtureParticipants.teamId,
         placement: fixtureParticipants.placement,
         score: fixtureParticipants.score,
+        source: fixtureParticipants.source,
       })
       .from(fixtureParticipants)
       .where(inArray(fixtureParticipants.fixtureId, lobbyIds));
@@ -572,9 +661,54 @@ export async function standingsOf(
       });
       byFixture.set(row.fixtureId, list);
     }
-    for (const [fixtureId, placements] of byFixture) {
-      inputs.push({ placements });
-      counted.add(fixtureId);
+    for (const fixtureId of lobbyIds) {
+      const projections = participants.filter((row) => row.fixtureId === fixtureId);
+      const history = await db
+        .select()
+        .from(matchEvents)
+        .where(eq(matchEvents.fixtureId, fixtureId))
+        .orderBy(matchEvents.seq);
+      if (history.length || projections.some((row) => row.source === "scored")) {
+        const [match] = await db.select().from(matches).where(eq(matches.fixtureId, fixtureId));
+        let state: PlacementState;
+        try {
+          state = placementEngine.replay(history.map(persistedMatchEvent));
+        } catch {
+          continue;
+        }
+        if (
+          !match?.finishedAt ||
+          JSON.stringify(state.format) !== JSON.stringify(placementFormat(match.format)) ||
+          !state.finished ||
+          state.terminal ||
+          state.lastSeq !== match.lastSeq ||
+          state.attempt !== match.attempt ||
+          state.teamIds.length !== projections.length
+        )
+          continue;
+        const aggregate = placementTable(state);
+        if (
+          aggregate.some(
+            (row) =>
+              !projections.some(
+                (p) =>
+                  p.source === "scored" &&
+                  p.teamId === row.teamId &&
+                  p.placement === row.placement &&
+                  p.score?.["kills"] === row.kills,
+              ),
+          )
+        )
+          continue;
+        inputs.push({ source: "scored", scoredPlacements: aggregate });
+        counted.add(fixtureId);
+      } else {
+        const placements = byFixture.get(fixtureId);
+        if (placements) {
+          inputs.push({ placements });
+          counted.add(fixtureId);
+        }
+      }
     }
   }
 
@@ -613,7 +747,12 @@ export async function standingsOf(
   const rows = buildStandings(
     teamRows.map((row) => row.id),
     inputs,
-    standingsRulesOf(pack),
+    {
+      ...standingsRulesOf(pack),
+      allOutUsesQuota: parseSeasonScoringRules(seasonRow?.scoringRules).allOutUsesQuota,
+      excludeNoResultFromNrr: parseSeasonScoringRules(seasonRow?.scoringRules)
+        .excludeNoResultFromNrr,
+    },
   ).map((row) => ({ ...row, teamName: names.get(row.teamId) ?? row.teamId }));
 
   // A match in progress TODAY is owed a result only once it has one or has

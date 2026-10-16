@@ -1,4 +1,4 @@
-import { orgMembers, tournaments } from "@desiauction/db";
+import { fixtures, orgMembers, tournaments } from "@desiauction/db";
 import { and, eq } from "drizzle-orm";
 
 import { systemDb } from "../db";
@@ -127,4 +127,40 @@ export async function memberTournamentSeasons(
     return [];
   }
   return competitionsOfTournament(systemDb, tournamentId);
+}
+
+/** Authenticated, cryptographically gated exact-ID lookup; no fixture details escape. */
+export async function handoverTenant(
+  personId: string,
+  token: unknown,
+  now = new Date(),
+): Promise<string | null> {
+  if (!personId) return null;
+  const { verifyHandoverToken } = await import("../scoring/handover");
+  const verified = verifyHandoverToken(token, now);
+  if (!verified) return null;
+  const [row] = await systemDb
+    .select({ orgId: fixtures.orgId })
+    .from(fixtures)
+    .where(eq(fixtures.id, verified.fixtureId))
+    .limit(1);
+  return row?.orgId ?? null;
+}
+
+/** C38: only a verified purpose-separated confirmation address resolves its tenant. */
+export async function confirmationTenant(
+  personId: string,
+  token: unknown,
+  now = new Date(),
+): Promise<string | null> {
+  if (!personId) return null;
+  const { readConfirmationToken } = await import("../scoring/confirmation-token");
+  const address = readConfirmationToken(token, now);
+  if (!address) return null;
+  const [row] = await systemDb
+    .select({ orgId: fixtures.orgId })
+    .from(fixtures)
+    .where(eq(fixtures.id, address.fixtureId))
+    .limit(1);
+  return row?.orgId ?? null;
 }

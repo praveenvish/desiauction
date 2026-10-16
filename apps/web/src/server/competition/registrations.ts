@@ -332,9 +332,78 @@ export async function submitRegistration(
   return { ok: true, registrationId };
 }
 
+/**
+ * A player the organizer knows by name alone (0104).
+ *
+ * No phone means no identity to reuse: a fresh person with no phone and no
+ * email, owned by this org — nobody can sign in as them, nothing is sent to
+ * them, and no other club can ever match them. The name is the club's own, so
+ * it goes on the person (there is no account behind it to protect).
+ *
+ * Without a phone the NAME is how a re-imported sheet finds this player again
+ * (`storedForImport`), so a second club-only player with the same name in the
+ * same season is refused rather than created.
+ */
+export async function addClubOnlyPlayer(
+  db: Db,
+  competitionId: string,
+  orgId: string,
+  actorId: string,
+  player: {
+    name: string;
+    role: string;
+    basePriceBand: string | null;
+    profile?: PlayerProfileInput;
+  },
+  auditSource = "organizer_manual",
+): Promise<AddPlayerResult> {
+  // Compared in JS with the import's own key, so the two doors agree exactly.
+  const clubOnly = await db
+    .select({ shown: sql<string | null>`coalesce(${registrations.enteredName}, ${people.name})` })
+    .from(registrations)
+    .innerJoin(people, eq(people.id, registrations.personId))
+    .where(and(eq(registrations.competitionId, competitionId), isNotNull(people.clubOrgId)));
+  if (clubOnly.some((entry) => nameKey(entry.shown) === nameKey(player.name))) {
+    return { ok: false, reason: "duplicate_name" };
+  }
+  const personId = newId();
+  await db
+    .insert(people)
+    .values({ id: personId, phone: null, name: player.name, clubOrgId: orgId });
+  const id = newId();
+  await db.insert(registrations).values({
+    id,
+    orgId,
+    competitionId,
+    personId,
+    role: player.role === "" ? null : player.role,
+    status: "submitted",
+    registrationNumber: registrationNumber(id),
+    ...(player.basePriceBand !== null ? { basePriceBand: player.basePriceBand } : {}),
+    ...validProfile(player.profile),
+  });
+  await db.insert(auditLog).values({
+    id: newId(),
+    actor: actorId,
+    action: "registration.added",
+    scopeType: "org",
+    scopeId: orgId,
+    subject: id,
+    meta: { competitionId, role: player.role, source: auditSource, clubOnly: "true" },
+  });
+  return {
+    ok: true,
+    registrationId: id,
+    number: registrationNumber(id),
+    personId,
+    personExisted: false,
+  };
+}
+
 export type AddPlayerResult =
   | { ok: true; registrationId: string; number: string; personId: string; personExisted: boolean }
-  | { ok: false; reason: "duplicate" };
+  /** `duplicate_name`: a club-only player of that name is already in this season. */
+  | { ok: false; reason: "duplicate" | "duplicate_name" };
 
 /**
  * An organizer enters a player who did not sign up themselves (parity §3.3).
@@ -363,17 +432,22 @@ export async function addPlayerByPhone(
   actorId: string,
   player: {
     name: string;
-    phone: string;
+    /** Null: a club-only player (0104) — see `addClubOnlyPlayer`. */
+    phone: string | null;
     /** The season's pack key — not cricket's four (migration 0047 opened it). */
     role: string;
     basePriceBand: string | null;
     profile?: PlayerProfileInput;
   },
 ): Promise<AddPlayerResult> {
+  if (player.phone === null) {
+    return addClubOnlyPlayer(db, competitionId, orgId, actorId, player);
+  }
+  const phone = player.phone;
   const [found] = await db
     .select({ id: people.id, name: people.name })
     .from(people)
-    .where(eq(people.phone, player.phone))
+    .where(eq(people.phone, phone))
     .limit(1);
   let personId = found?.id;
   const personExisted = personId !== undefined;
@@ -383,18 +457,13 @@ export async function addPlayerByPhone(
     // the surrounding tenant transaction (the savepoint trap).
     const inserted = await db
       .insert(people)
-      .values({ id: fresh, phone: player.phone, name: player.name })
+      .values({ id: fresh, phone, name: player.name })
       .onConflictDoNothing({ target: people.phone })
       .returning({ id: people.id });
     personId =
       inserted[0]?.id ??
-      (
-        await db
-          .select({ id: people.id })
-          .from(people)
-          .where(eq(people.phone, player.phone))
-          .limit(1)
-      )[0]?.id;
+      (await db.select({ id: people.id }).from(people).where(eq(people.phone, phone)).limit(1))[0]
+        ?.id;
     if (personId === undefined) {
       return { ok: false, reason: "duplicate" };
     }
@@ -412,7 +481,7 @@ export async function addPlayerByPhone(
       orgId,
       competitionId,
       personId,
-      role: player.role,
+      role: player.role === "" ? null : player.role,
       status: "submitted",
       registrationNumber: registrationNumber(id),
       // An account that already existed: the season shows the name the
@@ -487,6 +556,11 @@ export interface RegistrationRow {
    * is the only channel a season reaches a player on.
    */
   phone: string | null;
+  /**
+   * Added by this club with no real number (0104): no phone, no email, nobody
+   * can sign in as them, nothing is sent to them. The sheet offers "Add phone".
+   */
+  clubOnly: boolean;
   role: string | null;
   status: RegistrationStatus;
   teamId: string | null;
@@ -497,6 +571,12 @@ export interface RegistrationRow {
    * it. Null before the night, for a pre-signed player, and for an unsold one.
    */
   soldPrice: number | null;
+  /**
+   * What the organiser typed this player went for at an auction held outside
+   * the app (0105, `offline_price`, ×100 in the season's unit). Null = none
+   * typed. Only meaningful while results are being typed in.
+   */
+  handPrice?: number | null;
   // Icon (marquee) player: pre-assigned to their team, excluded from the auction.
   isIcon: boolean;
   // Retained from a prior season: pre-assigned and excluded the same way. The
@@ -557,6 +637,9 @@ export interface RegistrationRow {
   age: number | null;
   /** ISO `yyyy-mm-dd` as stored — the sheet's date field edits it. Review-gated. */
   dateOfBirth: string | null;
+  /** The organizer confirmed this player is 18 or older (0106): a photo of an
+   *  unknown age may then show on public pages. A date of birth still decides. */
+  adultConfirmed: boolean;
   battingStyle: string | null;
   bowlingStyle: string | null;
   /**
@@ -819,12 +902,20 @@ export interface RegistrationQuery {
   teamId?: string;
   /** Narrow to one playing role (the pack's key). */
   role?: string;
+  /**
+   * Players still missing a detail the organizer fills in after an import —
+   * the "fix it later" list: no photo, no phone (club-only, 0104), or no role.
+   */
+  missing?: RegistrationMissing;
   /** Exactly one registration — the player sheet opened from a team roster. */
   registrationId?: string;
   sort?: RegistrationSort;
   page: number;
   pageSize: number;
 }
+
+export const REGISTRATION_MISSING = ["photo", "phone", "role"] as const;
+export type RegistrationMissing = (typeof REGISTRATION_MISSING)[number];
 
 export interface RegistrationPage {
   rows: RegistrationRow[];
@@ -883,6 +974,14 @@ function registrationFilters(
   if (query.registrationId !== undefined) {
     filters.push(eq(registrations.id, query.registrationId));
   }
+  if (query.missing === "photo") {
+    // The same render gate the row applies: a photo without consent is not shown.
+    filters.push(or(isNull(shownPhotoKey), isNull(shownPhotoConsentAt)) ?? sql`false`);
+  } else if (query.missing === "phone") {
+    filters.push(isNull(people.phone));
+  } else if (query.missing === "role") {
+    filters.push(or(isNull(registrations.role), eq(registrations.role, "")) ?? sql`false`);
+  }
   const term = query.search?.trim();
   if (term !== undefined && term !== "") {
     const like = containsPattern(term);
@@ -932,10 +1031,12 @@ export async function queryRegistrations(
       name: shownName,
       typedName: sql<boolean>`${registrations.enteredName} is not null`,
       phone: people.phone,
+      clubOnly: sql<boolean>`${people.clubOrgId} is not null`,
       role: registrations.role,
       status: registrations.status,
       teamId: registrations.teamId,
       teamName: teams.name,
+      handPrice: registrations.offlinePrice,
       // The desk said "Sold" and nothing else (census 12): the price is one
       // lookup away, on the season's one non-abandoned auction.
       soldPrice: sql<number | null>`(
@@ -944,6 +1045,7 @@ export async function queryRegistrations(
         where ${lots.registrationId} = ${registrations.id}
           and ${lots.status} = 'sold'
           and ${auctions.status} <> 'abandoned'
+          and ${auctions.kind} = 'real'
         limit 1
       )`,
       isIcon: registrations.isIcon,
@@ -968,6 +1070,7 @@ export async function queryRegistrations(
       bowlingStyle: registrations.bowlingStyle,
       attributes: registrations.attributes,
       createdAt: registrations.createdAt,
+      adultConfirmedAt: registrations.adultConfirmedAt,
     })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
@@ -989,8 +1092,9 @@ export async function queryRegistrations(
   const sport = season?.sport ?? DEFAULT_SPORT_KEY;
   const now = new Date();
   const rows: RegistrationRow[] = raw.map(
-    ({ photoKey, photoConsentAt, attributes, createdAt, ...r }) => ({
+    ({ photoKey, photoConsentAt, attributes, createdAt, adultConfirmedAt, ...r }) => ({
       ...r,
+      adultConfirmed: adultConfirmedAt !== null,
       createdAt: createdAt.toISOString(),
       dateOfBirth: r.dateOfBirth,
       duplicateName: dupKeys.has(nameKey(r.name)),

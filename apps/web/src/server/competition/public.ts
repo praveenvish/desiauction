@@ -1,8 +1,8 @@
 import { cache } from "react";
+import { publicName } from "../scoring/public-name";
 import {
   deriveAge,
   describeAttributes,
-  isMinor,
   mayPublishPhoto,
   paise,
   type MoneyUnit,
@@ -11,6 +11,7 @@ import {
   type PlayerPosterInput,
   type PosterMark,
 } from "@desiauction/core";
+import { inRealAuction, isRealAuction } from "@desiauction/auction";
 import {
   auctionEvents,
   auctions,
@@ -215,11 +216,11 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
     systemDb
       .select({ status: auctions.status, config: auctions.config })
       .from(auctions)
-      .where(eq(auctions.competitionId, row.id))
+      .where(and(eq(auctions.competitionId, row.id), isRealAuction()))
       .limit(1),
     teamsOf(systemDb, row.id),
     publishedSchedule(systemDb, row.id),
-    seasonPlayIn(systemDb, { id: row.id, sport: row.sport }),
+    seasonPlayIn(systemDb, { id: row.id, sport: row.sport }, undefined, "public"),
     seasonVenueOf(systemDb, row.id),
   ]);
   return {
@@ -286,6 +287,8 @@ export interface ShowcasePlayer {
   /** Why a `retained`-status player skipped the auction — the word to print. */
   preSignedAs: PreSignedKind | null;
   teamName: string | null;
+  /** The squad page this player belongs on (`teamSlugOf`); null with no team. */
+  teamSlug: string | null;
   /**
    * What the room paid, in the season's unit ×100 — null for anyone not sold
    * at auction (in the pool, pre-signed, passed). Public since the founder's
@@ -302,6 +305,7 @@ interface ShowcaseRow {
   name: string | null;
   role: string | null;
   dateOfBirth: string | null;
+  adultConfirmedAt: Date | null;
   battingStyle: string | null;
   bowlingStyle: string | null;
   attributes: unknown;
@@ -321,7 +325,7 @@ interface ShowcaseRow {
  * captain the room bought and the organizer named afterwards — that player's
  * public outcome is the sale.
  */
-const showcasePreSigned = sql<boolean>`(${preSignedSql} and not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.status} = 'sold'))`;
+const showcasePreSigned = sql<boolean>`(${preSignedSql} and not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.status} = 'sold' and ${inRealAuction(lots.auctionId)}))`;
 
 /**
  * The hammer price, when there was one: the registration's SOLD lot in a
@@ -333,7 +337,7 @@ const showcasePreSigned = sql<boolean>`(${preSignedSql} and not exists (select 1
  */
 const showcaseSoldPrice = sql<
   number | null
->`(select max(${lots.soldPrice}) from ${lots} inner join ${auctions} on ${auctions.id} = ${lots.auctionId} where ${lots.registrationId} = ${registrations.id} and ${lots.status} = 'sold' and ${auctions.status} <> 'abandoned')::float8`;
+>`(select max(${lots.soldPrice}) from ${lots} inner join ${auctions} on ${auctions.id} = ${lots.auctionId} where ${lots.registrationId} = ${registrations.id} and ${lots.status} = 'sold' and ${auctions.status} <> 'abandoned' and ${isRealAuction()})::float8`;
 
 /**
  * The stored photo KEY a public surface may render, or null — the same two
@@ -346,7 +350,10 @@ const showcaseSoldPrice = sql<
  * age: with no date there is none to publish.
  */
 function publicPhotoKey(r: ShowcaseRow, now: Date): string | null {
-  return mayPublishPhoto(r.dateOfBirth, now) && r.photoConsentAt !== null ? r.photoKey : null;
+  return mayPublishPhoto(r.dateOfBirth, now, r.adultConfirmedAt !== null) &&
+    r.photoConsentAt !== null
+    ? r.photoKey
+    : null;
 }
 
 /**
@@ -369,12 +376,13 @@ function toShowcasePlayer(r: ShowcaseRow, now: Date, sport: string): ShowcasePla
   // at once — regardless of any photo consent an adult would have given. The
   // organizer still sees the full roster on the authenticated, capability-gated
   // review screens; only public exposure is withheld.
-  const minor = isMinor(r.dateOfBirth, now);
+  const identity = publicName(r, r, now);
+  const minor = identity.minor;
   const photoKey = publicPhotoKey(r, now);
   return {
     registrationId: r.registrationId,
     number: r.number,
-    name: r.name ?? "Unnamed",
+    name: identity.name,
     role: r.role,
     age: minor ? null : deriveAge(r.dateOfBirth, now),
     battingStyle: r.battingStyle,
@@ -389,6 +397,10 @@ function toShowcasePlayer(r: ShowcaseRow, now: Date, sport: string): ShowcasePla
     status: r.preSigned ? "retained" : r.teamId === null ? "available" : "sold",
     preSignedAs: r.preSigned ? preSignedKind(r) : null,
     teamName: r.teamName,
+    teamSlug:
+      r.teamId === null || r.teamName === null
+        ? null
+        : teamSlugOf({ id: r.teamId, name: r.teamName }),
     // A pre-signed player's public outcome is the mark, not a price.
     soldPrice: r.preSigned ? null : (r.soldPrice ?? null),
   };
@@ -458,6 +470,7 @@ export async function publicShowcase(slug: string): Promise<ShowcasePool | null>
       name: shownName,
       role: registrations.role,
       dateOfBirth: registrations.dateOfBirth,
+      adultConfirmedAt: registrations.adultConfirmedAt,
       battingStyle: registrations.battingStyle,
       bowlingStyle: registrations.bowlingStyle,
       attributes: registrations.attributes,
@@ -563,6 +576,7 @@ export async function publicPlayerCard(
       name: shownName,
       role: registrations.role,
       dateOfBirth: registrations.dateOfBirth,
+      adultConfirmedAt: registrations.adultConfirmedAt,
       battingStyle: registrations.battingStyle,
       bowlingStyle: registrations.bowlingStyle,
       attributes: registrations.attributes,
@@ -604,7 +618,10 @@ export async function publicPlayerCard(
       and(
         eq(registrations.personId, row.personId),
         eq(competitions.orgId, comp.orgId),
-        eq(competitions.visibility, "public"),
+        and(
+          eq(competitions.visibility, "public"),
+          sql`exists (select 1 from organizations directory_org where directory_org.id = ${competitions.orgId} and directory_org.kind = 'club')`,
+        ),
         eq(registrations.status, "approved"),
         ne(registrations.competitionId, comp.id),
       ),
@@ -696,6 +713,7 @@ export async function publicPlayerPoster(
         eq(lots.registrationId, player.registrationId),
         eq(auctions.competitionId, comp.id),
         ne(auctions.status, "abandoned"),
+        isRealAuction(),
       ),
     )
     .limit(1);
@@ -705,7 +723,13 @@ export async function publicPlayerPoster(
           await systemDb
             .select({ status: auctions.status })
             .from(auctions)
-            .where(and(eq(auctions.competitionId, comp.id), ne(auctions.status, "abandoned")))
+            .where(
+              and(
+                eq(auctions.competitionId, comp.id),
+                ne(auctions.status, "abandoned"),
+                isRealAuction(),
+              ),
+            )
             .limit(1)
         )[0]?.status ?? null)
       : null;
@@ -822,7 +846,13 @@ export async function myAuctionOutcome(
   const [auction] = await systemDb
     .select({ id: auctions.id, status: auctions.status })
     .from(auctions)
-    .where(and(eq(auctions.competitionId, row.competitionId), ne(auctions.status, "abandoned")))
+    .where(
+      and(
+        eq(auctions.competitionId, row.competitionId),
+        ne(auctions.status, "abandoned"),
+        isRealAuction(),
+      ),
+    )
     .limit(1);
   const [lot] =
     auction === undefined
@@ -861,7 +891,8 @@ export async function myAuctionOutcome(
     // A "sold" with no team row to name is not a sentence we can finish.
     outcome: outcome === "sold" && team === undefined ? "pool" : outcome,
     teamName: team?.name ?? null,
-    teamSlug: team === undefined ? null : teamSlugOf(team.name),
+    teamSlug:
+      team === undefined || teamId === null ? null : teamSlugOf({ id: teamId, name: team.name }),
     teamId: team === undefined ? null : teamId,
     teamColor: team?.color ?? null,
     pricePaise: outcome === "sold" ? (lot?.soldPrice ?? null) : null,
@@ -877,6 +908,65 @@ export async function myAuctionOutcome(
  * only what the team page and player card already publish: the name, the
  * number that addresses their page, the price and the buying team.
  */
+/**
+ * A CASE STUDY'S NUMBERS, FROM THE RECORD (content/case-studies.ts).
+ *
+ * A case study states figures about a real night, so they are read here rather
+ * than typed into the story: lots sold and unsold, the top price and the total
+ * spent, from the season's one non-abandoned auction. Behind the same gate as
+ * every public read (a published season), and with no player in it: a case
+ * study names nobody by default. Null when the season is not published or held
+ * no auction, so the page can say "no figures" rather than print zeros.
+ */
+export interface CaseStudyFigures {
+  teams: number;
+  sold: number;
+  unsold: number;
+  topPrice: Paise;
+  totalSpent: Paise;
+  unit: MoneyUnit;
+}
+
+export async function publicCaseStudyFigures(slug: string): Promise<CaseStudyFigures | null> {
+  const [comp] = await systemDb
+    .select({
+      id: competitions.id,
+      visibility: competitions.visibility,
+      unit: competitions.auctionUnit,
+    })
+    .from(competitions)
+    .where(eq(competitions.slug, slug))
+    .limit(1);
+  if (comp === undefined || comp.visibility !== "public") {
+    return null;
+  }
+  const [row] = await systemDb
+    .select({
+      auctions: sql<number>`count(distinct ${auctions.id})::int`,
+      sold: sql<number>`count(${lots.id}) filter (where ${lots.status} = 'sold')::int`,
+      unsold: sql<number>`count(${lots.id}) filter (where ${lots.status} = 'unsold')::int`,
+      top: sql<string | null>`max(${lots.soldPrice}) filter (where ${lots.status} = 'sold')`,
+      total: sql<string | null>`sum(${lots.soldPrice}) filter (where ${lots.status} = 'sold')`,
+    })
+    .from(auctions)
+    .leftJoin(lots, eq(lots.auctionId, auctions.id))
+    .where(
+      and(eq(auctions.competitionId, comp.id), ne(auctions.status, "abandoned"), isRealAuction()),
+    );
+  if (row === undefined || row.auctions === 0) {
+    return null;
+  }
+  const teamCount = (await teamsOf(systemDb, comp.id)).length;
+  return {
+    teams: teamCount,
+    sold: row.sold,
+    unsold: row.unsold,
+    topPrice: paise(Number(row.top ?? 0)),
+    totalSpent: paise(Number(row.total ?? 0)),
+    unit: comp.unit,
+  };
+}
+
 export interface PublicTopBuy {
   registrationId: string;
   number: string;
@@ -912,6 +1002,7 @@ export async function publicTopBuys(slug: string, limit = 3): Promise<PublicTopB
       and(
         eq(auctions.competitionId, comp.id),
         ne(auctions.status, "abandoned"),
+        isRealAuction(),
         eq(lots.status, "sold"),
         eq(registrations.status, "approved"),
       ),
@@ -961,6 +1052,27 @@ export interface PublicTeam {
   competitionSlug: string;
   sport: string;
   competitionLogoKey: string | null;
+  /**
+   * The season around the squad: its banner (0082), crest, place, dates and
+   * organizer. Already public on `/c/[slug]` behind the same visibility gate;
+   * the squad page used to open on a blank band with none of it.
+   */
+  season: {
+    coverUrl: string | null;
+    logoUrl: string | null;
+    location: string | null;
+    startsOn: string | null;
+    endsOn: string | null;
+    orgName: string;
+  };
+  /** The season's other teams, in name order — the page's way sideways. */
+  otherTeams: {
+    name: string;
+    slug: string;
+    shortName: string | null;
+    color: string | null;
+    crestUrl: string | null;
+  }[];
   team: {
     id: string;
     name: string;
@@ -983,11 +1095,48 @@ export interface PublicTeam {
   /** What the season's auction counts in (0091): "₹…" or "… pts". */
   unit: MoneyUnit;
   auctionStatus: string | null;
+  /**
+   * 0110: `imported` — the auction was held outside the app. Its placed
+   * players are shown as they are typed in, before any "Publish".
+   */
+  auctionSource: "app" | "imported";
 }
 
-/** The address segment for a team: its name, as a slug. */
-export function teamSlugOf(name: string): string {
-  return slugifyName(name);
+/**
+ * The address segment for a team. A name in plain English letters is its own
+ * slug ("Malad Mavericks" → `malad-mavericks`), as it always was. Any other
+ * name — "आशापुरा इलेवन", "रघुनाथपुरा XI" — used to lose every letter and fall
+ * back to `competition` (or to the stray `xi`), so a season of Hindi-named
+ * teams gave all of them ONE address, which always opened the first team.
+ * Those names now carry a short tag from the team's own id, unique per season.
+ */
+export function teamSlugOf(team: { id: string; name: string }): string {
+  const base = team.name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+  // eslint-disable-next-line no-control-regex -- "anything outside ASCII"
+  if (base !== "" && !/[^\x00-\x7F]/.test(team.name)) {
+    return base;
+  }
+  const tag = team.id.slice(-6).toLowerCase();
+  return base === "" ? `team-${tag}` : `${base}-${tag}`;
+}
+
+/**
+ * Which team an address names: today's slug first, then the one it was shared
+ * under before (`slugifyName` alone), so a link already sent on WhatsApp or
+ * printed on a QR code still opens a team rather than a 404.
+ */
+export function teamForSlug<T extends { id: string; name: string }>(
+  rows: readonly T[],
+  slug: string,
+): T | undefined {
+  return (
+    rows.find((row) => teamSlugOf(row) === slug) ??
+    rows.find((row) => slugifyName(row.name) === slug)
+  );
 }
 
 export async function publicTeam(slug: string, teamSlug: string): Promise<PublicTeam | null> {
@@ -998,10 +1147,17 @@ export async function publicTeam(slug: string, teamSlug: string): Promise<Public
       sport: competitions.sport,
       visibility: competitions.visibility,
       logoKey: competitions.logoUrl,
+      coverKey: competitions.coverUrl,
+      location: competitions.location,
+      startsOn: competitions.startsOn,
+      endsOn: competitions.endsOn,
+      orgName: organizations.name,
       unit: competitions.auctionUnit,
+      auctionSource: competitions.auctionSource,
       listSquadsInSearch: competitions.listSquadsInSearch,
     })
     .from(competitions)
+    .innerJoin(organizations, eq(organizations.id, competitions.orgId))
     .where(eq(competitions.slug, slug))
     .limit(1);
   if (comp === undefined || comp.visibility !== "public") {
@@ -1019,14 +1175,21 @@ export async function publicTeam(slug: string, teamSlug: string): Promise<Public
     .from(teams)
     .where(eq(teams.competitionId, comp.id))
     .orderBy(asc(teams.name));
-  const team = teamRows.find((row) => teamSlugOf(row.name) === teamSlug);
+  const team = teamForSlug(teamRows, teamSlug);
   if (team === undefined) {
     return null;
   }
   const [auction] = await systemDb
-    .select({ id: auctions.id, status: auctions.status, config: auctions.config })
+    .select({
+      id: auctions.id,
+      status: auctions.status,
+      config: auctions.config,
+      enteredByHand: auctions.enteredByHand,
+    })
     .from(auctions)
-    .where(and(eq(auctions.competitionId, comp.id), ne(auctions.status, "abandoned")))
+    .where(
+      and(eq(auctions.competitionId, comp.id), ne(auctions.status, "abandoned"), isRealAuction()),
+    )
     .limit(1);
 
   const member = {
@@ -1035,6 +1198,7 @@ export async function publicTeam(slug: string, teamSlug: string): Promise<Public
     name: shownName,
     role: registrations.role,
     dateOfBirth: registrations.dateOfBirth,
+    adultConfirmedAt: registrations.adultConfirmedAt,
     photoKey: shownPhotoKey,
     photoConsentAt: shownPhotoConsentAt,
     isIcon: registrations.isIcon,
@@ -1079,13 +1243,45 @@ export async function publicTeam(slug: string, teamSlug: string): Promise<Public
           )
           .orderBy(desc(lots.soldPrice));
 
+  // Everyone else on this team and not sold in a lot — the same players the
+  // season page's squad cards already list publicly (`publicShowcase` reads
+  // `registrations.team_id`), so the two pages can never disagree on a count.
+  // That covers players put on a team by hand or by the assign-team desk, and
+  // after a hand-entered publish the ones placed WITHOUT a price (no lot).
+  // A typed price is shown only where it IS the result: an imported season
+  // (0110) or a hand-entered auction.
+  const handPlaced =
+    auction === undefined ? comp.auctionSource === "imported" : auction.enteredByHand;
+  const placedRows = await systemDb
+    .select({ ...member, price: registrations.offlinePrice })
+    .from(registrations)
+    .innerJoin(people, eq(people.id, registrations.personId))
+    .where(
+      and(
+        eq(registrations.competitionId, comp.id),
+        eq(registrations.teamId, team.id),
+        eq(registrations.status, "approved"),
+        sql`not ${preSignedSql}`,
+        ...(auction === undefined
+          ? []
+          : [
+              sql`not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.auctionId} = ${auction.id} and ${lots.status} = 'sold')`,
+            ]),
+      ),
+    )
+    .orderBy(sql`${registrations.offlinePrice} desc nulls last`, asc(shownName));
+
   const now = new Date();
   const photo = (row: {
     dateOfBirth: string | null;
+    adultConfirmedAt: Date | null;
     photoConsentAt: Date | null;
     photoKey: string | null;
   }) =>
-    mayPublishPhoto(row.dateOfBirth, now) && row.photoConsentAt !== null ? row.photoKey : null;
+    mayPublishPhoto(row.dateOfBirth, now, row.adultConfirmedAt !== null) &&
+    row.photoConsentAt !== null
+      ? row.photoKey
+      : null;
   const toMember = (
     row: (typeof preSignedRows)[number],
     pricePaise: number | null,
@@ -1108,6 +1304,7 @@ export async function publicTeam(slug: string, teamSlug: string): Promise<Public
     ...boughtRows
       .filter((row) => !preSignedRows.some((pre) => pre.registrationId === row.registrationId))
       .map((row) => toMember(row, row.price, row.isCaptain ? ["captain"] : [])),
+    ...placedRows.map((row) => toMember(row, handPlaced ? row.price : null, [])),
   ];
   return {
     competitionId: comp.id,
@@ -1115,10 +1312,28 @@ export async function publicTeam(slug: string, teamSlug: string): Promise<Public
     competitionSlug: slug,
     sport: comp.sport,
     competitionLogoKey: comp.logoKey,
+    season: {
+      coverUrl: comp.coverKey === null ? null : storage.readUrl(comp.coverKey),
+      logoUrl: comp.logoKey === null ? null : storage.readUrl(comp.logoKey),
+      location: comp.location,
+      startsOn: comp.startsOn,
+      endsOn: comp.endsOn,
+      orgName: comp.orgName,
+    },
+    otherTeams: teamRows
+      .filter((row) => row.id !== team.id)
+      .map((row) => ({
+        name: row.name,
+        slug: teamSlugOf(row),
+        shortName: row.shortName,
+        color: row.color,
+        crestUrl: row.crestKey === null ? null : storage.readUrl(row.crestKey),
+      })),
     team: {
       id: team.id,
       name: team.name,
-      slug: teamSlug,
+      // The canonical address, even when an older link opened the page.
+      slug: teamSlugOf(team),
       shortName: team.shortName,
       color: team.color,
       crestKey: team.crestKey,
@@ -1126,10 +1341,14 @@ export async function publicTeam(slug: string, teamSlug: string): Promise<Public
       coachName: team.coachName,
     },
     members,
-    spentPaise: boughtRows.reduce((total, row) => total + (row.price ?? 0), 0),
+    spentPaise: [...boughtRows, ...(handPlaced ? placedRows : [])].reduce(
+      (total, row) => total + (row.price ?? 0),
+      0,
+    ),
     pursePaise: publicAuctionRules(auction?.config).pursePerTeam,
     unit: comp.unit,
     auctionStatus: auction?.status ?? null,
+    auctionSource: comp.auctionSource,
     squadListing: await publicSquadListing(comp.id, comp.listSquadsInSearch),
   };
 }
@@ -1222,7 +1441,7 @@ const DIRECTORY_PAGE_SIZE = 12;
 const latestAuctionStatus = sql<string | null>`(
     select ${auctions.status}
     from ${auctions}
-    where ${auctions.competitionId} = ${competitions.id}
+    where ${auctions.competitionId} = ${competitions.id} and ${isRealAuction()}
     order by ${auctions.createdAt} desc
     limit 1
   )`;
@@ -1241,7 +1460,7 @@ const latestAuctionEventMs = sql<number | null>`(
     select max(${auctionEvents.atMs})
     from ${auctionEvents}
     join ${auctions} on ${auctions.id} = ${auctionEvents.auctionId}
-    where ${auctions.competitionId} = ${competitions.id}
+    where ${auctions.competitionId} = ${competitions.id} and ${isRealAuction()}
   )`;
 
 /**
@@ -1287,8 +1506,21 @@ export async function publicCompetitionsDirectory(params: {
   const sort = params.sort ?? "opportunity";
   const published =
     params.sport === undefined
-      ? eq(competitions.visibility, "public")
-      : and(eq(competitions.visibility, "public"), eq(competitions.sport, params.sport));
+      ? and(
+          and(
+            eq(competitions.visibility, "public"),
+            sql`exists (select 1 from organizations directory_org where directory_org.id = ${competitions.orgId} and directory_org.kind = 'club')`,
+          ),
+          eq(organizations.kind, "club"),
+        )
+      : and(
+          and(
+            eq(competitions.visibility, "public"),
+            sql`exists (select 1 from organizations directory_org where directory_org.id = ${competitions.orgId} and directory_org.kind = 'club')`,
+          ),
+          eq(organizations.kind, "club"),
+          eq(competitions.sport, params.sport),
+        );
   const term = params.q?.trim();
   const search =
     term === undefined || term === ""
@@ -1474,6 +1706,8 @@ export interface MyRegistration {
   auctionUnit: MoneyUnit;
   /** The team this person plays for — sold to, or named captain/icon of. */
   teamName: string | null;
+  /** That team's public page address (`teamSlugOf`); null with no team. */
+  teamSlug: string | null;
   /** That team's own colour, for its chip; null when the club set none. */
   teamColor: string | null;
 }
@@ -1505,6 +1739,7 @@ export const myRegistrations = cache(async function myRegistrations(
       auctionStatus: auctions.status,
       auctionUnit: competitions.auctionUnit,
       teamName: teams.name,
+      teamRowId: teams.id,
       teamColor: teams.primaryColor,
     })
     .from(registrations)
@@ -1529,6 +1764,7 @@ export const myRegistrations = cache(async function myRegistrations(
       and(
         eq(auctions.competitionId, registrations.competitionId),
         ne(auctions.status, "abandoned"),
+        isRealAuction(),
       ),
     )
     .leftJoin(lots, and(eq(lots.registrationId, registrations.id), eq(lots.auctionId, auctions.id)))
@@ -1553,6 +1789,10 @@ export const myRegistrations = cache(async function myRegistrations(
       ) !== null,
     auctionUnit: row.auctionUnit,
     teamName: row.teamName,
+    teamSlug:
+      row.teamRowId === null || row.teamName === null
+        ? null
+        : teamSlugOf({ id: row.teamRowId, name: row.teamName }),
     teamColor: row.teamColor,
     auction:
       row.lotStatus === "sold" && row.soldPrice !== null
@@ -1604,14 +1844,28 @@ export async function publicSeasonSitemap(limit = 5000): Promise<SeasonSitemapEn
           where f.competition_id = "competitions"."id"
             and f.status in ('published', 'in_progress', 'completed', 'cancelled')),
         (select max(fr.updated_at) from fixture_results fr
-          where fr.competition_id = "competitions"."id"),
+          where fr.competition_id = "competitions"."id"
+            -- P-3 (F03): a scored result still inside its betting delay does
+            -- not move lastmod either — same rule as results.ts releasedToPublic.
+            and not exists (
+              select 1 from matches m
+                join competitions dc on dc.id = m.competition_id
+               where m.fixture_id = fr.fixture_id
+                 and m.trust_level <> 'verified'
+                 and m.finished_at is not null
+                 and m.finished_at + make_interval(secs => coalesce((dc.scoring_rules->>'publicDelaySeconds')::int, 60)) > now())),
         (select max(e.created_at) from auction_events e
            join auctions a on a.id = e.auction_id
-          where a.competition_id = "competitions"."id")
+          where a.competition_id = "competitions"."id" and a.kind = 'real')
       )`)}`.mapWith((value: string | Date) => new Date(value)),
     })
     .from(competitions)
-    .where(eq(competitions.visibility, "public"))
+    .where(
+      and(
+        eq(competitions.visibility, "public"),
+        sql`exists (select 1 from organizations directory_org where directory_org.id = ${competitions.orgId} and directory_org.kind = 'club')`,
+      ),
+    )
     .orderBy(asc(competitions.id))
     .limit(limit);
   const optedIn = rows.filter((row) => row.optedIn).map((row) => row.id);
@@ -1661,11 +1915,11 @@ async function indexableSquadSlugs(
   );
   if (allowed.length === 0) return result;
   const rows = await systemDb
-    .select({ competitionId: teams.competitionId, name: teams.name })
+    .select({ competitionId: teams.competitionId, id: teams.id, name: teams.name })
     .from(teams)
     .where(inArray(teams.competitionId, allowed));
   for (const row of rows) {
-    result.set(row.competitionId, [...(result.get(row.competitionId) ?? []), teamSlugOf(row.name)]);
+    result.set(row.competitionId, [...(result.get(row.competitionId) ?? []), teamSlugOf(row)]);
   }
   return result;
 }
@@ -1682,4 +1936,74 @@ export async function publicSquadListing(
     birthDates: births.get(competitionId) ?? [],
     now: new Date(),
   });
+}
+
+/** Resolve identity privately behind the existing published approved player gate. */
+export async function publicCricketCareer(slug: string, number: string) {
+  const card = await publicPlayerCard(slug, number);
+  if (!card || card.player.sport !== "cricket") return null;
+  const [identity] = await systemDb
+    .select({
+      personId: registrations.personId,
+      orgId: competitions.orgId,
+      dateOfBirth: registrations.dateOfBirth,
+    })
+    .from(registrations)
+    .innerJoin(competitions, eq(competitions.id, registrations.competitionId))
+    .where(
+      and(
+        eq(competitions.slug, slug),
+        and(
+          eq(competitions.visibility, "public"),
+          sql`exists (select 1 from organizations directory_org where directory_org.id = ${competitions.orgId} and directory_org.kind = 'club')`,
+        ),
+        eq(registrations.status, "approved"),
+        eq(registrations.registrationNumber, number),
+        eq(registrations.orgId, competitions.orgId),
+      ),
+    )
+    .limit(1);
+  if (!identity || publicName({ name: null }, identity, new Date()).minor) return null;
+  const { cricketCareerFor } = await import("../player/career-stats");
+  return cricketCareerFor(systemDb, { kind: "public", ...identity });
+}
+
+/** Public insight identity stays behind the published approved player boundary. */
+export async function publicCricketInsights(
+  slug: string,
+  number: string,
+  filter: import("../insights/sample").InsightFilter = {},
+) {
+  const card = await publicPlayerCard(slug, number);
+  if (!card || !["cricket", "box_cricket"].includes(card.player.sport)) return null;
+  const [identity] = await systemDb
+    .select({
+      personId: registrations.personId,
+      orgId: competitions.orgId,
+      dateOfBirth: registrations.dateOfBirth,
+    })
+    .from(registrations)
+    .innerJoin(competitions, eq(competitions.id, registrations.competitionId))
+    .where(
+      and(
+        eq(competitions.slug, slug),
+        eq(competitions.visibility, "public"),
+        sql`exists (select 1 from organizations directory_org where directory_org.id = ${competitions.orgId} and directory_org.kind = 'club')`,
+        eq(registrations.status, "approved"),
+        eq(registrations.registrationNumber, number),
+        eq(registrations.orgId, competitions.orgId),
+      ),
+    )
+    .limit(1);
+  if (!identity || publicName({ name: null }, identity, new Date()).minor) return null;
+  const [{ batterInsights }, { bowlerInsights }] = await Promise.all([
+    import("../insights/batter"),
+    import("../insights/bowler"),
+  ]);
+  const scope = { kind: "public" as const, ...identity };
+  const [batter, bowler] = await Promise.all([
+    batterInsights(systemDb, scope, filter),
+    bowlerInsights(systemDb, scope, filter),
+  ]);
+  return { batter, bowler };
 }

@@ -1,5 +1,6 @@
 "use server";
 
+import { isRealAuction } from "@desiauction/auction";
 import { isOrgCapabilitySet } from "@desiauction/core";
 import {
   auctions,
@@ -444,7 +445,7 @@ export async function orgOverview(slug: string): Promise<OrgOverview | null> {
       .select({ slug: competitions.slug, name: competitions.name })
       .from(auctions)
       .innerJoin(competitions, eq(competitions.id, auctions.competitionId))
-      .where(and(eq(auctions.orgId, org.id), eq(auctions.status, "live"))),
+      .where(and(eq(auctions.orgId, org.id), isRealAuction(), eq(auctions.status, "live"))),
     // Over-read, then filter by capability and take the last six. Filtering a
     // page of six would have shown a member three rows and a hole.
     systemDb

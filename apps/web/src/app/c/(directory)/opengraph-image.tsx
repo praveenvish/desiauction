@@ -1,4 +1,4 @@
-import { ImageResponse } from "next/og";
+import { imageResponse } from "../../../server/image-text/image-response";
 
 import { SHARE_IMAGE_SIZE, renderShareFallback } from "../[slug]/share-image-card";
 
@@ -22,6 +22,6 @@ export const alt = "Tournaments on DesiAuction";
 export const size = SHARE_IMAGE_SIZE;
 export const contentType = "image/png";
 
-export default function OpengraphImage() {
-  return new ImageResponse(renderShareFallback(), { ...size });
+export default async function OpengraphImage() {
+  return await imageResponse(renderShareFallback(), { ...size });
 }

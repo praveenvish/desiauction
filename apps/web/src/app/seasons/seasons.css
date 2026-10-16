@@ -871,17 +871,17 @@ p + .date-row {
   color: var(--text-primary);
 }
 
-.photo-match-thumb-row {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-width: 0;
+/* The photo review: the face first and big enough to judge, the player beside
+   it, a Remove on every row. */
+.photo-match-photo {
+  width: 72px;
 }
 
 .photo-match-thumb {
+  display: block;
   flex: none;
-  width: 44px;
-  height: 44px;
+  width: 56px;
+  height: 56px;
   object-fit: cover;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-subtle);
@@ -923,6 +923,45 @@ p + .date-row {
 
 .import-photos strong {
   color: var(--text-primary);
+}
+
+/* What the file will do about phones and roles (import-notices.tsx). The
+   made-up-number note is the one that matters, so it sits in a soft panel; the
+   other two read like the photo line beside them. */
+.import-notice {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.import-notice strong {
+  color: var(--text-primary);
+}
+
+.import-notice.reg-warning {
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.import-notice p {
+  margin: 0 0 var(--space-2);
+}
+
+.import-notice summary {
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.import-notice-list {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  max-height: 16rem;
+  overflow-y: auto;
+  display: grid;
+  gap: var(--space-1);
 }
 
 /* The drop zone's label when a Google Drive route sits above it. */
@@ -2072,11 +2111,34 @@ p + .date-row {
 
 /* Photo import review table: filenames are user data — keep them from
    blowing the layout, and render match failures in the muted danger voice. */
-.photo-match-file {
+/* One line, cut with an ellipsis. `overflow-wrap: anywhere` on a camera name
+   with no spaces let the table shrink the column to one character — the name
+   stacked down the dialog a letter per line. */
+.photo-match-filename {
+  display: block;
+  max-width: 28ch;
+  margin-top: var(--space-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: var(--font-mono);
-  font-size: var(--text-sm-size);
-  overflow-wrap: anywhere;
-  max-width: 22ch;
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.photo-match-action {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.photo-review-done {
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.photo-review-done .dash-hint {
+  margin: 0;
 }
 
 .photo-match-reason {

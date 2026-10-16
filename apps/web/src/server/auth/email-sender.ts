@@ -36,7 +36,7 @@ import { requestDetails, type RequestContext } from "../messaging/request-contex
  * learn to ignore account mail, and it hands anyone who can trigger a login
  * code a ready-made cover story.
  */
-export type CodeMailPurpose = "email_change" | "login" | "signup";
+export type CodeMailPurpose = "email_change" | "login" | "signup" | "step_up";
 
 /** What the provider said about a code mail it accepted. */
 export interface CodeMailReceipt {

@@ -28,7 +28,8 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
     timeout: 30_000,
   });
   const code = await latestOtp(phone);
-  await page.getByLabel("6-digit code").fill(code);
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(code);
   await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).not.toHaveURL(/\/login/);
   // PX-3: the name gate now guards every console route, not just /home — a
@@ -61,7 +62,8 @@ async function onboardWithName(page: Page, phone: string, name: string): Promise
     timeout: 30_000,
   });
   const code = await latestOtp(phone);
-  await page.getByLabel("6-digit code").fill(code);
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(code);
   await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).toHaveURL(/\/onboarding/);
   await page.getByLabel("What should we call you?").fill(name);
@@ -184,7 +186,17 @@ test("founder demo: org → competition → approve → team roster → venue �
     .first()
     .click();
   await expect(page.getByTestId("assign-team-row")).toBeVisible();
+  // The table updates optimistically; the SERVER has the team only once the
+  // save's server action answers. Navigating before that aborted the save in
+  // Firefox, and the team's roster below was empty (nightly, 2026-10-05). The
+  // field's "Saved" mark fades after 1.6s, so wait on the response itself.
+  const saved = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response.request().headers()["next-action"] !== undefined,
+  );
   await page.getByTestId("sheet-team").selectOption({ label: "Malad Mavericks" });
+  expect((await saved).ok()).toBe(true);
   await expect(page.getByTestId("reg-table")).toContainText("Malad Mavericks");
 
   // Team roster shows the assignment (URL-addressed, server-rendered) — open

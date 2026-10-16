@@ -7,6 +7,7 @@ import { AUDIENCE_PAGES } from "../content/audiences";
 import { COMPARISON_PAGES } from "../content/comparisons";
 import { TOOL_PAGES } from "../content/tools";
 import { GUIDES } from "../content/guides";
+import { CASE_STUDIES, HAS_CASE_STUDIES } from "../content/case-studies";
 import { SPORT_PAGES } from "../content/sports";
 import { publicSeasonSitemap } from "../server/competition/public";
 import { INDEXABLE_PAGES, isoCalendarDate } from "../server/seo/routes";
@@ -92,6 +93,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })),
     ...GUIDES.map((entry) => ({
       url: `${base}/guides/${entry.slug}`,
+      lastModified: entry.updatedOn,
+      changeFrequency: "monthly" as const,
+    })),
+    // Only once a real, consented story exists: until then the hub is noindex.
+    ...(HAS_CASE_STUDIES
+      ? [
+          {
+            url: `${base}/case-studies`,
+            lastModified: [...CASE_STUDIES]
+              .map((entry) => entry.updatedOn)
+              .sort()
+              .at(-1),
+            changeFrequency: "monthly" as const,
+          },
+        ]
+      : []),
+    ...CASE_STUDIES.map((entry) => ({
+      url: `${base}/case-studies/${entry.slug}`,
       lastModified: entry.updatedOn,
       changeFrequency: "monthly" as const,
     })),

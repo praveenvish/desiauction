@@ -15,14 +15,21 @@ import {
   type SportPack,
 } from "./sports";
 import { parseCsvDate, type DateOrder } from "./csv-date";
+import { nameKey } from "./competition";
 import { normalizePhone } from "./phone";
+import { looksLikePlaceholderPhone } from "./placeholder-phone";
 import { parseFeeStatus, parseRupeesToPaise, type FeeStatus } from "./money";
 import { deriveAge, parseBattingStyle, parseBowlingStyle } from "./player-profile";
 
 export interface CsvRegistrationRow {
   line: number; // 1-based source line (header = line 1)
   name: string;
-  phone: string; // normalized E.164
+  /**
+   * Normalized E.164, or NULL: the file gave no number, or gave one that reads
+   * as a filler (`looksLikePlaceholderPhone`). A null-phone row becomes a
+   * club-only player — nobody can sign in as them and nothing is sent to them.
+   */
+  phone: string | null;
   /** The PACK's role key. Not `RegistrationRole` — that is cricket's four. */
   role: string;
   basePriceBand: string | null;
@@ -104,16 +111,36 @@ export interface CsvRowError {
   fields?: string[];
 }
 
+/** A number the file gave that this import will NOT store — see placeholder-phone.ts. */
+export interface PlaceholderPhone {
+  line: number;
+  name: string;
+  /** Normalized E.164 — the value an organizer vouches for in `realPhones`. */
+  phone: string;
+}
+
 export interface CsvParseResult {
   rows: CsvRegistrationRow[];
   errors: CsvRowError[];
+  /**
+   * Rows whose number was set aside as a filler. They are still in `rows`,
+   * phoneless; this list is what the preview shows so the organizer can say
+   * "that one is real".
+   */
+  placeholders: PlaceholderPhone[];
 }
 
-const REQUIRED_HEADER = ["name", "phone", "role"] as const;
+/**
+ * Only the name. A club's master sheet is often a list of names with whatever
+ * else it could gather — the phone and the role arrive later, and refusing the
+ * file until they do kept the whole roster out of the product.
+ */
+const REQUIRED_HEADER = ["name"] as const;
 
 /** The four fields every player needs, however they arrive (CSV row or form). */
 export interface NewPlayerInput {
   name: string;
+  /** Blank is allowed: a club-only player has no number until one is added. */
   phone: string;
   role: string;
   basePriceBand?: string | null;
@@ -136,7 +163,7 @@ export type NewPlayerCheck =
        * database column was opened to any sport in migration 0047 and the type
        * in front of it was not.
        */
-      value: { name: string; phone: string; role: string; basePriceBand: string | null };
+      value: { name: string; phone: string | null; role: string; basePriceBand: string | null };
     }
   | { ok: false; errors: PlayerFieldError[] };
 
@@ -169,7 +196,7 @@ export function validateNewPlayer(
     errors.push({ field: "name", message: "name must be at least 3 characters" });
   }
   const phone = normalizePhone(rawPhone);
-  if (!phone.ok) {
+  if (rawPhone !== "" && !phone.ok) {
     // "9.87654E+09" is a number Excel reformatted on open-and-save; the digits
     // are gone, so the only useful answer is where to get an untouched file.
     const mangled = /^\d(\.\d+)?e\+?\d+$/i.test(rawPhone);
@@ -184,9 +211,12 @@ export function validateNewPlayer(
   // not as a bare enum match — the same contract the styles got, and for the
   // same reason: this is the ONE validation truth, so the dialog and the file
   // now accept and refuse exactly the same vocabulary. See `parseRole`.
-  // Empty and wrong are different answers — see `evaluateRegistration`.
+  // Empty and wrong are different answers — see `evaluateRegistration`. Empty
+  // is allowed here even where the sport requires a role: the organizer adds
+  // the player now and sets the role before approving, and approval is where
+  // `evaluateRegistration` insists on one. Wrong is still refused.
   const role = parseRoleIn(pack, rawRole);
-  if (rawRole === "" ? pack.roles.required : role === null) {
+  if (rawRole !== "" && role === null) {
     errors.push({
       field: "role",
       message: `invalid ${pack.label.toLowerCase()} role "${rawRole}"`,
@@ -209,7 +239,7 @@ export function validateNewPlayer(
     ok: true,
     value: {
       name,
-      phone: phone.ok ? phone.phone : rawPhone,
+      phone: phone.ok ? phone.phone : null,
       // Canonical from here on: the caller stores what the machine understands,
       // never the spelling the file happened to use. A sport whose pack does
       // not require roles keeps the empty string rather than inventing one.
@@ -402,10 +432,9 @@ export function driveFileIdOf(value: string): string | null {
   return match?.[1] ?? null;
 }
 
-/** Two spellings of one person's name: case and spacing are noise. */
+/** Two spellings of one person's name. */
 function sameName(a: string, b: string): boolean {
-  const key = (value: string) => value.trim().toLowerCase().replace(/\s+/g, " ");
-  return key(a) === key(b);
+  return nameKey(a) === nameKey(b);
 }
 
 /** Comparable form of a team name: case, spacing and punctuation are noise. */
@@ -438,6 +467,12 @@ export interface CsvParseOptions {
    * goalkeeper, on every line, while the football pack recognised all of them.
    */
   pack?: SportPack;
+  /**
+   * Numbers the organizer vouched for as real although they read as fillers
+   * (E.164). Everything else `looksLikePlaceholderPhone` flags is read as no
+   * phone.
+   */
+  realPhones?: readonly string[];
 }
 
 /**
@@ -474,7 +509,7 @@ export function parseRegistrationRecords(
   const pack = options?.pack ?? DEFAULT_SPORT;
   const records = input.filter((fields) => !(fields.length === 1 && fields[0]?.trim() === ""));
   if (records.length === 0) {
-    return { rows: [], errors: [{ line: 1, message: "The file is empty." }] };
+    return { rows: [], errors: [{ line: 1, message: "The file is empty." }], placeholders: [] };
   }
 
   const header = (records[0] ?? []).map((h) => h.trim().toLowerCase());
@@ -487,8 +522,20 @@ export function parseRegistrationRecords(
     return {
       rows: [],
       errors: [{ line: 1, message: `Missing required column(s): ${missing.join(", ")}.` }],
+      placeholders: [],
     };
   }
+
+  const vouched = new Set(options?.realPhones ?? []);
+  const isFiller = (phone: string): boolean =>
+    !vouched.has(phone) && looksLikePlaceholderPhone(phone);
+  const placeholders: PlaceholderPhone[] = [];
+  /**
+   * Phoneless rows, by name. Without a number the NAME is how a later file
+   * finds this player again (`importMatchKey`), so two in one file is a
+   * question for the organizer rather than two players nobody can tell apart.
+   */
+  const seenPhoneless = new Map<string, number>();
 
   const rows: CsvRegistrationRow[] = [];
   const errors: CsvRowError[] = [];
@@ -518,7 +565,13 @@ export function parseRegistrationRecords(
     const line = r + 1; // 1-based, header is line 1
     const fields = records[r] ?? [];
     const rawName = (fields[index["name"] ?? -1] ?? "").trim();
-    const rawPhone = (fields[index["phone"] ?? -1] ?? "").trim();
+    const writtenPhone = (fields[index["phone"] ?? -1] ?? "").trim();
+    const readPhone = normalizePhone(writtenPhone);
+    const filler: string | null =
+      readPhone.ok && isFiller(readPhone.phone) ? readPhone.phone : null;
+    // A filler is read as a blank from here on: validated as no phone, kept out
+    // of the duplicate check, and never stored.
+    const rawPhone = filler === null ? writtenPhone : "";
     const rawRole = (fields[index["role"] ?? -1] ?? "").trim().toLowerCase();
     const band =
       index["base_price_band"] !== undefined ? (fields[index["base_price_band"]] ?? "").trim() : "";
@@ -691,6 +744,18 @@ export function parseRegistrationRecords(
     // and it needs the normalized phone even when another field failed — so a
     // repeat is still reported against the line that repeats it.
     const phone = normalizePhone(rawPhone);
+    if (rawPhone === "" && rawName.length >= 3) {
+      const key = nameKey(rawName);
+      const prior = seenPhoneless.get(key);
+      if (prior !== undefined) {
+        rowErrors.push(
+          `two players named "${rawName}" with no phone (also row ${String(prior)}) — add a phone to one, or make the names different (for example, add the village)`,
+        );
+        failed.add("name");
+      } else {
+        seenPhoneless.set(key, line);
+      }
+    }
     if (phone.ok) {
       const prior = seenPhones.get(phone.phone);
       if (prior !== undefined && prior.name !== "" && sameName(prior.name, rawName)) {
@@ -720,6 +785,9 @@ export function parseRegistrationRecords(
       }
     }
 
+    if (filler !== null) {
+      placeholders.push({ line, name: rawName, phone: filler });
+    }
     if (rowErrors.length > 0) {
       errors.push({
         line,
@@ -732,7 +800,7 @@ export function parseRegistrationRecords(
     rows.push({
       line,
       name: rawName,
-      phone: phone.ok ? phone.phone : rawPhone,
+      phone: phone.ok ? phone.phone : null,
       // Canonical, not as written: `check.ok` means the row passed, so its
       // parsed role is the one that reaches the database.
       role: check.ok ? check.value.role : rawRole,
@@ -759,5 +827,5 @@ export function parseRegistrationRecords(
     });
   }
 
-  return { rows, errors };
+  return { rows, errors, placeholders };
 }

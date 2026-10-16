@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
+import { useWriteStatus, writeScopes } from "./use-write-scope";
 import type { Row } from "./labels";
 import { overridesAfterPage } from "./roster-overrides";
 
@@ -38,8 +39,9 @@ export interface Roster {
   refreshing: boolean;
 }
 
-export function useRoster(serverRows: readonly Row[]): Roster {
+export function useRoster(serverRows: readonly Row[], slug: string): Roster {
   const router = useRouter();
+  useWriteStatus(slug, "", null);
   const [refreshing, startRefresh] = useTransition();
   const [overrides, setOverrides] = useState<Record<string, Partial<Row>>>({});
   // A COUNT per row, not a set: two writes to one player overlap (pick a team,
@@ -55,7 +57,10 @@ export function useRoster(serverRows: readonly Row[]): Roster {
   // (React's "adjust state when a prop changes" pattern — no effect, no flash.)
   if (seenRows !== serverRows) {
     setSeenRows(serverRows);
-    const after = overridesAfterPage(overrides, inflight, doubts, serverRows);
+    const protectedRows = new Map(inflight);
+    for (const row of serverRows)
+      if (writeScopes(slug).status(row.id, row.teamId)) protectedRows.set(row.id, 1);
+    const after = overridesAfterPage(overrides, protectedRows, doubts, serverRows);
     setOverrides(after.kept);
     setDoubts(after.doubts);
   }

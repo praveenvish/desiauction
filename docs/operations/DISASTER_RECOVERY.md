@@ -81,6 +81,7 @@ by the SIGTERM boot-smoke (2026-07-16).
    psql -v ON_ERROR_STOP=1 \
      -v app_password=… -v system_password=… \
      -v engine_password=… -v runner_password=… \
+     -v live_password=… \
      -f ops/db/create-app-role.sql
    ```
 

@@ -1,5 +1,7 @@
 import { newId, problemReportScreenshots, problemReports, type Db } from "@desiauction/db";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import { redactSupportPath } from "../../lib/support-path";
+export { REDACTED, TOKEN_ROUTE_PREFIXES } from "../../lib/support-path";
 
 /**
  * A PROBLEM REPORT, VALIDATED AND RATE-LIMITED — everything except the IO
@@ -66,9 +68,6 @@ const CONTEXT_VALUE_LIMIT = 300;
  * every operator can read. Keep in step with `app/*\/[token]`; the unit test
  * reads the app directory so a new token route cannot be forgotten silently.
  */
-export const TOKEN_ROUTE_PREFIXES = ["join", "owner-join", "demo", "review"] as const;
-
-export const REDACTED = "[redacted]";
 
 /**
  * Rebuild the page address with nothing secret left in it.
@@ -90,15 +89,7 @@ export function redactPageUrl(raw: string, baseUrl: string): string | null {
   if (parsed.origin !== base.origin) {
     return null;
   }
-  const segments = parsed.pathname.split("/");
-  for (let index = 1; index < segments.length - 1; index += 1) {
-    if ((TOKEN_ROUTE_PREFIXES as readonly string[]).includes(segments[index] ?? "")) {
-      if ((segments[index + 1] ?? "") !== "") {
-        segments[index + 1] = REDACTED;
-      }
-    }
-  }
-  const path = segments.join("/").slice(0, 500);
+  const path = redactSupportPath(parsed.pathname).slice(0, 500);
   return `${base.origin}${path === "" ? "/" : path}`;
 }
 

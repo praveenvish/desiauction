@@ -1,7 +1,10 @@
 import { ButtonLink, ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
+import { MoneyUnitOverride } from "../../../../../components/money-unit";
 import { liveAuctionView } from "../../../../../server/auction/live-actions";
+import { PracticeBar } from "../practice-bar";
+import { AuctionTaskContext } from "../auction-task-context";
 import { LivePanel } from "./live-panel";
 import "../../../seasons.css";
 import "../auction.css";
@@ -18,7 +21,9 @@ export default async function LiveAuctionPage({ params }: { params: Promise<{ sl
   // The server's read of the status: a finished room offers the recap, not the plan.
   const finished =
     view.status === "completed" || view.status === "reconciled" || view.status === "abandoned";
-  return (
+  // A practice (0101) counts in points and is nobody's public record.
+  const inPractice = view.practice?.inPractice === true;
+  const room = (
     // `live-room` scopes the room's own toast placement (live.css): on a phone
     // the paddle is pinned to the foot, and notices rise above it.
     <div className="live-room">
@@ -42,7 +47,29 @@ export default async function LiveAuctionPage({ params }: { params: Promise<{ sl
         <main className="registrations-dash live-page">
           <div className="dash-stack">
             <h1 className="auction-sr-only">{view.competition.name} — live auction</h1>
+            <AuctionTaskContext
+              task={view.myTeamIds.length > 0 ? "Owner room" : "Auction room"}
+              scope={view.competition.name}
+              detail={
+                inPractice
+                  ? "Practice · no real spending"
+                  : finished
+                    ? "Results and squads"
+                    : undefined
+              }
+            />
+            <PracticeBar
+              slug={slug}
+              practice={view.practice}
+              realStarted={view.practice === null && view.status !== "scheduled"}
+              watch={view.practice !== null || view.status === "scheduled"}
+            />
+            {/* Keyed by the auction it shows: when the room moves (a practice
+              ends, the night opens) the panel starts over on the new auction —
+              its own socket and state — instead of holding the old one's last
+              snapshot. The bar above stays mounted, so its "why" line survives. */}
             <LivePanel
+              key={view.auctionId}
               slug={slug}
               view={view}
               exits={
@@ -70,9 +97,11 @@ export default async function LiveAuctionPage({ params }: { params: Promise<{ sl
                       My plan
                     </ButtonLink>
                   ) : null}
-                  <ButtonLink href={`/seasons/${slug}/auction/spectate`} variant="secondary">
-                    {finished ? "Public recap" : "Spectate"}
-                  </ButtonLink>
+                  {inPractice ? null : (
+                    <ButtonLink href={`/seasons/${slug}/auction/spectate`} variant="secondary">
+                      {finished ? "Public recap" : "Spectate"}
+                    </ButtonLink>
+                  )}
                   {/* The setup page is the organizer's desk. An owner reached a
                     page that is not theirs from the foot of their own room. */}
                   {view.viewer.canConduct ? (
@@ -88,4 +117,5 @@ export default async function LiveAuctionPage({ params }: { params: Promise<{ sl
       </ToastProvider>
     </div>
   );
+  return <MoneyUnitOverride unit={inPractice ? "points" : null}>{room}</MoneyUnitOverride>;
 }

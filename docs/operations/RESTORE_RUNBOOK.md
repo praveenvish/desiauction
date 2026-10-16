@@ -157,6 +157,7 @@ can be, never by hand-editing rows.
    psql "$TARGET_ADMIN_URL" -v ON_ERROR_STOP=1 \
      -v app_password=... -v system_password=... \
      -v engine_password=... -v runner_password=... \
+     -v live_password=... \
      -f ops/db/create-app-role.sql
    DATABASE_URL=postgres://.../desiauction_restore \
      pnpm --filter @desiauction/web grants:verify

@@ -45,26 +45,45 @@ describe("captainOf and preSigned", () => {
 });
 
 describe("setupSteps", () => {
+  it("names every Icon player on one line", () => {
+    const steps = setupSteps(
+      { ownerName: null, coachName: null },
+      null,
+      [{ name: "A One" }, { name: null }],
+      false,
+      true,
+    );
+    expect(steps.find((step) => step.key === "icon")?.label).toBe("Icon · A One, Unnamed");
+  });
+
   it("says the owner waits for the auction, and offers Pick for the captain", () => {
-    const steps = setupSteps({ ownerName: null, coachName: null }, null, false, true);
+    const steps = setupSteps({ ownerName: null, coachName: null }, null, [], false, true);
     expect(steps.map((step) => [step.label, step.action?.label ?? null])).toEqual([
       ["Owner — invited once the auction exists", null],
       ["Captain", "Pick"],
+      ["Icon (optional)", "Pick"],
       ["Coach (optional)", "Add"],
     ]);
   });
 
   it("offers Invite once the auction exists, and states what is done", () => {
-    const steps = setupSteps({ ownerName: null, coachName: "Anil" }, { name: "Rahul" }, true, true);
+    const steps = setupSteps(
+      { ownerName: null, coachName: "Anil" },
+      { name: "Rahul" },
+      [{ name: "कमलेश सुथार" }],
+      true,
+      true,
+    );
     expect(steps.map((step) => [step.done, step.label, step.action?.label ?? null])).toEqual([
       [false, "Owner", "Invite"],
       [true, "Captain · Rahul", null],
+      [true, "Icon · कमलेश सुथार", null],
       [true, "Coach · Anil", null],
     ]);
   });
 
   it("offers nothing to someone who can't manage the team", () => {
-    const steps = setupSteps({ ownerName: null, coachName: null }, null, true, false);
+    const steps = setupSteps({ ownerName: null, coachName: null }, null, [], true, false);
     expect(steps.every((step) => step.action === null)).toBe(true);
   });
 });

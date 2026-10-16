@@ -1,4 +1,5 @@
 import { sportLabel } from "@desiauction/core/sport-labels";
+import { rankLiveScopes } from "../../lib/home-tasks";
 
 /* ===========================================================================
  * THE SEVEN NAVIGATION LAWS (RN-1)
@@ -56,6 +57,11 @@ export function shellKind(pathname: string): ShellKind {
   // The overlay and public board are bare, chrome-free surfaces — checked
   // before `liveMatch` so the auction segment never frames them in the Live shell.
   if (
+    /^\/c\/[^/]+\/m\/[^/]+(?:\/(?:overlay|board))?\/?$/.test(pathname) ||
+    /^\/m\/[^/]+\/?$/.test(pathname) ||
+    pathname.startsWith("/match/confirm/") ||
+    pathname === "/score" ||
+    pathname.startsWith("/score/") ||
     pathname.startsWith("/gallery") ||
     pathname.startsWith("/dev") ||
     // Onboarding is a focused, chrome-free moment (2026-07-24 collapse). The
@@ -93,6 +99,8 @@ export function shellKind(pathname: string): ShellKind {
     pathname.startsWith("/security") ||
     pathname.startsWith("/rules-guidelines") ||
     pathname.startsWith("/schedule-demo") ||
+    // The launch cohort's application form — the demo form with its own source.
+    pathname.startsWith("/founding-25") ||
     // A booking link opens in whatever browser the mail was read in, often
     // with a live session — without this the person's own demo would arrive
     // framed in the organizer console.
@@ -328,9 +336,17 @@ const ADMIN_SECTIONS: readonly Omit<AdminSection, "dividerBefore">[] = [
   },
   {
     key: "users",
-    label: "Users",
-    href: "/admin/users",
+    label: "People",
+    href: "/admin/people",
     capability: "platform.admin",
+    group: "trust",
+  },
+  // AC-1.2: who holds which platform role, and the superadmin's controls.
+  {
+    key: "roles",
+    label: "Roles",
+    href: "/admin/roles",
+    capability: "platform.grant",
     group: "trust",
   },
   // Can take a public page down, overriding an organizer's own decision.
@@ -433,7 +449,7 @@ const ADMIN_PRIMARY_KEYS: ReadonlySet<string> = new Set([
 const ADMIN_INLINE_MAX = 7;
 
 const ADMIN_MENU_GROUPS: readonly { label: string; keys: readonly string[] }[] = [
-  { label: "Trust & safety", keys: ["moderation", "erasure", "reports"] },
+  { label: "Trust & safety", keys: ["roles", "moderation", "erasure", "reports"] },
   { label: "Growth", keys: ["passes", "demos", "reviews", "newsletter"] },
   { label: "Comms", keys: ["notifications"] },
 ];
@@ -484,8 +500,11 @@ export function activeAdminTab(pathname: string): string {
   if (pathname.startsWith("/admin/orgs")) {
     return "orgs";
   }
-  if (pathname.startsWith("/admin/users")) {
+  if (pathname.startsWith("/admin/people") || pathname.startsWith("/admin/users")) {
     return "users";
+  }
+  if (pathname.startsWith("/admin/roles")) {
+    return "roles";
   }
   if (pathname.startsWith("/admin/audit")) {
     return "audit";
@@ -552,9 +571,10 @@ export function activeOrgMoneyTab(pathname: string, slug: string): string | null
 const SECTION_LABELS: [RegExp, string][] = [
   // PX-9 admin, longest-first — the detail pages must not read "Organizations".
   [/^\/admin\/orgs\/[^/]+$/, "Organization"],
-  [/^\/admin\/users\/[^/]+$/, "User"],
+  [/^\/admin\/people\/[^/]+$/, "Person"],
   [/^\/admin\/orgs$/, "Organizations"],
-  [/^\/admin\/users$/, "Users"],
+  [/^\/admin\/people$/, "People"],
+  [/^\/admin\/roles$/, "Roles"],
   [/^\/admin\/audit$/, "Audit"],
   [/^\/admin\/health$/, "Health"],
   // Messaging was missing from BOTH admin lists — this one and ADMIN_TABS. The
@@ -598,10 +618,15 @@ const SECTION_LABELS: [RegExp, string][] = [
    */
   [/\/registrations$/, "Players"],
   [/\/fixtures\/calendar$/, "Calendar"],
+  [/\/fixtures\/today$/, "Match day"],
   [/\/fixtures\/match-day$/, "Match day"],
   [/\/fixtures$/, "Schedule"],
   [/\/lineups$/, "Lineups"],
   [/\/reviews$/, "Reviews"],
+  [/\/awards$/, "Season awards"],
+  [/\/brief\/[^/]+$/, "Captain’s brief"],
+  [/^\/me\/insights$/, "My cricket insights"],
+  [/\/insights$/, "Player insights"],
   [/\/standings$/, "Table"],
   [/\/auction\/ledger$/, "Ledger"],
   [/\/auction\/engine$/, "Engine"],
@@ -977,7 +1002,8 @@ export type PlatformDoorCapability =
   | "platform.moderate"
   | "platform.privacy"
   | "platform.pass"
-  | "platform.demo";
+  | "platform.demo"
+  | "platform.grant";
 
 /** A team this person owns, or a season they were appointed to run. */
 export interface NavScope {
@@ -1006,6 +1032,8 @@ export interface NavScope {
 export interface NavRoles {
   /** Holds `org:owner` or `org:staff` anywhere. */
   organizes: boolean;
+  /** A current scoring season appointment, from roles.scores. */
+  scores?: number;
   /**
    * How many clubs this person runs. The Clubs item is offered only past one:
    * with a single club it is a list of one, and that club is already reached
@@ -1079,6 +1107,8 @@ const PLATFORM_DOORS: [PlatformDoorCapability, string][] = [
   ["platform.privacy", "/admin/erasure"],
   ["platform.pass", "/admin/passes"],
   ["platform.demo", "/admin/demos"],
+  // A superadmin without the console grant lands on the one page that is theirs.
+  ["platform.grant", "/admin/roles"],
 ];
 
 export function operatorDoorHref(held: readonly PlatformDoorCapability[]): string | null {
@@ -1097,7 +1127,7 @@ export function operatorDoorHref(held: readonly PlatformDoorCapability[]): strin
  * the whole room is stopped, whereas an owner's absence costs only that owner.
  */
 function liveDoor(roles: NavRoles): NavItem | null {
-  const night = roles.conducts.find((scope) => scope.live);
+  const night = rankLiveScopes(roles.conducts).find((scope) => scope.live);
   if (night !== undefined) {
     return {
       key: "cockpit",
@@ -1108,7 +1138,7 @@ function liveDoor(roles: NavRoles): NavItem | null {
       live: true,
     };
   }
-  const team = roles.teams.find((scope) => scope.live);
+  const team = rankLiveScopes(roles.teams).find((scope) => scope.live);
   if (team !== undefined) {
     return {
       key: "room",
@@ -1138,7 +1168,8 @@ function scopeItem(
   icon: NavIcon,
   href: (scope: NavScope) => string,
 ): NavItem | null {
-  const first = scopes[0];
+  const ordered = rankLiveScopes(scopes);
+  const first = ordered[0];
   if (first === undefined) {
     return null;
   }
@@ -1159,8 +1190,8 @@ function scopeItem(
     href: href(first),
     icon,
     ...(scopes.some((scope) => scope.live) ? { live: true } : {}),
-    choices: scopes.map((scope, index) => ({
-      key: `${key}-${String(index)}`,
+    choices: ordered.map((scope) => ({
+      key: `${key}-${scope.seasonSlug}-${scope.teamId ?? "season"}`,
       label: scope.label,
       hint: scope.seasonName,
       href: href(scope),
@@ -1246,6 +1277,9 @@ export function navigationFor(input: { roles: NavRoles | null; pathname: string 
   const candidates: (NavItem | null)[] = [
     { key: "home", label: "Home", shortLabel: "Home", href: "/home", icon: "home" },
     liveDoor(roles),
+    (roles.scores ?? 0) > 0
+      ? { key: "score", label: "Score", shortLabel: "Score", href: "/score", icon: "sports" }
+      : null,
     scopeItem("team", roles.teams, "My teams", "My team", "team", ownTeamHref),
     scopeItem(
       "nights",
@@ -1464,6 +1498,7 @@ export function seasonTabs(
   role: SeasonRole,
   options: {
     canSettle?: boolean;
+    teamFormation?: "auction" | "organizer" | "team_entry";
     /** The owner's own team here — "My team" opens its squad, not the grid. */
     ownTeamId?: string;
   } = {},
@@ -1515,9 +1550,11 @@ export function seasonTabs(
           // recorded per match and the table is derived from the fixtures
           // beside it, so all three are one question (round 2 moved Lineups
           // here from Players).
-          claims: ["/standings", "/lineups"],
+          claims: ["/standings", "/lineups", "/fixtures/today"],
         },
-        auction,
+        ...(options.teamFormation === undefined || options.teamFormation === "auction"
+          ? [auction]
+          : []),
         // Absent without `settlement.view`, never disabled — the surface itself
         // 404s rather than admit the books exist, and the tab must agree.
         ...(options.canSettle === true
@@ -1528,7 +1565,13 @@ export function seasonTabs(
     case "auctioneer":
       // Conduct is narrow on purpose (core/capabilities): run the night, see
       // who is bidding. No registrations, no money, no reviews.
-      return [overview, teams, auction];
+      return [
+        overview,
+        teams,
+        ...(options.teamFormation === undefined || options.teamFormation === "auction"
+          ? [auction]
+          : []),
+      ];
     case "owner":
       // Overview leads (round 5): an owner standing on the season's own page
       // saw four tabs and none of them lit.
@@ -1546,8 +1589,12 @@ export function seasonTabs(
           }),
           testId: "open-teams",
         },
-        { key: "my-plan", label: "My plan", href: `${base}/auction/plan` },
-        { key: "room", label: "Auction room", href: `${base}/auction/live` },
+        ...(options.teamFormation === undefined || options.teamFormation === "auction"
+          ? [
+              { key: "my-plan", label: "My plan", href: `${base}/auction/plan` },
+              { key: "room", label: "Auction room", href: `${base}/auction/live` },
+            ]
+          : []),
         table,
       ];
     case "player":
@@ -1555,11 +1602,19 @@ export function seasonTabs(
         overview,
         { key: "my-entry", label: "My entry", href: `${base}/register` },
         table,
-        auction,
+        ...(options.teamFormation === undefined || options.teamFormation === "auction"
+          ? [auction]
+          : []),
       ];
     case "member":
     case "public":
-      return [overview, table, auction];
+      return [
+        overview,
+        table,
+        ...(options.teamFormation === undefined || options.teamFormation === "auction"
+          ? [auction]
+          : []),
+      ];
   }
 }
 

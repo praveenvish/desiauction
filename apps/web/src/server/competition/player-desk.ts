@@ -3,6 +3,7 @@ import { auctionOf } from "@desiauction/auction";
 import type { Db } from "@desiauction/db";
 
 import { canCompetition } from "./authz";
+import { seasonRosterLocked } from "./registration-aggregate";
 import type { CompetitionSummary } from "./competitions";
 
 /**
@@ -17,12 +18,20 @@ import type { CompetitionSummary } from "./competitions";
 export interface PlayerDeskContext {
   /** `team.manage` — marks and team moves. Reviewing is the page's own gate. */
   canManageTeams: boolean;
+  /** Actual formation; presentation never infers an auction from an unassigned player. */
+  teamFormation: NonNullable<CompetitionSummary["teamFormation"]>;
   /** An auction exists and has not been abandoned. */
   auctionExists: boolean;
   /** The auction has left `scheduled`: pool, marks, role and band are frozen. */
   rosterLocked: boolean;
   /** The auction has been run (completed / reconciled): no team now means unsold. */
   auctionDone: boolean;
+  /**
+   * Results of an auction held outside the app are still being typed in
+   * (0105): no auction in the app, and the viewer is an organiser. The sheet
+   * then asks what the player went for, beside their team.
+   */
+  handEntry: boolean;
   bands: readonly string[];
   roles: readonly { key: string; label: string }[];
   rolesRequired: boolean;
@@ -34,22 +43,27 @@ export async function playerDeskContext(
   personId: string,
   competition: CompetitionSummary,
 ): Promise<PlayerDeskContext> {
-  const [canManageTeams, auction] = await Promise.all([
-    canCompetition(
-      db,
-      personId,
-      { orgId: competition.orgId, competitionId: competition.id },
-      "team.manage",
-    ),
+  const scope = { orgId: competition.orgId, competitionId: competition.id };
+  const [canManageTeams, canManage, auction] = await Promise.all([
+    canCompetition(db, personId, scope, "team.manage"),
+    // The hand-entry writers' own gate (`hand-results-actions.ts`).
+    canCompetition(db, personId, scope, "competition.manage"),
     auctionOf(db, competition.id),
   ]);
+  // The shared rule: an auction aborted before it opened locks nothing.
+  const rosterLocked = await seasonRosterLocked(db, competition.id);
   const pack = sportPackFor(competition.sport);
   return {
     canManageTeams,
+    teamFormation: competition.teamFormation ?? "auction",
     auctionExists: auction !== null && auction.status !== "abandoned",
-    rosterLocked: auction !== null && auction.status !== "scheduled",
+    rosterLocked,
     auctionDone:
       auction !== null && (auction.status === "completed" || auction.status === "reconciled"),
+    handEntry:
+      (competition.teamFormation === undefined || competition.teamFormation === "auction") &&
+      canManage &&
+      (auction === null || auction.status === "abandoned"),
     bands: Object.keys(auction?.config.basePriceBands ?? DEFAULT_AUCTION_CONFIG.basePriceBands),
     roles: pack.roles.values.map((value) => ({ key: value.key, label: value.label })),
     rolesRequired: pack.roles.required,

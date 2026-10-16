@@ -1,7 +1,16 @@
-import { ButtonLink, IconAlert, IconCheck, Pill, type KitTone } from "@desiauction/ui";
+import {
+  ButtonLink,
+  SectionCard,
+  IconUsers,
+  IconAlert,
+  IconCheck,
+  Pill,
+  type KitTone,
+} from "@desiauction/ui";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { PageTitle } from "../../../../components/shell/page-title";
 import { auctionDashboard } from "../../../../server/auction/actions";
 import { competitionView, registrationDashboard } from "../../../../server/competition/actions";
 import { fixtureDashboard, venuesView } from "../../../../server/competition/fixture-actions";
@@ -53,6 +62,36 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
   const view = await competitionView(slug);
   if (view === null) {
     notFound();
+  }
+  if (
+    view.competition.teamFormation !== undefined &&
+    view.competition.teamFormation !== "auction"
+  ) {
+    return (
+      <main className="registrations-dash">
+        <PageTitle title="Season readiness" subtitle={view.competition.name} />
+        <SectionCard
+          title="Prepare your teams, then schedule matches"
+          description={
+            view.competition.teamFormation === "team_entry"
+              ? "Review captain sign-ups and check the approved squads before creating matches."
+              : "Assign players to teams and check each squad before creating matches."
+          }
+          icon={<IconUsers />}
+        >
+          <p>
+            This season forms teams without an auction. Review your current teams first; match
+            scheduling is available in Matches.
+          </p>
+          <div className="rd-path-actions">
+            <ButtonLink href={`/seasons/${slug}/teams`}>Review teams</ButtonLink>
+            <ButtonLink href={`/seasons/${slug}/fixtures`} variant="secondary">
+              Open match schedule
+            </ButtonLink>
+          </div>
+        </SectionCard>
+      </main>
+    );
   }
   const [registrations, fixtures, auction, orgs] = await Promise.all([
     registrationDashboard(slug, {}),

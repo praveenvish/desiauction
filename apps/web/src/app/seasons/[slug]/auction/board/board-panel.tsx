@@ -3,7 +3,13 @@
 import { lotSeed } from "../../../../../lib/player-seed";
 import { roleLabeller } from "../../../../../lib/role-label";
 import { type AuctionStatus } from "@desiauction/core";
-import { PlayerImage, PlayerPortrait, paintOnFill } from "@desiauction/ui";
+import {
+  PlayerImage,
+  PlayerPortrait,
+  TeamShield,
+  paintOnFill,
+  useTeamBadge,
+} from "@desiauction/ui";
 import { useMemo } from "react";
 
 import { OUTCOME_TITLE, outcomeMeta } from "../ceremony-stage";
@@ -83,6 +89,17 @@ function crestInitials(team: TeamIdentity | undefined, fallback: string): string
  */
 function BoardCrest({ team, fallback }: { team: TeamIdentity | undefined; fallback: string }) {
   const logoUrl = team?.logoUrl ?? null;
+  const badge = useTeamBadge();
+  if ((logoUrl === null || logoUrl === "") && badge === "shield") {
+    // 0111: the season's default team logo, at the board's crest size.
+    return (
+      <TeamShield
+        initials={crestInitials(team, fallback)}
+        color={team?.primaryColor ?? null}
+        size={46}
+      />
+    );
+  }
   const mark = (
     <span
       className="board-crest board-crest-mark"

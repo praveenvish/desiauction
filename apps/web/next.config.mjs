@@ -102,7 +102,7 @@ export default {
    * `import { Button } from "@desiauction/ui"` to the file that defines Button.
    */
   experimental: {
-    optimizePackageImports: ["@desiauction/ui"],
+    optimizePackageImports: ["@desiauction/ui", "@desiauction/core", "@desiauction/core/scoring"],
   },
   /*
    * PINO RUNS FROM node_modules, NOT FROM A BUNDLE.
@@ -117,7 +117,10 @@ export default {
    * production there is no transport, and standalone tracing still copies pino
    * into the server's node_modules.
    */
-  serverExternalPackages: ["pino", "pino-pretty"],
+  // harfbuzzjs loads its .wasm beside its own module (`new URL(..., import.meta.url)`),
+  // which a bundled copy cannot find; opentype.js rides with it. Both are read from
+  // node_modules at runtime, and the standalone trace copies the .wasm.
+  serverExternalPackages: ["pino", "pino-pretty", "harfbuzzjs", "opentype.js"],
   headers() {
     return Promise.resolve([
       // Everything except /embed (see EMBED_CSP above).
@@ -176,6 +179,15 @@ export default {
       {
         source: "/admin/messaging",
         destination: "/admin/notifications/templates",
+        permanent: false,
+      },
+      // AC-1.2: /admin/users became /admin/people — the directory now manages
+      // people and their platform roles. Temporary, like the one above. The
+      // query (search, filter, page) travels with it.
+      { source: "/admin/users", destination: "/admin/people", permanent: false },
+      {
+        source: "/admin/users/:personId",
+        destination: "/admin/people/:personId",
         permanent: false,
       },
     ]);

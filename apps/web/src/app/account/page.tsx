@@ -47,6 +47,7 @@ import { ProfilePanel } from "./profile-panel";
 import { SecurityPanels } from "./security-panels";
 import { SignOutButton } from "./sign-out-button";
 import { HashSection } from "./hash-section";
+import { InstallAppPanel } from "../../components/pwa/install-app-panel";
 import {
   ACCOUNT_SECTIONS,
   contactStatus,
@@ -322,6 +323,7 @@ export default async function AccountPage({
           />
         )}
         {settings === null ? null : <MessageLanguageChoice language={settings.language} />}
+        <InstallAppPanel />
         {pushKey === null ? null : <PushDeviceSwitch publicKey={pushKey} />}
         <p className="acct-fineprint">
           The big moments — a team buys you, you are named captain, you are in a lineup — land in{" "}

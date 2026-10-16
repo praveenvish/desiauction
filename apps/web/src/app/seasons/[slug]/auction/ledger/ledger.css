@@ -355,3 +355,25 @@
 .lp-chip[aria-pressed="true"] .lp-chip-n {
   color: inherit;
 }
+
+@media (max-width: 719px) {
+  .ledger-grid tbody tr {
+    grid-template-areas:
+      "lot lot lot"
+      "time team bid"
+      "result result result";
+  }
+
+  .ledger-c-result {
+    justify-self: start;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .ledger-result,
+  .ledger-outcome {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    flex-wrap: wrap;
+  }
+}

@@ -69,14 +69,14 @@ export async function teamPeopleOf(
     union all
     select i.accepted_by, p.name, t.id, t.name, null, true
     from auction_owner_invites i
-    join auctions a on a.id = i.auction_id and a.status <> 'abandoned'
+    join auctions a on a.id = i.auction_id and a.status <> 'abandoned' and a.kind = 'real'
     join people p on p.id = i.accepted_by
     join teams t on t.id = i.team_id
     where a.competition_id = ${competitionId} and i.accepted_by is not null and i.revoked_at is null
     union all
     select g.person_id, p.name, t.id, t.name, null, true
     from paddle_grants g
-    join auctions a on a.id = g.auction_id and a.status <> 'abandoned'
+    join auctions a on a.id = g.auction_id and a.status <> 'abandoned' and a.kind = 'real'
     join people p on p.id = g.person_id
     join teams t on t.id = g.team_id
     where a.competition_id = ${competitionId} and g.revoked_at is null

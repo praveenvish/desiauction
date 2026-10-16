@@ -1,4 +1,5 @@
 "use client";
+import { SponsorSettings } from "./sponsor-settings";
 
 import {
   Button,
@@ -32,10 +33,16 @@ import {
   type KitTone,
   Notice,
   Pill,
+  PlayerImage,
   SectionCard,
   Select,
+  useNoPhotoStyle,
+  useTeamBadge,
+  TeamShield,
   useToast,
   VisuallyHidden,
+  type NoPhotoStyle,
+  type TeamBadge,
 } from "@desiauction/ui";
 import { ENTRY_CATEGORIES, entryCategoryLabel, roleOptions } from "@desiauction/core";
 import Link from "next/link";
@@ -50,6 +57,8 @@ import {
   advanceCompetitionAction,
   cloneCompetitionAction,
   setCompetitionVisibilityAction,
+  setNoPhotoStyleAction,
+  setTeamBadgeAction,
   setSquadListingAction,
   updateCompetitionDetailsAction,
   type DetailsField,
@@ -224,7 +233,14 @@ function nextDestination(
 const STEP_LABELS = ["Setup", "Teams", "Registration", "Auction", "Matches", "Settlement"];
 
 /** A points season (0091) has no Settlement rung — nothing is ever owed. */
+function nonAuction(view: SeasonOverviewView): boolean {
+  return (
+    view.competition.teamFormation !== undefined && view.competition.teamFormation !== "auction"
+  );
+}
+
 function stepLabels(view: SeasonOverviewView): readonly string[] {
+  if (nonAuction(view)) return ["Setup", "Teams", "Registration", "Matches"];
   return view.competition.auctionUnit === "points" ? STEP_LABELS.slice(0, 5) : STEP_LABELS;
 }
 
@@ -236,6 +252,13 @@ function stepLabels(view: SeasonOverviewView): readonly string[] {
  */
 function clearedRungs(view: SeasonOverviewView): boolean[] {
   const status = view.competition.status;
+  if (nonAuction(view))
+    return [
+      status !== "draft",
+      view.teamCount > 0,
+      status === "registration_closed",
+      view.fixtureCount > 0 && view.fixturesOpen === 0,
+    ];
   return [
     status !== "draft",
     view.teamCount > 0,
@@ -254,6 +277,10 @@ function clearedRungs(view: SeasonOverviewView): boolean[] {
 /** Where each rung's work happens — linked only for someone who may go there. */
 function stepHref(index: number, slug: string, view: SeasonOverviewView): string | undefined {
   const base = `/seasons/${slug}`;
+  if (nonAuction(view))
+    return view.viewer.canManage
+      ? [undefined, `${base}/teams`, `${base}/registrations`, `${base}/fixtures`][index]
+      : undefined;
   if (index === 5) {
     return view.viewer.canSettle ? `${base}/money` : undefined;
   }
@@ -309,7 +336,11 @@ function secondaryAction(
       label: `Review ${String(view.pendingPlayers)} ${view.pendingPlayers === 1 ? "registration" : "registrations"}`,
     };
   }
-  if (view.competition.status === "registration_closed" && view.auctionStatus === null) {
+  if (
+    !nonAuction(view) &&
+    view.competition.status === "registration_closed" &&
+    view.auctionStatus === null
+  ) {
     return { href: `/seasons/${slug}/auction`, label: "Set up the auction" };
   }
   // "Schedule" — the tab's own name for this surface (nav.ts seasonTabs).
@@ -474,18 +505,24 @@ export function OverviewPanel({
   const points = view.competition.auctionUnit === "points";
   const money = useMoney();
   const steps = stepLabels(view);
-  const onward = nextDestination(
-    slug,
-    view.auctionStatus,
-    view.viewer.canSettle,
-    points,
-    view.fixtureCount,
-    dueMatches,
-  );
+  const onward = nonAuction(view)
+    ? {
+        href: `/seasons/${slug}/fixtures`,
+        label: view.fixtureCount === 0 ? "Build the schedule" : "Schedule",
+        title: "Registration is closed. The matches come next.",
+      }
+    : nextDestination(
+        slug,
+        view.auctionStatus,
+        view.viewer.canSettle,
+        points,
+        view.fixtureCount,
+        dueMatches,
+      );
   const locked = "locked" in onward;
   const cleared = clearedRungs(view);
   const activeIndex = cleared.indexOf(false);
-  const auctionDone = cleared[3] === true;
+  const auctionDone = nonAuction(view) ? status === "registration_closed" : cleared[3] === true;
   // The enum has no `completed` value (that is a migration), but the fact is
   // derivable: the auction is over and the books are discharged.
   //
@@ -495,7 +532,10 @@ export function OverviewPanel({
   // and a gold "Run it again" on a season whose squads had not played a ball.
   const fixturesDone = view.fixtureCount > 0 && view.fixturesOpen === 0;
   const finished =
-    auctionDone && (points ? fixturesDone : view.settlement !== null && view.settlement.discharged);
+    auctionDone &&
+    (points || nonAuction(view)
+      ? fixturesDone
+      : view.settlement !== null && view.settlement.discharged);
   const missing = missingForRegistration(view.competition);
   const secondary = secondaryAction(view, slug, finished);
   const canPublish = view.publishBlockers.length === 0;
@@ -537,7 +577,13 @@ export function OverviewPanel({
     );
     if (result.ok) {
       setBlocked(false);
-      toast({ title: ADVANCE_ANNOUNCEMENT[step.to] ?? "Season updated.", tone: "success" });
+      toast({
+        title:
+          nonAuction(view) && step.to === "registration_closed"
+            ? "Registration closed. Build the match schedule next."
+            : (ADVANCE_ANNOUNCEMENT[step.to] ?? "Season updated."),
+        tone: "success",
+      });
       router.refresh();
       pendingFocusRef.current = "advance";
     } else if (result.needsDetails === true) {
@@ -602,6 +648,57 @@ export function OverviewPanel({
     }
   };
 
+  // 0107: how a player with no photo is drawn — the season's own choice,
+  // read from the layout's provider so the row and every face agree.
+  const noPhotoStyle = useNoPhotoStyle();
+  const [noPhotoBusy, setNoPhotoBusy] = useState<NoPhotoStyle | null>(null);
+  const chooseNoPhotoStyle = async (style: NoPhotoStyle) => {
+    if (style === noPhotoStyle) {
+      return;
+    }
+    setNoPhotoBusy(style);
+    const result = await release(setNoPhotoStyleAction(slug, style), () => {
+      setNoPhotoBusy(null);
+    });
+    if (result.ok) {
+      toast({
+        title:
+          style === "silhouette"
+            ? "Players without a photo now show the player silhouette"
+            : "Players without a photo now show their initials",
+        tone: "success",
+      });
+      router.refresh();
+    } else {
+      toast({ title: result.error ?? "Could not update.", tone: "danger" });
+    }
+  };
+
+  // 0111: how a team with no logo is drawn — the shield or its initials.
+  const teamBadge = useTeamBadge();
+  const [badgeBusy, setBadgeBusy] = useState<TeamBadge | null>(null);
+  const chooseTeamBadge = async (badge: TeamBadge) => {
+    if (badge === teamBadge) {
+      return;
+    }
+    setBadgeBusy(badge);
+    const result = await release(setTeamBadgeAction(slug, badge), () => {
+      setBadgeBusy(null);
+    });
+    if (result.ok) {
+      toast({
+        title:
+          badge === "shield"
+            ? "Teams without a logo now show a team shield"
+            : "Teams without a logo now show their initials",
+        tone: "success",
+      });
+      router.refresh();
+    } else {
+      toast({ title: result.error ?? "Could not update.", tone: "danger" });
+    }
+  };
+
   // SEO-1 Phase 7: the embed snippet — the card in an iframe, and a plain link
   // after it. The link is the backlink; a link inside the frame is ours.
   const copyEmbedCode = async () => {
@@ -649,7 +746,9 @@ export function OverviewPanel({
     : seasonOn
       ? "season on"
       : auctionDone
-        ? "auction done"
+        ? nonAuction(view)
+          ? "season on"
+          : "auction done"
         : status.replace(/_/g, " ");
   // A team owner after the auction: the pool figures and the pool-by-role card
   // were the organizer's working view, stale for the owner; their own team
@@ -660,7 +759,7 @@ export function OverviewPanel({
     const state = cleared[index] === true ? "done" : index === activeIndex ? "current" : "upcoming";
     const href = stepHref(index, slug, view);
     const counted =
-      index === 4 && state === "current" && view.fixtureCount > 0
+      index === (nonAuction(view) ? 3 : 4) && state === "current" && view.fixtureCount > 0
         ? `${label} · ${String(matchesPlayed)} of ${String(view.fixtureCount)}`
         : label;
     return {
@@ -708,7 +807,23 @@ export function OverviewPanel({
   let nextNotice: ReactNode = null;
   if (view.viewer.canManage && !finished) {
     if (step !== null) {
-      const copy = NEXT_COPY[status];
+      const copy =
+        nonAuction(view) && status === "registration_open"
+          ? {
+              title: "Registration is open.",
+              body:
+                view.competition.teamFormation === "team_entry"
+                  ? "Review team sign-ups on Teams, then close registration and build the schedule."
+                  : "Approve your players and assign their teams, then build the schedule.",
+            }
+          : nonAuction(view) &&
+              status === "setup" &&
+              view.competition.teamFormation === "team_entry"
+            ? {
+                title: "Next: open registration.",
+                body: "Captains submit teams through the team sign-up link. Review them on Teams.",
+              }
+            : NEXT_COPY[status];
       // While registration is open with people waiting, reviewing them IS the
       // next step; closing registration is the gate after it, so it steps back.
       const reviewFirst = status === "registration_open" && view.pendingPlayers > 0;
@@ -1347,6 +1462,80 @@ export function OverviewPanel({
                 </span>
               </li>
             ) : null}
+            <li className="ov-look" data-testid="no-photo-row">
+              <span className="ov-look-thumb" aria-hidden>
+                <PlayerImage name="Player" seed="no-photo-preview" size="sm" decorative />
+              </span>
+              <span className="ov-look-text">
+                <strong>Players without a photo</strong>
+                <span>
+                  {noPhotoStyle === "silhouette"
+                    ? "Show a player silhouette — on every page, poster and share card."
+                    : "Show their initials — on every page, poster and share card."}
+                </span>
+              </span>
+              <span className="ov-look-actions" role="group" aria-label="Players without a photo">
+                <Button
+                  size="sm"
+                  variant={noPhotoStyle === "initials" ? "secondary" : "ghost"}
+                  aria-pressed={noPhotoStyle === "initials"}
+                  loading={noPhotoBusy === "initials"}
+                  disabled={noPhotoBusy !== null}
+                  data-testid="no-photo-initials"
+                  onClick={() => void chooseNoPhotoStyle("initials")}
+                >
+                  Initials
+                </Button>
+                <Button
+                  size="sm"
+                  variant={noPhotoStyle === "silhouette" ? "secondary" : "ghost"}
+                  aria-pressed={noPhotoStyle === "silhouette"}
+                  loading={noPhotoBusy === "silhouette"}
+                  disabled={noPhotoBusy !== null}
+                  data-testid="no-photo-silhouette"
+                  onClick={() => void chooseNoPhotoStyle("silhouette")}
+                >
+                  Silhouette
+                </Button>
+              </span>
+            </li>
+            <li className="ov-look" data-testid="team-badge-row">
+              <span className="ov-look-thumb" aria-hidden>
+                <TeamShield initials="TS" color={null} size={30} />
+              </span>
+              <span className="ov-look-text">
+                <strong>Teams without a logo</strong>
+                <span>
+                  {teamBadge === "shield"
+                    ? "Show a team shield in the team's colour — on every page, poster and share card."
+                    : "Show their initials — on every page, poster and share card."}
+                </span>
+              </span>
+              <span className="ov-look-actions" role="group" aria-label="Teams without a logo">
+                <Button
+                  size="sm"
+                  variant={teamBadge === "shield" ? "secondary" : "ghost"}
+                  aria-pressed={teamBadge === "shield"}
+                  loading={badgeBusy === "shield"}
+                  disabled={badgeBusy !== null}
+                  data-testid="team-badge-shield"
+                  onClick={() => void chooseTeamBadge("shield")}
+                >
+                  Shield
+                </Button>
+                <Button
+                  size="sm"
+                  variant={teamBadge === "initials" ? "secondary" : "ghost"}
+                  aria-pressed={teamBadge === "initials"}
+                  loading={badgeBusy === "initials"}
+                  disabled={badgeBusy !== null}
+                  data-testid="team-badge-initials"
+                  onClick={() => void chooseTeamBadge("initials")}
+                >
+                  Initials
+                </Button>
+              </span>
+            </li>
             {isPublic && view.platformHold === null ? (
               <li className="ov-look" data-testid="embed-row">
                 <span className="ov-look-thumb" aria-hidden>
@@ -1434,6 +1623,8 @@ export function OverviewPanel({
           // 0091: the unit is fixed once an auction exists (its purse was
           // typed in it). The server refuses too; this only says so first.
           unitLocked={view.auctionStatus !== null}
+          // 0110: fixed while a real auction stands; an aborted one frees it.
+          sourceLocked={view.auctionStatus !== null && view.auctionStatus !== "abandoned"}
           onClose={() => {
             setSettingsOpen(false);
           }}
@@ -1557,6 +1748,7 @@ function SeasonSettingsDialog({
   slug,
   competition,
   unitLocked,
+  sourceLocked,
   onClose,
   onSaved,
 }: {
@@ -1564,6 +1756,7 @@ function SeasonSettingsDialog({
   slug: string;
   competition: SeasonOverviewView["competition"];
   unitLocked: boolean;
+  sourceLocked: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -1573,6 +1766,7 @@ function SeasonSettingsDialog({
   const [endsOn, setEndsOn] = useState(competition.endsOn ?? "");
   const [entryCategory, setEntryCategory] = useState<string>(competition.entryCategory);
   const [auctionUnit, setAuctionUnit] = useState<string>(competition.auctionUnit);
+  const [auctionSource, setAuctionSource] = useState<string>(competition.auctionSource);
   const [error, setError] = useState<{ field: DetailsField; message: string } | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -1589,6 +1783,7 @@ function SeasonSettingsDialog({
         endsOn,
         entryCategory,
         ...(unitLocked ? {} : { auctionUnit }),
+        ...(sourceLocked ? {} : { auctionSource }),
       }),
       () => {
         setPending(false);
@@ -1619,6 +1814,7 @@ function SeasonSettingsDialog({
       }
     >
       <div className="season-settings-form">
+        <SponsorSettings slug={slug} />
         {error !== null && error.field === "form" ? (
           <p className="season-guard" role="alert">
             {error.message}
@@ -1704,6 +1900,27 @@ function SeasonSettingsDialog({
           {/* rupees-always: names the rupee unit itself */}
           <option value="inr">Rupees (₹) — real money</option>
           <option value="points">Points — no money changes hands</option>
+        </Select>
+        {/* 0110: where the auction happens. Imported seasons type their
+            results in on the Teams tab and show them publicly as they go. */}
+        <Select
+          label="Auction"
+          name="season-auction-source"
+          value={auctionSource}
+          disabled={sourceLocked}
+          onChange={(event) => {
+            setAuctionSource(event.target.value);
+          }}
+          help={
+            sourceLocked
+              ? "Fixed — this season already has an auction."
+              : "Imported: add each team's players on the Teams tab. Public squad pages show them as you go."
+          }
+          data-testid="season-auction-source"
+          {...errorFor("auctionSource")}
+        >
+          <option value="app">Run live on DesiAuction</option>
+          <option value="imported">Held elsewhere — import the results</option>
         </Select>
       </div>
     </Dialog>

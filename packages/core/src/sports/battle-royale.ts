@@ -104,6 +104,20 @@ export const BATTLE_ROYALE: SportPack = {
    * `jersey_name` is already that field.
    */
   attributes: [],
+  scoring: {
+    family: "placement",
+    depth: 1,
+    defaultFormat: "lobby_1",
+    awardTable: "top-fragger-v1",
+    formats: [
+      {
+        key: "lobby_1",
+        label: "1 round",
+        rounds: 1,
+        points: { placement: [10, 6, 5, 4, 3, 2, 1, 1, 0, 0], perScore: { kills: 1 } },
+      },
+    ],
+  },
   result: { scoreFields: SCORE_FIELDS },
   standings: {
     /*

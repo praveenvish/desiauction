@@ -206,9 +206,9 @@ describe("several teams collapse into a popover, never into silence", () => {
       (entry) => entry.key === "team",
     );
     expect(item?.label).toBe("My teams");
-    expect(item?.choices?.map((choice) => choice.label)).toEqual(["Demo Panthers", "City Kings"]);
+    expect(item?.choices?.map((choice) => choice.label)).toEqual(["City Kings", "Demo Panthers"]);
     // The item is still a plain link when the popover cannot open.
-    expect(item?.href).toBe("/seasons/demo-pl/teams");
+    expect(item?.href).toBe("/seasons/city-cup/teams");
     // One of them is live, so the item carries the dot.
     expect(item?.live).toBe(true);
   });
@@ -242,7 +242,7 @@ describe("exactly one item is ever active", () => {
     "/account",
     "/help",
     "/admin",
-    "/admin/users",
+    "/admin/people",
     "/seasons/demo-pl/teams",
   ];
 
@@ -327,6 +327,7 @@ describe("every operator gets a door, and it opens on something they hold", () =
     ["platform.privacy", "/admin/erasure"],
     ["platform.pass", "/admin/passes"],
     ["platform.demo", "/admin/demos"],
+    ["platform.grant", "/admin/roles"],
   ];
 
   for (const [capability, href] of cases) {
@@ -691,4 +692,24 @@ describe("administration shows an operator the desks they hold (RN-1 §6.3)", ()
     expect(two.map((section) => section.key)).toEqual(["erasure", "passes"]);
     expect(two[1]?.dividerBefore).toBe(true);
   });
+});
+
+it("keeps all live scope choices stable when query order changes", () => {
+  const roles = {
+    ...NOBODY,
+    teams: [scope("New scheduled", "new"), scope("Older live", "old", true)],
+    conducts: [scope("Night B", "b", true), scope("Night A", "a", true)],
+  };
+  const first = navigationFor({ roles, pathname: "/home" });
+  const reversed = navigationFor({
+    roles: { ...roles, teams: [...roles.teams].reverse(), conducts: [...roles.conducts].reverse() },
+    pathname: "/home",
+  });
+  expect(first).toEqual(reversed);
+  expect(first.rail.find((item) => item.key === "cockpit")?.href).toBe(
+    "/seasons/a/auction/cockpit",
+  );
+  expect(first.rail.find((item) => item.key === "team")?.choices?.map((item) => item.href)).toEqual(
+    ["/seasons/old/teams", "/seasons/new/teams"],
+  );
 });

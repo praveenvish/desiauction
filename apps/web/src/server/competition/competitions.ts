@@ -10,6 +10,8 @@ import {
   type EntryCategory,
   type MoneyUnit,
 } from "@desiauction/core";
+import { NEW_SEASON_SCORING_RULES } from "@desiauction/core/scoring";
+import { isRealAuction } from "@desiauction/auction";
 import {
   auctions,
   auditLog,
@@ -24,9 +26,10 @@ import {
   writeSurvivingConstraint,
   type Db,
 } from "@desiauction/db";
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ne, sql } from "drizzle-orm";
 
 import { storage } from "../media";
+import { newTeamEntryCode, type TeamFormation } from "./team-entry-code";
 import { squadListingDecision, type SquadListing } from "../seo/squads";
 
 // Competition + Tournament + Team persistence (IP-3 §4). All rules come from core;
@@ -76,6 +79,17 @@ export async function tournamentsOf(db: Db, orgId: string): Promise<TournamentSu
     .orderBy(tournaments.name);
 }
 
+/**
+ * WHERE A SEASON'S AUCTION HAPPENS (0110): `app` runs it live here; `imported`
+ * was held somewhere else and its results are typed in on the Teams tab.
+ */
+export const AUCTION_SOURCES = ["app", "imported"] as const;
+export type AuctionSource = (typeof AUCTION_SOURCES)[number];
+
+export function isAuctionSource(value: string): value is AuctionSource {
+  return (AUCTION_SOURCES as readonly string[]).includes(value);
+}
+
 export interface CompetitionSummary {
   id: string;
   orgId: string;
@@ -92,6 +106,10 @@ export interface CompetitionSummary {
   entryCategory: EntryCategory;
   /** 0091: rupees or points — how every amount reads, and whether money is owed. */
   auctionUnit: MoneyUnit;
+  /** 0110: run live here, or held elsewhere and typed in on the Teams tab. */
+  auctionSource: AuctionSource;
+  teamFormation?: TeamFormation;
+  entryCode?: string | null;
   location: string | null;
   startsOn: string | null;
   endsOn: string | null;
@@ -113,6 +131,7 @@ export interface NewCompetition {
   endsOn?: string;
   /** 0091: absent takes the column default, rupees. */
   auctionUnit?: MoneyUnit;
+  teamFormation?: TeamFormation;
 }
 
 export async function createCompetition(
@@ -134,6 +153,9 @@ export async function createCompetition(
     name: valid.value,
     slug,
     sport: input.sport,
+    scoringRules: NEW_SEASON_SCORING_RULES,
+    teamFormation: input.teamFormation ?? "auction",
+    entryCode: input.teamFormation === "team_entry" ? newTeamEntryCode() : null,
     ...(input.auctionUnit !== undefined ? { auctionUnit: input.auctionUnit } : {}),
     ...(input.tournamentId !== undefined ? { tournamentId: input.tournamentId } : {}),
     ...(input.location !== undefined && input.location !== "" ? { location: input.location } : {}),
@@ -165,6 +187,8 @@ export async function createCompetition(
     status: "draft",
     entryCategory: "open",
     auctionUnit: input.auctionUnit ?? "inr",
+    auctionSource: "app",
+    teamFormation: input.teamFormation ?? "auction",
     visibility: "private",
     location: input.location ?? null,
     startsOn: input.startsOn ?? null,
@@ -202,6 +226,9 @@ export async function competitionsForPerson(db: Db, personId: string): Promise<S
       visibility: competitions.visibility,
       entryCategory: competitions.entryCategory,
       auctionUnit: competitions.auctionUnit,
+      auctionSource: competitions.auctionSource,
+      teamFormation: competitions.teamFormation,
+      entryCode: competitions.entryCode,
       location: competitions.location,
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,
@@ -240,6 +267,9 @@ export async function competitionsOfTournament(
       visibility: competitions.visibility,
       entryCategory: competitions.entryCategory,
       auctionUnit: competitions.auctionUnit,
+      auctionSource: competitions.auctionSource,
+      teamFormation: competitions.teamFormation,
+      entryCode: competitions.entryCode,
       location: competitions.location,
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,
@@ -314,6 +344,9 @@ export async function resolveCompetition(
       visibility: competitions.visibility,
       entryCategory: competitions.entryCategory,
       auctionUnit: competitions.auctionUnit,
+      auctionSource: competitions.auctionSource,
+      teamFormation: competitions.teamFormation,
+      entryCode: competitions.entryCode,
       location: competitions.location,
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,
@@ -468,11 +501,13 @@ export interface CompetitionDetails {
   entryCategory?: EntryCategory;
   /** 0091: rupees or points. Absent = leave it; refused once an auction exists. */
   auctionUnit?: MoneyUnit;
+  /** 0110: in the app or imported. Absent = leave it; refused once an auction exists. */
+  auctionSource?: AuctionSource;
 }
 
 export type UpdateDetailsResult =
   | { ok: true; competition: CompetitionSummary }
-  | { ok: false; reason: "invalid_name" | "reversed_dates" | "unit_locked" };
+  | { ok: false; reason: "invalid_name" | "reversed_dates" | "unit_locked" | "source_locked" };
 
 /**
  * IS THE SEASON'S UNIT STILL OPEN TO CHANGE? (0091)
@@ -487,7 +522,29 @@ export async function auctionUnitLocked(db: Db, competitionId: string): Promise<
   const [row] = await db
     .select({ id: auctions.id })
     .from(auctions)
-    .where(eq(auctions.competitionId, competitionId))
+    .where(and(eq(auctions.competitionId, competitionId), isRealAuction()))
+    .limit(1);
+  return row !== undefined;
+}
+
+/**
+ * IS WHERE THE AUCTION HAPPENS STILL OPEN TO CHANGE? (0110)
+ *
+ * Only while the season has no real auction, an aborted one aside (the same
+ * test hand entry uses). A live auction here and an imported one are two
+ * different records of the same night; once either exists, the answer is fixed.
+ */
+export async function auctionSourceLocked(db: Db, competitionId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: auctions.id })
+    .from(auctions)
+    .where(
+      and(
+        eq(auctions.competitionId, competitionId),
+        isRealAuction(),
+        ne(auctions.status, "abandoned"),
+      ),
+    )
     .limit(1);
   return row !== undefined;
 }
@@ -519,6 +576,11 @@ export async function updateCompetitionDetails(
   if (unitChanges && (await auctionUnitLocked(db, competition.id))) {
     return { ok: false, reason: "unit_locked" };
   }
+  const sourceChanges =
+    input.auctionSource !== undefined && input.auctionSource !== competition.auctionSource;
+  if (sourceChanges && (await auctionSourceLocked(db, competition.id))) {
+    return { ok: false, reason: "source_locked" };
+  }
   const next = {
     name: valid.value,
     location: input.location,
@@ -528,6 +590,7 @@ export async function updateCompetitionDetails(
     // a season is for is exactly as consequential as renaming it.
     entryCategory: input.entryCategory ?? competition.entryCategory,
     auctionUnit: input.auctionUnit ?? competition.auctionUnit,
+    auctionSource: input.auctionSource ?? competition.auctionSource,
   };
   await db.update(competitions).set(next).where(eq(competitions.id, competition.id));
   await db.insert(auditLog).values({
@@ -545,6 +608,7 @@ export async function updateCompetitionDetails(
         endsOn: competition.endsOn,
         entryCategory: competition.entryCategory,
         auctionUnit: competition.auctionUnit,
+        auctionSource: competition.auctionSource,
       },
       to: next,
     },
@@ -589,7 +653,13 @@ export async function setAuctionStart(
   const [auction] = await db
     .select({ status: auctions.status })
     .from(auctions)
-    .where(and(eq(auctions.competitionId, competition.id), sql`${auctions.status} <> 'abandoned'`))
+    .where(
+      and(
+        eq(auctions.competitionId, competition.id),
+        isRealAuction(),
+        sql`${auctions.status} <> 'abandoned'`,
+      ),
+    )
     .limit(1);
   if (auction !== undefined && auction.status !== "scheduled") {
     return { ok: false, reason: "auction_started" };
@@ -667,6 +737,57 @@ export async function setCompetitionSquadListing(
     scopeId: competition.orgId,
     subject: competition.id,
     meta: { to: listed, slug: competition.slug },
+  });
+}
+
+/**
+ * How the season draws players with no photo (0107): initials or the
+ * cricketer. Audited like the other "how the season looks" choices — it
+ * changes every poster and page the season's players appear on.
+ */
+export async function setCompetitionNoPhotoStyle(
+  db: Db,
+  competition: CompetitionSummary,
+  personId: string,
+  style: "initials" | "silhouette",
+): Promise<void> {
+  await db
+    .update(competitions)
+    .set({ noPhotoStyle: style })
+    .where(eq(competitions.id, competition.id));
+  await db.insert(auditLog).values({
+    id: newId(),
+    actor: personId,
+    action: "competition.no_photo_style_changed",
+    scopeType: "org",
+    scopeId: competition.orgId,
+    subject: competition.id,
+    meta: { to: style, slug: competition.slug },
+  });
+}
+
+/**
+ * How the season draws teams with no logo (0111): the shield or initials.
+ * Audited like the other "how the season looks" choices.
+ */
+export async function setCompetitionTeamBadge(
+  db: Db,
+  competition: CompetitionSummary,
+  personId: string,
+  badge: "shield" | "initials",
+): Promise<void> {
+  await db
+    .update(competitions)
+    .set({ teamBadge: badge })
+    .where(eq(competitions.id, competition.id));
+  await db.insert(auditLog).values({
+    id: newId(),
+    actor: personId,
+    action: "competition.team_badge_changed",
+    scopeType: "org",
+    scopeId: competition.orgId,
+    subject: competition.id,
+    meta: { to: badge, slug: competition.slug },
   });
 }
 

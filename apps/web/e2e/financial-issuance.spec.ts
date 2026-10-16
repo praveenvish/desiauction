@@ -1,4 +1,4 @@
-import AxeBuilder from "@axe-core/playwright";
+import { writeFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 import { completeAuction, leaveCockpit } from "./complete-auction";
 import { withRunnerHeld } from "./finops-runner";
@@ -22,6 +22,9 @@ test.describe.configure({ mode: "serial" });
 
 const STAMP = String(Date.now()).slice(-8);
 const FOUNDER = `64${STAMP}`;
+const RISERS = "Risers — मुंबई मैदान की क्रिकेट टीम और मित्र मंडली";
+let servedOrg = "";
+let servedDocument = "";
 
 async function otpLogin(page: Page, phone: string): Promise<void> {
   if (!page.url().includes("/login")) {
@@ -33,7 +36,8 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
     timeout: 30_000,
   });
   const code = await latestOtp(phone);
-  await page.getByLabel("6-digit code").fill(code);
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(code);
   await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).not.toHaveURL(/\/login/);
 }
@@ -41,8 +45,8 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
 function playersCsv(stamp: string): string {
   const header = "name,phone,role,base_price_band";
   const rows = Array.from({ length: 3 }, (_, i) => {
-    const phone = `9${stamp}${i}`.slice(0, 10);
-    return `Issue Player ${i},${phone},batter,C`;
+    const phone = `9${stamp}${String(i)}`.slice(0, 10);
+    return `Issue Player ${String(i)},${phone},batter,C`;
   });
   return [header, ...rows].join("\n");
 }
@@ -67,6 +71,9 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
   await expect(page).toHaveURL(/\/org\/[^/]+$/);
   const orgSlug = new URL(page.url()).pathname.split("/")[2] ?? "";
   expect(orgSlug).not.toBe("");
+  servedOrg = orgSlug;
+  expect((await page.request.get(`/org/${orgSlug}/settlement`)).status()).toBe(404);
+  expect((await page.request.get(`/org/${orgSlug}/money`)).status()).toBe(404);
 
   // --- Grant the two authorities this journey needs, from the product --------
   // Both authority panels live on the org detail page's "Money & roles" tab;
@@ -81,6 +88,7 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
     timeout: 20_000,
   });
 
+  expect((await page.request.get(`/org/${orgSlug}/money`)).status()).toBe(404);
   await page.getByTestId("open-grant-finance").click();
   await page.getByTestId("finance-person").selectOption({ label: "Issuance Founder" });
   await page.getByTestId("finance-role").selectOption("finops:controller");
@@ -138,7 +146,7 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
   // Team management lives in the Teams tab.
   const seasonUrl = page.url();
   await page.goto(`${seasonUrl}/teams`);
-  for (const team of ["Risers", "Royals"]) {
+  for (const team of [RISERS, "Royals"]) {
     await page.getByTestId("open-add-team").click();
     await page.getByLabel("Team name").filter({ visible: true }).fill(team);
     await page.getByTestId("add-team-workspace").click();
@@ -179,7 +187,7 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
   await page.getByTestId("accept-short-squads").check();
   await page.getByTestId("create-auction").click();
   await expect(page.getByTestId("auction-status")).toHaveText("scheduled", { timeout: 20_000 });
-  for (const team of ["Risers", "Royals"]) {
+  for (const team of [RISERS, "Royals"]) {
     await issuePaddleTo(page, team);
   }
   await queueAllFromSetup(page);
@@ -203,7 +211,7 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
     timeout: 30_000,
   });
   await page.getByTestId("basis-select").selectOption("fixed");
-  await page.getByLabel("Risers owes (₹)").fill("50000");
+  await page.getByLabel(`${RISERS} owes (₹)`).fill("50000");
   await page.getByTestId("open-case").click();
   await expect(page.getByTestId("case-status")).toHaveText("Opened", { timeout: 20_000 });
   await page.getByTestId("verify-case").click();
@@ -259,6 +267,12 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
   // The lane advanced: 1 issued, next is 2. Dense, no gap.
   await expect(page.locator("[data-testid^='next-receipt-']")).toContainText("000002");
 
+  // Register selection survives explicit detail and return, including native Back.
+  await page.getByTestId("view-receipts").click();
+  await page.getByTestId("kind-filter").selectOption("receipt");
+  await page.getByTestId("register-search").fill("Risers");
+  await expect(page).toHaveURL(/q=Risers/);
+  const selectedRegister = page.url();
   // --- It reproduces from the log, and carries its settlement reference --------
   await page.locator("[data-testid^='doc-'] a").first().click();
   await expect(page.getByTestId("document-panel")).toHaveAttribute("data-hydrated", "true", {
@@ -270,8 +284,69 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
   );
   await expect(page.getByTestId("settlement-ref")).toContainText("payment");
   await expect(page.getByTestId("doc-timeline")).toContainText("Document issued");
+  servedDocument = new URL(page.url()).pathname;
   await axeClean(page, "finance · auto-issued document");
+  await page.getByTestId("back-to-documents").focus();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(selectedRegister);
+  await expect(page.getByTestId("register-search")).toHaveValue("Risers");
+  await expect(page.getByTestId("kind-filter")).toHaveValue("receipt");
+  await expect(page.getByTestId("register-table")).toContainText("Risers");
+  await page.locator("[data-testid^='doc-'] a").first().click();
+  await expect(page.getByTestId("document-panel")).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL(selectedRegister);
+  await expect(page.getByTestId("register-search")).toHaveValue("Risers");
+  await page.goto("/money");
+  await expect(page.getByRole("link", { name: "Finance desk", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Settlement desk", exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "Finance desk", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/org/${orgSlug}/money`));
 
+  const originalViewport = page.viewportSize();
+  for (const path of [
+    `/org/${orgSlug}/money`,
+    `/org/${orgSlug}/money/deliveries`,
+    `/org/${orgSlug}/money/reconciliation`,
+    servedDocument,
+    "/money",
+  ]) {
+    await page.goto(path);
+    for (const theme of ["daylight", "floodlight"]) {
+      await page.evaluate(async (value) => {
+        document.documentElement.setAttribute("data-theme", value);
+        await Promise.all(
+          document
+            .getAnimations()
+            .filter((animation) => animation instanceof CSSTransition)
+            .map((animation) => animation.finished),
+        );
+      }, theme);
+      for (const width of [320, 390, 768, 1440]) {
+        await page.setViewportSize({ width, height: 900 });
+        await expect(page.locator("main")).toBeVisible();
+        expect(
+          await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+        ).toBe(true);
+        await axeClean(page, `finance ${path} ${theme} ${String(width)}`);
+        await page.evaluate(() => {
+          window.scrollTo(0, 0);
+        });
+        await page.screenshot({
+          path: test
+            .info()
+            .outputPath(
+              `${path === servedDocument ? "document" : path.endsWith("deliveries") ? "deliveries" : path.endsWith("reconciliation") ? "reconciliation" : path === "/money" ? "money-hub" : "finance"}-${theme}-${String(width)}.png`,
+            ),
+          fullPage: true,
+        });
+      }
+    }
+  }
+  if (originalViewport) await page.setViewportSize(originalViewport);
+  await page.evaluate(() => {
+    document.documentElement.setAttribute("data-theme", "daylight");
+  });
   // --- Financial Operations is healthy ----------------------------------------
   await page.goto(`/org/${orgSlug}/money`);
   await expect(page.getByTestId("ops-overall")).toHaveText("healthy", { timeout: 30_000 });
@@ -299,4 +374,39 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
       { timeout: 90_000, intervals: [3_000] },
     )
     .toBe("matched");
+  await writeFile(
+    test.info().outputPath("financial-route-fixture.json"),
+    JSON.stringify({
+      cookies: await page.context().cookies(),
+      orgSlug,
+      documentRoute: servedDocument,
+    }),
+    { mode: 0o600 },
+  );
+});
+
+test("finance authority remains absent to a separately authenticated non-member on every served route", async ({
+  browser,
+}) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  try {
+    await otpLogin(page, `65${STAMP}`);
+    await expect(page).toHaveURL(/\/onboarding/);
+    await page.getByLabel("What should we call you?").fill("Finance Boundary Visitor");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await expect(page).toHaveURL(/\/home/);
+    for (const path of [
+      `/org/${servedOrg}/money`,
+      `/org/${servedOrg}/money/deliveries`,
+      `/org/${servedOrg}/money/reconciliation`,
+      servedDocument,
+    ]) {
+      const response = await page.request.get(path);
+      expect(response.status(), path).toBe(404);
+      expect(await response.text()).not.toContain('data-testid="document-panel"');
+    }
+  } finally {
+    await context.close();
+  }
 });

@@ -24,12 +24,16 @@ import {
   personHistoryAction,
   registrationTimelineAction,
   triageRegistrationAction,
+  addPlayerPhoneAction,
   updateRegistrationDetailsAction,
   type TriageAction,
 } from "../../../../server/competition/actions";
 import type { PlayerDeskContext } from "../../../../server/competition/player-desk";
 import type { RegistrationEditInput } from "../../../../server/competition/registration-edit";
 import type { TimelineEntry } from "../../../../server/competition/registrations";
+import { useWriteStatus } from "./use-write-scope";
+import { useMoney, useMoneyUnit } from "../../../../components/money-unit";
+import { priceByHandAction } from "../../../../server/competition/hand-results-actions";
 import { PlayerPhotoUploader } from "../registrations/player-photo-uploader";
 import { SegmentSetting, SelectSetting, TextSetting } from "./fields";
 import {
@@ -113,6 +117,12 @@ export function PlayerSheet({
   const [tab, setTab] = useState<SheetTab>(
     initialTab ?? (row.status === "approved" ? "squad" : "details"),
   );
+  const [visited, setVisited] = useState({ rowId: row.id, tabs: new Set<SheetTab>([tab]) });
+  if (visited.rowId !== row.id) setVisited({ rowId: row.id, tabs: new Set<SheetTab>([tab]) });
+  const changeTab = (next: SheetTab) => {
+    setTab(next);
+    setVisited((current) => ({ rowId: row.id, tabs: new Set([...current.tabs, next]) }));
+  };
   const [deciding, setDeciding] = useState<TriageAction | null>(null);
   const toast = useToast();
 
@@ -175,6 +185,7 @@ export function PlayerSheet({
     return result;
   };
 
+  const writeStatus = useWriteStatus(slug, row.id, row.teamId);
   const pre = preSignedKind(row);
   return (
     <aside className="pd-sheet" aria-labelledby={titleId} data-testid="player-sheet">
@@ -279,20 +290,45 @@ export function PlayerSheet({
           </div>
         ) : null}
 
-        <DecisionBar
-          row={row}
-          deciding={deciding}
-          onDecide={(action) => void decide(action)}
-          {...(onDecline !== undefined
-            ? {
-                onDecline: () => {
-                  onDecline(row);
-                },
-              }
-            : {})}
-          preSigned={pre}
-        />
-
+        {writeStatus !== null ? (
+          <p role="status" className="pd-callout">
+            {writeStatus === "unconfirmed" ? (
+              <>
+                Couldn't confirm the current saved record. Reloading replaces local edits with the
+                saved record.{" "}
+                <button
+                  type="button"
+                  className="pd-link"
+                  onClick={() => {
+                    window.location.reload();
+                  }}
+                >
+                  Reload saved record
+                </button>
+              </>
+            ) : writeStatus === "checking" ? (
+              "Checking saved changes…"
+            ) : (
+              "Saving…"
+            )}
+          </p>
+        ) : null}
+        <fieldset className="pd-write-fields" disabled={writeStatus !== null}>
+          <DecisionBar
+            row={row}
+            deciding={deciding}
+            onDecide={(action) => void decide(action)}
+            {...(onDecline !== undefined
+              ? {
+                  onDecline: () => {
+                    onDecline(row);
+                  },
+                }
+              : {})}
+            preSigned={pre}
+            auctionFormation={desk.teamFormation === "auction"}
+          />
+        </fieldset>
         {nextToReview !== undefined && !canTriage(row) ? (
           <button
             type="button"
@@ -309,25 +345,33 @@ export function PlayerSheet({
           </button>
         ) : null}
 
-        {/* Tabs as buttons over one panel: the APG tab pattern with automatic
-            activation, arrow keys included. */}
-        <SheetTabs tab={tab} onTab={setTab} baseId={titleId} row={row} />
-
-        <div
-          className="pd-sheet-panel"
-          role="tabpanel"
-          id={`${titleId}-panel`}
-          aria-labelledby={`${titleId}-tab-${tab}`}
-        >
-          {tab === "details" ? (
-            <DetailsTab slug={slug} row={row} desk={desk} mutate={mutate} />
-          ) : tab === "squad" ? (
-            <SquadTab slug={slug} row={row} desk={desk} teams={teams} mutate={mutate} />
-          ) : tab === "fee" ? (
-            <FeeTab slug={slug} row={row} mutate={mutate} />
-          ) : (
-            <ActivityTab slug={slug} row={row} />
-          )}
+        {/* Visit lazily; retain local drafts between tabs, resetting fields by player identity. */}
+        <SheetTabs tab={tab} onTab={changeTab} baseId={titleId} row={row} />
+        <div key={row.id}>
+          {TABS.map((entry) => (
+            <div
+              key={entry.id}
+              className="pd-sheet-panel"
+              role="tabpanel"
+              id={`${titleId}-panel-${entry.id}`}
+              aria-labelledby={`${titleId}-tab-${entry.id}`}
+              hidden={tab !== entry.id}
+            >
+              <fieldset className="pd-write-fields" disabled={writeStatus !== null}>
+                {visited.tabs.has(entry.id) ? (
+                  entry.id === "details" ? (
+                    <DetailsTab slug={slug} row={row} desk={desk} mutate={mutate} />
+                  ) : entry.id === "squad" ? (
+                    <SquadTab slug={slug} row={row} desk={desk} teams={teams} mutate={mutate} />
+                  ) : entry.id === "fee" ? (
+                    <FeeTab slug={slug} row={row} mutate={mutate} />
+                  ) : (
+                    <ActivityTab slug={slug} row={row} />
+                  )
+                ) : null}
+              </fieldset>
+            </div>
+          ))}
         </div>
       </div>
     </aside>
@@ -378,7 +422,7 @@ function SheetTabs({
           role="tab"
           id={`${baseId}-tab-${entry.id}`}
           aria-selected={entry.id === active}
-          aria-controls={`${baseId}-panel`}
+          aria-controls={`${baseId}-panel-${entry.id}`}
           tabIndex={entry.id === active ? 0 : -1}
           className="pd-tab"
           data-testid={`sheet-tab-${entry.id}`}
@@ -407,12 +451,14 @@ function DecisionBar({
   onDecide,
   onDecline,
   preSigned,
+  auctionFormation,
 }: {
   row: Row;
   deciding: TriageAction | null;
   onDecide: (action: TriageAction) => void;
   onDecline?: () => void;
   preSigned: ReturnType<typeof preSignedKind>;
+  auctionFormation: boolean;
 }) {
   if (canTriage(row)) {
     return (
@@ -472,13 +518,17 @@ function DecisionBar({
   if (row.status === "approved") {
     return (
       <p className="pd-decision-note" data-testid="sheet-outcome">
-        {preSigned !== null
+        {!auctionFormation
           ? row.teamId !== null
-            ? `Pre-signed to ${row.teamName ?? "their team"} — skips the auction.`
-            : `${PRE_SIGNED_LABEL[preSigned]} with no team — in no auction and no squad. Pick a team in Squad.`
-          : row.teamId !== null
-            ? `Approved · on ${row.teamName ?? "a team"}.`
-            : "Approved · in the auction pool."}
+            ? `Approved · assigned to ${row.teamName ?? "a team"}.`
+            : "Approved · not assigned to a team yet."
+          : preSigned !== null
+            ? row.teamId !== null
+              ? `Pre-signed to ${row.teamName ?? "their team"} — skips the auction.`
+              : `${PRE_SIGNED_LABEL[preSigned]} with no team — in no auction and no squad. Pick a team in Squad.`
+            : row.teamId !== null
+              ? `Approved · on ${row.teamName ?? "a team"}.`
+              : "Approved · in the auction pool."}
       </p>
     );
   }
@@ -527,15 +577,19 @@ function DetailsTab({
             commit={save("name", (value) => ({ name: value.trim(), typedName: true }))}
             testId="edit-name"
           />
-          <div className="pd-setting">
-            <div className="pd-setting-head">
-              <span>Contact</span>
+          {row.clubOnly ? (
+            <AddPhoneSetting slug={slug} row={row} mutate={mutate} />
+          ) : (
+            <div className="pd-setting">
+              <div className="pd-setting-head">
+                <span>Contact</span>
+              </div>
+              <p className="pd-readonly" data-private>
+                {personContact(row)}
+              </p>
+              <p className="pd-setting-hint">A number is who the player is — it can’t be edited.</p>
             </div>
-            <p className="pd-readonly" data-private>
-              {personContact(row)}
-            </p>
-            <p className="pd-setting-hint">A number is who the player is — it can’t be edited.</p>
-          </div>
+          )}
           <TextSetting
             label="Date of birth"
             type="date"
@@ -543,6 +597,26 @@ function DetailsTab({
             commit={save("dateOfBirth")}
             testId="edit-dob"
           />
+          {/* With no date of birth, the club's word decides whether the photo
+              may show on the public page (0106). A date, once entered,
+              decides on its own — so the question goes away. */}
+          {row.dateOfBirth === null ? (
+            <SegmentSetting
+              label="18 or older?"
+              value={row.adultConfirmed ? "yes" : "no"}
+              options={[
+                { value: "no", label: "Not confirmed" },
+                { value: "yes", label: "Yes, 18+" },
+              ]}
+              commit={(value) =>
+                raw({ adultConfirmed: value === "yes" }, "adultConfirmed", {
+                  adultConfirmed: value === "yes",
+                })
+              }
+              hint="Their photo shows on the public page only once you confirm they are 18 or older."
+              testId="edit-adult"
+            />
+          ) : null}
           <TextSetting
             label="Father’s name"
             value={row.fatherName ?? ""}
@@ -644,6 +718,86 @@ function DetailsTab({
 }
 
 /**
+ * "Add phone" for a club-only player (0104) — added with no real number.
+ *
+ * A button, not the autosave every other field uses: a number is who the player
+ * is from then on (they can sign in, they get messages), so it is written when
+ * the organizer says so, never because focus left a half-typed box.
+ */
+function AddPhoneSetting({ slug, row, mutate }: { slug: string; row: Row; mutate: Mutate }) {
+  const id = useId();
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const submit = async () => {
+    if (draft.trim() === "") {
+      setError("Type the player's mobile number first.");
+      return;
+    }
+    setBusy(true);
+    const result = await mutate(row, {}, () => addPlayerPhoneAction(slug, row.id, draft), {
+      quiet: true,
+    });
+    setBusy(false);
+    if (result.ok) {
+      setDraft("");
+      setError(null);
+    } else {
+      setError(result.error);
+    }
+  };
+  return (
+    <div className="pd-setting" data-testid="add-phone">
+      <div className="pd-setting-head">
+        <label htmlFor={id}>Mobile number</label>
+      </div>
+      <div className="pd-add-phone">
+        <input
+          id={id}
+          className="pd-input"
+          inputMode="tel"
+          autoComplete="off"
+          placeholder="10-digit mobile"
+          value={draft}
+          disabled={busy}
+          aria-invalid={error !== null ? true : undefined}
+          aria-describedby={`${id}-hint`}
+          data-testid="add-phone-input"
+          onChange={(event) => {
+            setDraft(event.target.value);
+            setError(null);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              void submit();
+            }
+          }}
+        />
+        <Button
+          size="sm"
+          variant="secondary"
+          loading={busy}
+          onClick={() => void submit()}
+          data-testid="add-phone-save"
+        >
+          Add number
+        </Button>
+      </div>
+      {error !== null ? (
+        <p className="pd-setting-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      <p className="pd-setting-hint" id={`${id}-hint`}>
+        Added by your club with no phone, so nobody can sign in as them and no messages are sent.
+        Check the number before adding it — after that it can&apos;t be changed here.
+      </p>
+    </div>
+  );
+}
+
+/**
  * One field → one partial update, applied to the row before the server answers.
  * The field component shows Saving/Saved; errors come back inline, not as toasts.
  */
@@ -662,7 +816,12 @@ function useSaver(slug: string, row: Row, mutate: Mutate) {
       );
       return result.ok
         ? { ok: true }
-        : { ok: false, error: result.fieldErrors?.[field] ?? result.error };
+        : {
+            ok: false,
+            error: result.fieldErrors?.[field] ?? result.error,
+            ...(result.unconfirmed ? { unconfirmed: true as const } : {}),
+            ...(result.notStarted ? { notStarted: true as const } : {}),
+          };
     },
     [mutate, row, slug],
   );
@@ -695,6 +854,9 @@ function SquadTab({
   const onTeam = row.teamId !== null;
   const locked = desk.rosterLocked;
   const canEdit = desk.canManageTeams;
+  const toast = useToast();
+  const unit = useMoneyUnit();
+  const money = useMoney();
   const teamName = (id: string | null) =>
     id === null ? null : (teams.find((team) => team.id === id)?.name ?? null);
 
@@ -735,7 +897,8 @@ function SquadTab({
     void setMarks({ [mark]: next }, `${name} ${PHRASE[mark][next ? 0 : 1]}`, { [mark]: !next });
   };
 
-  const status = squadStatus(row, locked);
+  const auctionFormation = desk.teamFormation === "auction";
+  const status = squadStatus(row, locked, desk.handEntry, auctionFormation);
   const marksDisabledReason = !canEdit
     ? "Managing squads needs the team permission for this season."
     : null;
@@ -757,7 +920,7 @@ function SquadTab({
             label="Team"
             wide
             value={row.teamId ?? ""}
-            empty={locked ? "No team" : "No team — goes to the auction"}
+            empty={!auctionFormation || locked ? "No team" : "No team — goes to the auction"}
             options={teams.map((team) => ({ value: team.id, label: team.name }))}
             disabled={!canEdit || locked || teams.length === 0}
             {...(teams.length === 0
@@ -777,19 +940,62 @@ function SquadTab({
                 () => markRegistrationAction(slug, row.id, marks),
                 {
                   success: clearing
-                    ? `${name} has no team — back in the auction pool`
+                    ? auctionFormation
+                      ? `${name} has no team — back in the auction pool`
+                      : `${name} is not assigned to a team`
                     : `${name} → ${teamName(value) ?? "team"}`,
                 },
               );
               return result;
             }}
           />
+          {/* 0105: the auction was held outside the app. The player's team is
+              chosen here, so what they went for is typed here too — the
+              desk had the team and no box for the points (founder, BPL-4). */}
+          {desk.handEntry && row.teamId !== null && !isPreSigned(row) ? (
+            <TextSetting
+              label={unit === "points" ? "Points they went for" : "Price they went for"}
+              value={row.handPrice == null ? "" : String(row.handPrice / 100)}
+              inputMode="numeric"
+              placeholder="Not given"
+              hint="Optional — shows on the squad page and posters once you publish the results."
+              testId="sheet-hand-price"
+              commit={async (value) => {
+                const typed = value.trim();
+                const amount = Number(typed);
+                const validProjection =
+                  /^\d+$/.test(typed) &&
+                  Number.isSafeInteger(amount) &&
+                  Number.isSafeInteger(amount * 100);
+                const result = await mutate(
+                  row,
+                  typed === ""
+                    ? { handPrice: null }
+                    : validProjection
+                      ? { handPrice: amount * 100 }
+                      : {},
+                  () => priceByHandAction(slug, row.id, typed),
+                );
+                if (result.ok) {
+                  toast({
+                    title: `${name}: ${result.price === null ? "no price" : money.exact(result.price)}`,
+                    tone: "success",
+                  });
+                }
+                return result;
+              }}
+            />
+          ) : null}
         </div>
       </section>
 
       <section className="pd-form-section">
         <h3>Joins the team as</h3>
-        <div className="pd-marks" role="group" aria-label="Pre-signing marks">
+        <div
+          className="pd-marks"
+          role="group"
+          aria-label={auctionFormation ? "Pre-signing marks" : "Squad roles and marks"}
+        >
           <MarkToggle
             label="Captain"
             on={row.isCaptain}
@@ -810,7 +1016,11 @@ function SquadTab({
               toggle("isIcon");
             }}
             testId={`icon-toggle-${row.personId}`}
-            help="The marquee name, signed before the night."
+            help={
+              desk.teamFormation === "auction"
+                ? "The marquee name, signed before the night."
+                : "Marquee player recorded for this squad."
+            }
           />
           <MarkToggle
             label="Retained"
@@ -825,9 +1035,11 @@ function SquadTab({
         </div>
         <p className="pd-setting-hint">
           {marksDisabledReason ??
-            (locked
-              ? "Icon and Retained are locked with the auction. The armband can still move between players a team has bought."
-              : `Any of these keeps them out of the auction — ${onTeam ? "they join their team directly" : "pick their team above"}.${desk.auctionExists ? " The auction is set up, and these still count: its lots follow them when it opens." : ""}`)}
+            (!auctionFormation
+              ? "Captain, Icon and Retained are recorded squad marks. Assign a team above; match lineups are recorded separately."
+              : locked
+                ? "Icon and Retained are locked with the auction. The armband can still move between players a team has bought."
+                : `Any of these keeps them out of the auction — ${onTeam ? "they join their team directly" : "pick their team above"}.${desk.auctionExists ? " The auction is set up, and these still count: its lots follow them when it opens." : ""}`)}
         </p>
       </section>
     </div>
@@ -837,7 +1049,25 @@ function SquadTab({
 function squadStatus(
   row: Row,
   locked: boolean,
+  handEntry = false,
+  auctionFormation = true,
 ): { tone: "success" | "info" | "warning" | "danger" | "neutral"; text: ReactNode } {
+  if (!auctionFormation) {
+    return row.status !== "approved"
+      ? {
+          tone: "neutral",
+          text: "Not approved yet — review the registration before preparing the squad.",
+        }
+      : row.teamId === null
+        ? {
+            tone: "info",
+            text: "Approved, with no team assigned. Choose a team to place them in its squad.",
+          }
+        : {
+            tone: "success",
+            text: `Assigned to ${row.teamName ?? "a team"}. Match lineups are recorded separately.`,
+          };
+  }
   const kind = preSignedKind(row);
   const marks = [
     row.isIcon ? "Icon" : null,
@@ -857,6 +1087,16 @@ function squadStatus(
       tone: "success",
       text: `Pre-signed to ${row.teamName ?? "their team"} as ${marks} — skips the auction.`,
     };
+  }
+  // Results typed in (0105): there is no pool to be "still in" — a team here
+  // IS what the auction decided, and no team means unsold at publish.
+  if (handEntry && row.status === "approved") {
+    return row.teamId !== null
+      ? { tone: "success", text: `Bought by ${row.teamName ?? "a team"}.` }
+      : {
+          tone: "info",
+          text: "Not on a team — marked unsold when you publish the results.",
+        };
   }
   if (row.teamId !== null) {
     return locked

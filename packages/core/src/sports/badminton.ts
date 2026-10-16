@@ -1,3 +1,4 @@
+import { RALLY_FORMAT_PRESETS } from "../scoring/rally/formats";
 import { optionsOf, termsOf, type TermDetail } from "./vocabulary";
 import { difference, summariseFields } from "./tiebreakers";
 
@@ -108,6 +109,13 @@ const TERMS: Terminology = {
 };
 
 export const BADMINTON: SportPack = {
+  scoring: {
+    family: "rally",
+    depth: 2,
+    formats: [RALLY_FORMAT_PRESETS.badminton_bo3, RALLY_FORMAT_PRESETS.badminton_tie_5],
+    defaultFormat: "badminton_bo3",
+    awardTable: "badminton-v1",
+  },
   key: "badminton",
   label: "Badminton",
   roles: ROLES,

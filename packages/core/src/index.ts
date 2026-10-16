@@ -18,7 +18,10 @@ export {
 } from "./money";
 export type { Paise, DeductResult, ParsePaiseResult, FeeStatus, MoneyUnit } from "./money";
 export type { Clock } from "./clock";
+export { initialsOf, type InitialsOptions } from "./initials";
+export { hasDevanagari } from "./script";
 export { normalizePhone } from "./phone";
+export { looksLikePlaceholderPhone } from "./placeholder-phone";
 export { scrub, scrubError, scrubText, REDACTED } from "./scrub";
 export type { NormalizedPhone, PhoneResult } from "./phone";
 export {
@@ -83,7 +86,7 @@ export {
   validateNewPlayer,
 } from "./registration-csv";
 export { isAmbiguousDate, parseCsvDate } from "./csv-date";
-export { planImport, planImportRow } from "./import-diff";
+export { importMatchKey, planImport, planImportRow } from "./import-diff";
 export { unplacedValues } from "./import-values";
 export type { ImportVocabulary, UnplacedValue, ValueOption } from "./import-values";
 export type {
@@ -97,6 +100,7 @@ export type {
 export {
   IMPORT_FIELDS,
   IMPORT_FIELD_LABELS,
+  RECOMMENDED_IMPORT_FIELDS,
   REQUIRED_IMPORT_FIELDS,
   applyMapping,
   attributeAliasClaims,
@@ -130,6 +134,7 @@ export type {
   CsvRowError,
   CsvParseOptions,
   CsvParseResult,
+  PlaceholderPhone,
   NewPlayerCheck,
   NewPlayerInput,
   PlayerField,
@@ -218,7 +223,14 @@ export {
   DEFAULT_POINTS_AUCTION_CONFIG,
   pointsSlabs,
   defaultAuctionConfigFor,
+  PRACTICE_PURSE_POINTS,
+  PRACTICE_BASE_POINTS,
+  PRACTICE_SQUAD_SIZES,
+  isPracticeSquadSize,
+  practiceAuctionConfig,
+  practiceLotCount,
 } from "./auction";
+export type { PracticeSquadSize } from "./auction";
 export {
   buildAuctionSnapshot,
   canonicalJson,
@@ -351,7 +363,10 @@ export {
   validateUpload,
   bytesMatchImageType,
   deriveMediaKey,
+  isStoredMediaKey,
   isValidMediaKey,
+  thumbKeyOf,
+  THUMB_EDGE,
   mediaKeyBelongsTo,
 } from "./media";
 export type { AllowedImageType, MediaSubject, MediaUpload, MediaValidation } from "./media";
@@ -390,8 +405,13 @@ export {
 } from "./tiers";
 export {
   buildPlayerPoster,
+  buildResultPoster,
+  type ResultPoster,
+  type ResultPosterInput,
   buildSeasonPoster,
   buildTeamPoster,
+  roleTagOf,
+  squadSpotlight,
   buildTopBuysPoster,
   crestMark,
   firstNameOf,
@@ -406,8 +426,10 @@ export {
   POSTER_KINDS,
   POSTER_SIZES,
   POSTER_THEMES,
+  seasonTeamColours,
   shortNameOf,
   splitName,
+  TEAM_PALETTE,
   TOP_BUY_COUNTS,
   type PlayerPoster,
   type PlayerPosterInput,
@@ -420,10 +442,12 @@ export {
   type SeasonPosterInput,
   type SeasonSquad,
   type SeasonSquadInput,
+  type SeasonStage,
   type TeamPoster,
   type TeamPosterInput,
   type TeamPosterMember,
   type TeamPosterRow,
+  type SpotlightCard,
   type TopBuyCount,
   type TopBuyInput,
   type TopBuyRow,

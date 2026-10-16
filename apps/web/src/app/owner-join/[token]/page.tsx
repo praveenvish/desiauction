@@ -1,3 +1,4 @@
+import { ScoringSignOutForm } from "../../../components/scoring-sign-out-form";
 import Link from "next/link";
 import { formatAmount, formatPaiseINR, paise } from "@desiauction/core";
 import { Button, ButtonLink, Card } from "@desiauction/ui";
@@ -31,8 +32,15 @@ export const metadata = { title: "Team owner invitation" };
 // link nobody can use. Today the link is an unaddressed bearer token and the
 // page says so out loud. Not decided here.
 
-export default async function OwnerJoinPage({ params }: { params: Promise<{ token: string }> }) {
+export default async function OwnerJoinPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ token: string }>;
+  searchParams: Promise<{ review?: string | string[] }>;
+}) {
   const { token } = await params;
+  const review = (await searchParams).review === "1";
   const session = await currentSession();
   if (session === null) {
     redirect(`/login?next=/owner-join/${token}`);
@@ -47,6 +55,12 @@ export default async function OwnerJoinPage({ params }: { params: Promise<{ toke
   return (
     <main className="join">
       <div className="join-panel">
+        {review ? (
+          <p role="status">
+            We couldn&apos;t confirm the outcome. Review the latest invitation status before
+            repeating an action.
+          </p>
+        ) : null}
         {landing.state === "valid" ? (
           <ValidOwnerInvite preview={landing.preview} token={token} />
         ) : landing.state === "already-owner" ? (
@@ -88,12 +102,12 @@ export default async function OwnerJoinPage({ params }: { params: Promise<{ toke
           </>
         )}
 
-        <form action={switchAccount} className="join-identity">
+        <ScoringSignOutForm logout={switchAccount} className="join-identity">
           <span>Signed in as {viewerLabel}. Not you?</span>{" "}
           <button type="submit" className="join-linkbutton" data-testid="owner-join-switch-account">
             Sign out
           </button>
-        </form>
+        </ScoringSignOutForm>
       </div>
     </main>
   );
@@ -181,6 +195,7 @@ function ValidOwnerInvite({ preview, token }: { preview: OwnerJoinPreview; token
             if (result.ok) {
               redirect(`/seasons/${result.competitionSlug}/auction/live`);
             }
+            redirect(`/owner-join/${encodeURIComponent(token)}?review=1`);
           }}
         >
           {/* `lg` (52px): the second of the two 40px CTAs in the growth loop. */}

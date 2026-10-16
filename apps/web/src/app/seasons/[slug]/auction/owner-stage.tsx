@@ -86,6 +86,7 @@ export function OwnerStage({
   rules,
   teams,
   myPaddleNumber,
+  bidScope,
   squadSigned,
   remainingMs,
   lotDurationMs,
@@ -93,6 +94,7 @@ export function OwnerStage({
   frozen,
   readOnly,
   busy,
+  sending,
   onBid,
   plan,
   planNames,
@@ -111,6 +113,7 @@ export function OwnerStage({
   teams: readonly TeamIdentity[];
   /** Null for a viewer holding no paddle: the card and the price, no paddle. */
   myPaddleNumber: string | null;
+  bidScope: string;
   squadSigned: number;
   remainingMs: number | null;
   lotDurationMs: number;
@@ -118,6 +121,8 @@ export function OwnerStage({
   frozen: boolean;
   readOnly: boolean;
   busy: boolean;
+  /** A bid from this tab is actually in flight. */
+  sending?: boolean;
   onBid: (amount: number) => void;
   plan: PlanState | null;
   planNames: (registrationId: string) => string;
@@ -189,11 +194,13 @@ export function OwnerStage({
       {stance !== null ? (
         <PaddleControl
           lotId={lot.lotId}
+          bidScope={bidScope}
           stance={stance}
           rules={rules}
           squadSigned={squadSigned}
           readOnly={readOnly}
           busy={busy}
+          sending={sending ?? busy}
           onBid={onBid}
           plan={plan}
         />

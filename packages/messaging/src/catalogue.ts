@@ -180,6 +180,19 @@ const ENTRIES = [
     channels: ["email", "whatsapp"],
   },
   {
+    // AC-1.2: every change DesiAuction support makes to somebody's account —
+    // a role given or taken, a suspension and its end, a sign-out everywhere,
+    // an invitation — told to that person with the operator's reason.
+    key: "security.admin_action",
+    label: "Account changed by DesiAuction support",
+    description:
+      "Tells a person, with the operator's reason, when support gave or removed a platform role, suspended or reopened their account, signed them out everywhere, or invited them.",
+    audience: "account",
+    category: "security",
+    topic: "security",
+    channels: ["email"],
+  },
+  {
     // A passkey signs in with no code at all, so one added by somebody holding
     // a stolen session is a key they keep (email programme PR14). Removing
     // the owner's own passkey is the other half of a takeover.
@@ -405,6 +418,75 @@ const ENTRIES = [
     category: "transactional",
     topic: "matches",
     channels: ["email", "in_app"],
+  },
+  {
+    key: "match.toss_reminder",
+    label: "Toss reminder",
+    description: "A one-time reminder when the toss has happened, requested by the viewer.",
+    audience: "player",
+    category: "transactional",
+    topic: "matches",
+    channels: ["email", "in_app"],
+  },
+  {
+    key: "match.quiet",
+    label: "Scoring has gone quiet",
+    description: "The organiser is told when a live match has no ball for fifteen minutes.",
+    audience: "organizer",
+    category: "transactional",
+    topic: "matches",
+    channels: ["in_app"],
+  },
+  {
+    key: "match.result",
+    label: "Match result",
+    description: "The finalized result of a match you played in.",
+    audience: "player",
+    category: "transactional",
+    topic: "matches",
+    channels: ["in_app", "email"],
+    inboxKeys: ["match.result_published"],
+  },
+  {
+    key: "player.claim_invite",
+    label: "Claim your match stats",
+    description: "A scorer or organizer linked your guest registration to your mobile number.",
+    audience: "player",
+    category: "transactional",
+    topic: "registration",
+    channels: ["in_app", "email"],
+    inboxKeys: ["player.claim_invited"],
+  },
+  {
+    key: "player.claim_offer",
+    label: "Is this you?",
+    description:
+      "A scorer tied a guest player to your mobile number. Nothing moves until you accept.",
+    audience: "player",
+    category: "transactional",
+    topic: "registration",
+    channels: ["in_app", "email"],
+    inboxKeys: ["player.claim_offered"],
+  },
+  {
+    key: "match.confirm_request",
+    label: "Confirm a match result",
+    description: "The opposing team asks you to confirm the recorded result.",
+    audience: "player",
+    category: "transactional",
+    topic: "matches",
+    channels: ["in_app", "email"],
+    inboxKeys: ["match.confirm_requested"],
+  },
+  {
+    key: "match.award",
+    label: "Match award",
+    description: "You received Player of the Match or Fighter of the Match.",
+    audience: "player",
+    category: "transactional",
+    topic: "matches",
+    channels: ["in_app", "email", "whatsapp"],
+    inboxKeys: ["match.award_won"],
   },
   {
     key: "lineup.announced",

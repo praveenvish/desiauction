@@ -18,12 +18,14 @@ longer exists and listed seven secrets of the twenty below.
 | `desiauction_app` / `desiauction_system` passwords | `web.env` (`DATABASE_URL`, `SYSTEM_DATABASE_URL`) | See "Database credential rotation" |
 | `desiauction_engine` password | `engine.env` | Same; restarts the engine, so outside a live window only |
 | `desiauction_runner` password | `runner.env` | Same |
+| `desiauction_live` password | `live.env` (`LIVE_DATABASE_URL`) | Same; restarts the live service, so open spectator sockets reconnect. **Hosts created before F07 must add it once** — see DEPLOYMENT.md "Environment variables" |
 | Object storage root (`MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`) | `minio.env`, and as `MEDIA_S3_*` / `FINOPS_S3_*` in `web.env` and `runner.env` | The application uses the ROOT credential, so this restarts storage, web and runner together. Uploads fail for the length of the restart |
 | `PGBACKREST_REPO1_S3_KEY` / `_KEY_SECRET` | `pgbackrest.env` | IAM allows two keys: create, set, restart the `pgbackrest` and `db` services, confirm `pgbackrest check`, delete the old key |
 | **`PGBACKREST_REPO1_CIPHER_PASS`** | `pgbackrest.env` | **NOT ROTATABLE in place.** It encrypts the backup repository; changing it makes every existing backup unreadable. It is generated on the host and exists nowhere else until somebody copies it — see [Escrow](#escrow-the-two-things-that-cannot-be-regenerated) |
 | Mirror keys (`MIRROR_S3_ACCESS_KEY` / `_SECRET_KEY`) | `mirror.env` | Two keys, no cutover; restart `minio-mirror` |
 | `FEEDBACK_JOB_SECRET`, `SETTLEMENT_JOB_SECRET`, `DEMO_JOB_SECRET` | `web.env` (the scheduler reads the same file) | Restart web and scheduler together; a scheduler holding the old value gets 404 from the job routes and `da-jobs-failed` fires |
 | `DEMO_TOKEN_SECRET`, `REVIEW_TOKEN_SECRET` | `web.env` | Every demo-booking and review link already mailed stops working. Rotate only on exposure |
+| `SCORING_HANDOVER_SECRET` | `web.env` | Signs live-scoring handover QR codes (10 min), result-confirmation links (7 days) and viewer tokens. Rotating it voids handovers in progress and confirmation links already sent. **Hosts created before LS-1 must add it once** (`openssl rand -hex 32`) before the first LS-1 deploy, or the production preflight refuses the deploy |
 | `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` | GitHub environment secret (build time) | Pages open across the deploy that changes it must be reloaded once. Otherwise never needs rotating |
 | WhatsApp (`WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN`) | `web.env`, founder-held | Meta System User token: generate the new one, set, restart web. The app secret and verify token change in Meta's console at the same moment as here |
 | `SES_ACCESS_KEY_ID` / `SES_SECRET_ACCESS_KEY` | `web.env`, `runner.env`, founder-held | Two keys per IAM user: create, set in both, restart both, then delete the old one |

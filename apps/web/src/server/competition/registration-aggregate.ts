@@ -10,6 +10,7 @@ import {
   type RegistrationStatus,
   type Tier,
 } from "@desiauction/core";
+import { isRealAuction } from "@desiauction/auction";
 import {
   auctions,
   auditLog,
@@ -19,7 +20,7 @@ import {
   teams,
   type Db,
 } from "@desiauction/db";
-import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 
 import { logSecurityEvent, type SecurityAction } from "../auth/security-events";
 import type { RegistrationEditSet } from "./registration-edit";
@@ -106,20 +107,46 @@ const LEAVES_THE_SQUAD = {
 export async function rosterAuction(
   db: Db,
   competitionId: string,
-): Promise<{ id: string; status: string } | null> {
+): Promise<{ id: string; status: string; everOpened: boolean } | null> {
   const [row] = await db
-    .select({ id: auctions.id, status: auctions.status })
+    .select({
+      id: auctions.id,
+      status: auctions.status,
+      // Did the room ever open? An auction aborted while still scheduled
+      // never drew the pool and sold nobody (`auctionHoldsRoster`).
+      // Spelled out as "auctions"."id": interpolated, the column prints bare
+      // ("id"), which inside the subquery binds to the EVENT's own id.
+      everOpened: sql<boolean>`exists (select 1 from auction_events e where e.auction_id = "auctions"."id" and e.type = 'AuctionOpened')`,
+    })
     .from(auctions)
-    .where(eq(auctions.competitionId, competitionId))
+    .where(and(eq(auctions.competitionId, competitionId), isRealAuction()))
     .orderBy(desc(auctions.createdAt))
     .limit(1)
     .for("share");
   return row ?? null;
 }
 
-/** The roster belongs to the auction once it has left `scheduled` (P2-3, DA-04). */
-export function auctionHoldsRoster(auction: { status: string } | null): boolean {
-  return auction !== null && auction.status !== "scheduled";
+/**
+ * The roster belongs to the auction once it has left `scheduled` (P2-3, DA-04)
+ * — unless it left by being ABORTED BEFORE IT EVER OPENED. That auction drew no
+ * pool, sold nobody and holds no money: it is the one a club abandons to type
+ * in the results of a night held offline, and it locked their own team sheet
+ * against them (founder, BPL-4, 2026-10-07). An auction aborted mid-night,
+ * with sales and possibly a settlement case, still holds the roster.
+ * `everOpened` omitted is read as "it opened" — the safe default.
+ */
+export function auctionHoldsRoster(
+  auction: { status: string; everOpened?: boolean } | null,
+): boolean {
+  if (auction === null || auction.status === "scheduled") {
+    return false;
+  }
+  return !(auction.status === "abandoned" && auction.everOpened === false);
+}
+
+/** Is this season's roster locked by its auction? One read, the shared rule. */
+export async function seasonRosterLocked(db: Db, competitionId: string): Promise<boolean> {
+  return auctionHoldsRoster(await rosterAuction(db, competitionId));
 }
 
 /**
@@ -250,6 +277,7 @@ export async function transition(
   registrationId: string,
   reviewerId: string,
   event: RegistrationEvent,
+  options: { notifyPlayer?: boolean } = {},
 ): Promise<TransitionResult> {
   const [current] = await db
     .select({ status: registrations.status })
@@ -336,7 +364,7 @@ export async function transition(
   if (outcome !== null) {
     return { ok: false, reason: "tier_limit", message: outcome.tierLimited };
   }
-  await notifyPlayer(db, [registrationId], event);
+  if (options.notifyPlayer !== false) await notifyPlayer(db, [registrationId], event);
   return { ok: true, status: decision.next };
 }
 
@@ -784,4 +812,50 @@ export async function updateRegistrationDetails(
     });
     return { ok: true };
   });
+}
+
+/**
+ * The organizer states that these players are 18 or older (0106) — the
+ * Players list's bulk "Mark 18+", and the import's "everyone in this sheet".
+ *
+ * Only rows of THIS season, and only rows nobody confirmed yet, so the first
+ * statement's time and author stand. Each player's timeline says who said it,
+ * the same way a sheet edit of the field does.
+ */
+export async function confirmAdults(
+  db: Db,
+  orgId: string,
+  competitionId: string,
+  registrationIds: readonly string[],
+  actorId: string,
+  now: Date,
+): Promise<number> {
+  if (registrationIds.length === 0) {
+    return 0;
+  }
+  const confirmed = await db
+    .update(registrations)
+    .set({ adultConfirmedAt: now })
+    .where(
+      and(
+        eq(registrations.competitionId, competitionId),
+        inArray(registrations.id, [...registrationIds]),
+        isNull(registrations.adultConfirmedAt),
+      ),
+    )
+    .returning({ id: registrations.id });
+  if (confirmed.length > 0) {
+    await db.insert(auditLog).values(
+      confirmed.map((row) => ({
+        id: newId(),
+        actor: actorId,
+        action: "registration.details_edited",
+        scopeType: "org" as const,
+        scopeId: orgId,
+        subject: row.id,
+        meta: { fields: "adultConfirmed" },
+      })),
+    );
+  }
+  return confirmed.length;
 }

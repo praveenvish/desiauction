@@ -95,7 +95,7 @@ PG=/opt/homebrew/opt/postgresql@17/bin
 DATABASE_URL=postgres://desiauction:desiauction@localhost:5432/desiauction \
   pnpm --filter @desiauction/db db:migrate
 "$PG/psql" -d desiauction -v app_password=local-app -v system_password=local-system \
-  -v engine_password=local-engine -v runner_password=local-runner -f ops/db/create-app-role.sql
+  -v engine_password=local-engine -v runner_password=local-runner -v live_password=local-live -f ops/db/create-app-role.sql
 DATABASE_URL=postgres://desiauction:desiauction@localhost:5432/desiauction \
   SYSTEM_DATABASE_URL=postgres://desiauction_system:local-system@localhost:5432/desiauction \
   pnpm --filter @desiauction/web test:integration

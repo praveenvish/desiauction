@@ -35,6 +35,13 @@
     flex-wrap: nowrap;
     justify-content: flex-end;
   }
+
+  /* …unless a card leads the page: pinned there, the pill and Cockpit sat on
+     top of the practice card's corner (BPL-4, 2026-10-07). */
+  .dash-stack > .auc-head.auc-head-row {
+    position: static;
+    justify-content: flex-end;
+  }
 }
 
 .auc-head-actions .date-row {

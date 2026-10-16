@@ -85,8 +85,8 @@ export default function GlobalError({
             </h1>
             <p style={{ fontSize: 16, lineHeight: 1.5, margin: "0 0 24px", color: "#4a4840" }}>
               {error.digest !== undefined
-                ? `You didn't lose anything. If this keeps happening, tell support the code ${error.digest}.`
-                : "You didn't lose anything — try again."}
+                ? `We couldn't load this screen. Check the latest state before repeating an action. If this keeps happening, tell support the code ${error.digest}.`
+                : "We couldn't load this screen. Check the latest state before repeating an action."}
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
               <button

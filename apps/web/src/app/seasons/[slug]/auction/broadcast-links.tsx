@@ -9,9 +9,11 @@ import {
   SectionCard,
   useToast,
 } from "@desiauction/ui";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useOrigin } from "../../../../lib/use-hydrated";
+import type { StreamKit } from "../../../../server/competition/stream-kit";
+import { streamKitView } from "../../../../server/competition/stream-kit-actions";
 import "./dashboard.css";
 
 /**
@@ -48,12 +50,12 @@ export function BroadcastLinks({ slug }: { slug: string }) {
       ? `/seasons/${slug}/auction/overlay`
       : `/seasons/${slug}/auction/overlay?sponsor=${encodeURIComponent(trimmedSponsor)}`;
 
-  async function copy(url: string, what: string) {
+  async function copy(text: string, copied: string) {
     try {
-      await navigator.clipboard.writeText(url);
-      toast({ title: `${what} link copied — paste it where it needs to run`, tone: "success" });
+      await navigator.clipboard.writeText(text);
+      toast({ title: copied, tone: "success" });
     } catch {
-      toast({ title: "Couldn't copy — select the address and copy it manually.", tone: "danger" });
+      toast({ title: "Couldn't copy — select the text and copy it manually.", tone: "danger" });
     }
   }
 
@@ -132,7 +134,9 @@ export function BroadcastLinks({ slug }: { slug: string }) {
             variant="secondary"
             size="sm"
             data-testid={pane.copyTestId}
-            onClick={() => void copy(pane.url, pane.what)}
+            onClick={() =>
+              void copy(pane.url, `${pane.what} link copied — paste it where it needs to run`)
+            }
           >
             <IconCopy size={16} />
             Copy link
@@ -151,7 +155,99 @@ export function BroadcastLinks({ slug }: { slug: string }) {
             <IconExternal size={14} />
           </a>
         </p>
+        {screen === "overlay" ? <StreamDescription slug={slug} copy={copy} /> : null}
       </div>
     </SectionCard>
+  );
+}
+
+/**
+ * THE YOUTUBE TEXT FOR THE STREAM (SEO-1 Phase 7, docs/seo/OUTREACH-KIT.md §3).
+ *
+ * Shown with the overlay, because that is the moment an organizer is setting up
+ * a stream. The description links to the season's public page: viewers find the
+ * squads there, and the link is a backlink from a real channel. Loaded once,
+ * when the pane first opens; an unpublished season gets a note instead, because
+ * its public page does not exist and the link would be dead.
+ */
+function StreamDescription({
+  slug,
+  copy,
+}: {
+  slug: string;
+  copy: (text: string, copied: string) => Promise<void>;
+}) {
+  const [kit, setKit] = useState<StreamKit | null | undefined>(undefined);
+
+  useEffect(() => {
+    let live = true;
+    streamKitView(slug)
+      .then((result) => {
+        if (live) setKit(result);
+      })
+      .catch(() => {
+        if (live) setKit(null);
+      });
+    return () => {
+      live = false;
+    };
+  }, [slug]);
+
+  if (kit === undefined) {
+    return null;
+  }
+  if (kit === null) {
+    return (
+      <p className="bc-note" data-testid="stream-kit-unpublished">
+        Streaming on YouTube? Publish the season first, and a ready-made description that links
+        viewers to its public page appears here.
+      </p>
+    );
+  }
+  return (
+    <div className="bc-kit" data-testid="stream-kit">
+      <h3 className="bc-kit-title">For your YouTube stream</h3>
+      <div className="bc-url-row">
+        <code className="bc-url" data-testid="stream-kit-title">
+          {kit.title}
+        </code>
+        <Button
+          variant="secondary"
+          size="sm"
+          data-testid="copy-stream-title"
+          onClick={() => void copy(kit.title, "Title copied — paste it into YouTube")}
+        >
+          <IconCopy size={16} />
+          Copy title
+        </Button>
+      </div>
+      <pre className="bc-kit-text" data-testid="stream-kit-description">
+        {kit.description}
+      </pre>
+      <div className="bc-kit-actions">
+        <Button
+          variant="secondary"
+          size="sm"
+          data-testid="copy-stream-description"
+          onClick={() => void copy(kit.description, "Description copied — paste it into YouTube")}
+        >
+          <IconCopy size={16} />
+          Copy description
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          data-testid="copy-stream-comment"
+          onClick={() => void copy(kit.pinnedComment, "Comment copied — pin it once you're live")}
+        >
+          <IconCopy size={16} />
+          Copy pinned comment
+        </Button>
+      </div>
+      <p className="bc-note">
+        Paste the description into the stream&apos;s YouTube description, and pin the comment once
+        you&apos;re live.
+      </p>
+    </div>
   );
 }

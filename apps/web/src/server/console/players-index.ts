@@ -122,14 +122,14 @@ export interface PlayersSlice {
  * `lots.registration_id = lots.id`). Plain text cannot be rewritten that way.
  */
 /** Same hand-written discipline as `soldSql` below: the season's auction is over. */
-const auctionDoneSql = sql<boolean>`exists (select 1 from auctions done_auction where done_auction.competition_id = "registrations"."competition_id" and done_auction.status in ('completed', 'reconciled'))`;
+const auctionDoneSql = sql<boolean>`exists (select 1 from auctions done_auction where done_auction.competition_id = "registrations"."competition_id" and done_auction.status in ('completed', 'reconciled') and done_auction.kind = 'real')`;
 
-const soldSql = sql<boolean>`exists (select 1 from lots sold_lot inner join auctions sold_auction on sold_auction.id = sold_lot.auction_id where sold_lot.registration_id = "registrations"."id" and sold_lot.status = 'sold' and sold_auction.status <> 'abandoned')`;
+const soldSql = sql<boolean>`exists (select 1 from lots sold_lot inner join auctions sold_auction on sold_auction.id = sold_lot.auction_id where sold_lot.registration_id = "registrations"."id" and sold_lot.status = 'sold' and sold_auction.status <> 'abandoned' and sold_auction.kind = 'real')`;
 
 /** The sold lot's price — the same lot `soldSql` finds, so the two cannot disagree. */
 const soldPriceSql = sql<
   number | null
->`(select price_lot.sold_price::float8 from lots price_lot inner join auctions price_auction on price_auction.id = price_lot.auction_id where price_lot.registration_id = "registrations"."id" and price_lot.status = 'sold' and price_auction.status <> 'abandoned' limit 1)`;
+>`(select price_lot.sold_price::float8 from lots price_lot inner join auctions price_auction on price_auction.id = price_lot.auction_id where price_lot.registration_id = "registrations"."id" and price_lot.status = 'sold' and price_auction.status <> 'abandoned' and price_auction.kind = 'real' limit 1)`;
 
 const auctionUnitSql = sql<MoneyUnit>`(select unit_season.auction_unit from competitions unit_season where unit_season.id = "registrations"."competition_id")`;
 

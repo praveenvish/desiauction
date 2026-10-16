@@ -1,3 +1,4 @@
+import { initialsOf as lettersOf } from "@desiauction/core/initials";
 import { formatCount } from "../../lib/plural";
 
 /**
@@ -19,6 +20,7 @@ export type StageKey = "setup" | "registration" | "auction" | "season" | "finish
 export interface StageInput {
   readonly slug: string;
   readonly status: string;
+  readonly teamFormation?: "auction" | "organizer" | "team_entry";
   readonly endsOn: string | null;
   readonly auctionUnit: "inr" | "points";
   readonly settlement: "settling" | "settled" | null;
@@ -68,7 +70,9 @@ export function seasonStage(season: StageInput, today: string): StageKey {
     return over ? "finished" : "season";
   }
   if (season.status === "registration_closed") {
-    return "auction";
+    return season.teamFormation !== undefined && season.teamFormation !== "auction"
+      ? "season"
+      : "auction";
   }
   if (season.status === "registration_open") {
     return "registration";
@@ -105,6 +109,14 @@ export function nextStep(season: StageInput, today: string): NextStep | null {
         urgent: false,
       };
     case "registration":
+      if (season.teamFormation === "team_entry") {
+        return {
+          label: "Review teams",
+          href: `${base}/teams`,
+          why: "Captains can submit teams while sign-ups are open",
+          urgent: false,
+        };
+      }
       return counts.pending > 0
         ? {
             label: `Review ${formatCount(counts.pending)}`,
@@ -197,12 +209,5 @@ export function needsYou<T extends StageInput & { startsOn: string | null }>(
 
 /** "TPL 2026" → "T2"; "Demo Premier League" → "DP" — a crest with no logo. */
 export function initialsOf(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return "?";
-  if (words.length === 1) return (words[0] ?? "?").slice(0, 2).toUpperCase();
-  return words
-    .slice(0, 2)
-    .map((word) => word.charAt(0))
-    .join("")
-    .toUpperCase();
+  return lettersOf(name, { words: "first-two", singleWord: 2 }) || "?";
 }

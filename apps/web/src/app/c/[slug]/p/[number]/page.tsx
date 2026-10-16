@@ -1,3 +1,4 @@
+import { CricketCareerSection } from "../../../../../components/cricket-career";
 import { cache } from "react";
 import {
   buildPlayerPoster,
@@ -17,7 +18,7 @@ import { preSignedWord, type PreSignedKind } from "../../../../../lib/pre-signed
 import {
   publicPlayer,
   publicPlayerPoster,
-  teamSlugOf,
+  publicCricketCareer,
 } from "../../../../../server/competition/public";
 import { linkCardAlt } from "../../../../seasons/[slug]/posters/poster-link";
 import {
@@ -161,7 +162,10 @@ export default async function PlayerProfilePage({
   // whether the card works.
   const refSuffix = typeof ref === "string" && ref !== "" ? `?ref=${encodeURIComponent(ref)}` : "";
   // The words that travel with the link — the same sentence the card draws.
-  const poster = await posterView(slug, number);
+  const [cricketCareer, poster] = await Promise.all([
+    publicCricketCareer(slug, number),
+    posterView(slug, number),
+  ]);
   const shareModel =
     poster === null
       ? null
@@ -319,9 +323,9 @@ export default async function PlayerProfilePage({
               </ButtonLink>
             ) : null}
             {/* A signed player's card leads to the squad they are part of. */}
-            {player.teamName !== null ? (
+            {player.teamSlug !== null ? (
               <ButtonLink
-                href={`/c/${slug}/t/${teamSlugOf(player.teamName)}`}
+                href={`/c/${slug}/t/${player.teamSlug}`}
                 variant="secondary"
                 size="lg"
                 data-testid="player-team-link"
@@ -337,6 +341,14 @@ export default async function PlayerProfilePage({
       />
 
       <PageBody>
+        {cricketCareer ? (
+          <>
+            <ButtonLink href={`/c/${slug}/p/${number}/insights`} variant="secondary">
+              Explore cricket insights
+            </ButtonLink>
+            <CricketCareerSection career={cricketCareer} />
+          </>
+        ) : null}
         {facts.length > 0 ? (
           <StatStrip label={`${player.name} — player details`} stats={facts} />
         ) : null}

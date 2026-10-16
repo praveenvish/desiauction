@@ -15,6 +15,7 @@
  * anyway, because Satori cannot resolve a CSS variable.
  */
 
+import { initialsOf } from "./initials";
 import { formatAmount, paise, type MoneyUnit } from "./money";
 import { roleLabel } from "./player-profile";
 
@@ -32,7 +33,23 @@ import { roleLabel } from "./player-profile";
  * Every family draws every poster kind, and the team colour drives the accents
  * in all of them, so the choice is mood, never "which one works for squads".
  */
-export const POSTER_THEMES = ["floodlight", "matchday", "minimal", "gold", "arena", "ink"] as const;
+/*
+ * - `stadium` — the team on a lit stage: its shirt (name and number on the
+ *   back) when there is no photo, a gold-metal price, a rubber stamp. Every
+ *   team in its own colour, so ten squads posted together are ten franchises.
+ *   Made for a Status (founder, 2026-10-07).
+ */
+export const POSTER_THEMES = [
+  "stadium",
+  "broadcast",
+  "scorecard",
+  "floodlight",
+  "matchday",
+  "minimal",
+  "gold",
+  "arena",
+  "ink",
+] as const;
 export type PosterTheme = (typeof POSTER_THEMES)[number];
 
 export function isPosterTheme(value: string): value is PosterTheme {
@@ -65,7 +82,7 @@ export function isPosterSize(value: string): value is PosterSize {
  * money). `top` and `season` read the whole auction, which is why they are
  * organizer-only upstream: a rival owner may not publish another team's prices.
  */
-export const POSTER_KINDS = ["player", "team", "reveal", "top", "season"] as const;
+export const POSTER_KINDS = ["player", "team", "reveal", "top", "season", "result"] as const;
 export type PosterKind = (typeof POSTER_KINDS)[number];
 
 export function isPosterKind(value: string): value is PosterKind {
@@ -82,7 +99,71 @@ export const POSTER_KIND_SIZES: Record<PosterKind, readonly PosterSize[]> = {
   reveal: ["square", "portrait", "story"],
   top: ["square", "portrait", "story"],
   season: ["portrait", "story"],
+  result: ["square", "portrait", "story"],
 };
+
+export interface ResultPosterInput {
+  competitionName: string;
+  competitionLogoUrl: string | null;
+  fixtureNumber: string;
+  headline: string;
+  margin: string;
+  trustLabel: string;
+  teams: readonly { name: string; score: string; color: string | null }[];
+  playerOfMatch: {
+    name: string;
+    photoUrl: string | null;
+    figures: string;
+    shots: readonly { angle: number; runs: number }[];
+  } | null;
+}
+
+export interface ResultPoster {
+  competitionName: string;
+  competitionLogoUrl: string | null;
+  fixtureLabel: string;
+  headline: string;
+  margin: string;
+  trustLabel: string;
+  teams: { name: string; score: string; color: string | null }[];
+  playerOfMatch: {
+    name: string;
+    monogram: string;
+    photoUrl: string | null;
+    figures: string;
+    shots: { angle: number; runs: number }[];
+  } | null;
+}
+
+/** Sanitized identities and consent-gated images are supplied by the export gate. */
+export function buildResultPoster(input: ResultPosterInput): ResultPoster {
+  return {
+    competitionName: clamp(input.competitionName, 48),
+    competitionLogoUrl: input.competitionLogoUrl,
+    fixtureLabel: `MATCH ${clamp(input.fixtureNumber.replace(/^match\s+/i, ""), 16)}`,
+    headline: clamp(input.headline, 64),
+    margin: clamp(input.margin, 96),
+    trustLabel: clamp(input.trustLabel, 48),
+    teams: input.teams.map((team) => ({
+      name: clamp(team.name, 32),
+      score: clamp(team.score, 32),
+      color: normalizeHexColor(team.color),
+    })),
+    playerOfMatch: input.playerOfMatch
+      ? {
+          name: clamp(input.playerOfMatch.name, 32),
+          monogram: monogramOf(input.playerOfMatch.name),
+          photoUrl: input.playerOfMatch.photoUrl,
+          figures: clamp(input.playerOfMatch.figures, 96),
+          shots: input.playerOfMatch.shots
+            .filter(
+              (shot) => Number.isFinite(shot.angle) && Number.isFinite(shot.runs) && shot.runs > 0,
+            )
+            .map(({ angle, runs }) => ({ angle, runs })),
+        }
+      : null,
+  };
+}
 
 /** Top-N is a choice from three, not a free number: 7 rows has no layout. */
 export const TOP_BUY_COUNTS = [3, 5, 10] as const;
@@ -225,9 +306,23 @@ export function heroNumberOf(jersey: string | null | undefined): string | null {
 }
 
 /** Names wrap badly on a poster long before they are truncated in a list. */
+const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
+/**
+ * At most `max` LETTERS as a reader counts them, then "…". Counted in
+ * graphemes, not UTF-16 units: a Hindi letter with its vowel sign is two or
+ * three units, so a unit count cut "दिनेश" between न and its े and left a
+ * dangling sign on the poster.
+ */
 function clamp(value: string, max: number): string {
   const trimmed = value.trim();
-  return trimmed.length <= max ? trimmed : `${trimmed.slice(0, max - 1).trimEnd()}…`;
+  const letters = Array.from(GRAPHEMES.segment(trimmed), (part) => part.segment);
+  return letters.length <= max
+    ? trimmed
+    : `${letters
+        .slice(0, max - 1)
+        .join("")
+        .trimEnd()}…`;
 }
 
 /**
@@ -243,25 +338,9 @@ export function crestMark(shortName: string | null | undefined, name: string): s
 }
 
 export function monogramOf(name: string): string {
-  /*
-   * Each word is stripped to its letters and digits BEFORE its initial is
-   * taken, not merely tested for having one. "Demo Cup (settled)" produced
-   * "D(" on a real poster: the bracketed word passed a has-a-letter filter and
-   * then handed over its opening parenthesis as its first character. Any name
-   * with a bracket, a quote or a dash does the same, and a competition suffix
-   * in brackets is an ordinary way to name a season.
-   */
-  const parts = name
-    .trim()
-    .split(/\s+/)
-    .map((part) => part.replace(/[^a-z0-9]/gi, ""))
-    .filter((part) => part !== "");
-  if (parts.length === 0) {
-    return "?";
-  }
-  const first = parts[0]?.[0] ?? "";
-  const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "";
-  return (first + last).toUpperCase();
+  // A person, a team or a season: first and last word, as a letter of any
+  // script (`initialsOf`). Hindi names used to come out "?".
+  return initialsOf(name) || "?";
 }
 
 /**
@@ -331,7 +410,7 @@ export function shortNameOf(name: string): string {
     return clamp(parts[0] ?? name, 14);
   }
   const last = parts[parts.length - 1] ?? "";
-  return `${clamp(parts[0] ?? "", 12)} ${last.slice(0, 1).toUpperCase()}.`;
+  return `${clamp(parts[0] ?? "", 12)} ${initialsOf(last) || last.slice(0, 1)}.`;
 }
 
 /** The smallest handle: the first name alone, for a face the size of a coin. */
@@ -358,6 +437,8 @@ export interface TeamPosterMember {
    * forwarded). Null means the initials tile, never a broken image.
    */
   photoUrl: string | null;
+  /** The shirt number the player registered with, as typed. */
+  jerseyNumber?: string | null;
 }
 
 export interface TeamPosterInput {
@@ -391,7 +472,13 @@ export interface TeamPosterRow {
   /** Every mark, for a face tile: "C" and "ICON" can both apply. */
   badges: readonly string[];
   isCaptain: boolean;
+  /** Pre-signed as an icon or retained — a spotlight card, not a list row. */
+  isMarked: boolean;
+  /** Short role for a list row: BAT, BOWL, AR, WK — or the role's first word. */
+  roleTag: string;
   photoUrl: string | null;
+  /** A shirt number worth printing on a shirt (`heroNumberOf`), else null. */
+  shirtNumber: string | null;
 }
 
 export interface TeamPoster {
@@ -408,6 +495,8 @@ export interface TeamPoster {
   squadLabel: string;
   spentLabel: string;
   remainingLabel: string;
+  /** The costliest buy's price, for the stats strip; null before any sale. */
+  topBuyLabel: string | null;
 }
 
 const BADGE: Record<PosterMark, string> = {
@@ -445,8 +534,73 @@ function rowOf(member: TeamPosterMember, unit: MoneyUnit): TeamPosterRow {
     markerLabel: primary === null ? null : BADGE[primary],
     badges: marks.map((mark) => BADGE[mark]),
     isCaptain: marks.includes("captain"),
+    isMarked: marks.length > 0,
+    roleTag: roleTagOf(member.role),
     photoUrl: member.photoUrl,
+    shirtNumber: heroNumberOf(member.jerseyNumber),
   };
+}
+
+const ROLE_TAG: Record<string, string> = {
+  batter: "BAT",
+  bowler: "BOWL",
+  all_rounder: "AR",
+  wicket_keeper: "WK",
+};
+
+/** A role in four letters or fewer, for a list row with no room for "All-rounder". */
+export function roleTagOf(role: string | null): string {
+  if (role === null || role.trim() === "") {
+    return "";
+  }
+  return ROLE_TAG[role] ?? roleLabel(role).split(/[\s-]/)[0]?.slice(0, 4).toUpperCase() ?? "";
+}
+
+export interface SpotlightCard {
+  readonly row: TeamPosterRow;
+  /** CAPTAIN, ICON, RETAINED, TOP BUY — or none, for a card filled by price alone. */
+  readonly badge: string | null;
+}
+
+/**
+ * WHO GETS A BIG CARD on the squad sheet: the players a team is known by.
+ *
+ * The captain, then icons, then retained players — the ones named before the
+ * night — up to three. A squad with fewer than three of those fills the row
+ * from its purchases, priciest first (the order rows arrive in), and the first
+ * of those is the TOP BUY when the money is on the poster. Everyone else is a
+ * list row, in the order they came. Pure, so the choice is tested, not eyeballed.
+ */
+export function squadSpotlight(
+  rows: readonly TeamPosterRow[],
+  options: { readonly prices: boolean; readonly max?: number },
+): { spotlight: SpotlightCard[]; rest: TeamPosterRow[] } {
+  const max = options.max ?? 3;
+  const spotlight: SpotlightCard[] = [];
+  for (const row of rows) {
+    if (spotlight.length >= max) {
+      break;
+    }
+    if (row.isMarked) {
+      spotlight.push({
+        row,
+        badge: row.isCaptain ? "CAPTAIN" : row.badges.includes("ICON") ? "ICON" : "RETAINED",
+      });
+    }
+  }
+  let topBuyGiven = false;
+  for (const row of rows) {
+    if (spotlight.length >= max) {
+      break;
+    }
+    if (!row.isMarked) {
+      const top: boolean = options.prices && row.priceLabel !== null && !topBuyGiven;
+      topBuyGiven ||= top;
+      spotlight.push({ row, badge: top ? "TOP BUY" : null });
+    }
+  }
+  const chosen = new Set(spotlight.map((card) => card.row));
+  return { spotlight, rest: rows.filter((row) => !chosen.has(row)) };
 }
 
 /**
@@ -484,7 +638,15 @@ export function buildTeamPoster(input: TeamPosterInput): TeamPoster {
     squadLabel: `${String(input.members.length)} player${input.members.length === 1 ? "" : "s"}`,
     spentLabel: formatAmount(paise(input.spentPaise), input.unit),
     remainingLabel: formatAmount(paise(remaining), input.unit),
+    topBuyLabel: topBuyOf(input.members, input.unit),
   };
+}
+
+function topBuyOf(members: readonly TeamPosterMember[], unit: MoneyUnit): string | null {
+  const prices = members
+    .map((member) => member.pricePaise)
+    .filter((price): price is number => price !== null && price > 0);
+  return prices.length === 0 ? null : formatAmount(paise(Math.max(...prices)), unit);
 }
 
 // --- Top buys ---------------------------------------------------------------
@@ -583,12 +745,21 @@ export interface SeasonSquadInput {
   spentPaise: number;
 }
 
+/**
+ * `before` — no lot has come up yet: the sheet is the pre-auction snapshot of
+ * every team with the captains and icons already named, and it carries no
+ * money. `after` — the results sheet. Decided upstream from the auction row.
+ */
+export type SeasonStage = "before" | "after";
+
 export interface SeasonPosterInput {
   competitionName: string;
   competitionLogoUrl: string | null;
   squads: readonly SeasonSquadInput[];
   /** What the season's auction counts in: prices print as "₹…" or "… pts". */
   unit: MoneyUnit;
+  /** Absent means `after` — the sheet as it always was. */
+  stage?: SeasonStage;
 }
 
 export interface SeasonSquad {
@@ -604,6 +775,7 @@ export interface SeasonSquad {
 export interface SeasonPoster {
   competitionName: string;
   competitionLogoUrl: string | null;
+  stage: SeasonStage;
   chip: string;
   /** "48 players · 6 teams" — the line that holds with prices hidden. */
   countLine: string;
@@ -612,6 +784,27 @@ export interface SeasonPoster {
   squads: readonly SeasonSquad[];
   /** The largest squad — what the grid has to be sized for. */
   largestSquad: number;
+}
+
+/**
+ * "6 teams · 6 captains · 12 icons" — before the night, the players on the
+ * sheet are the named ones, so the line counts them by what they are named.
+ * A player who is captain AND icon counts once in each.
+ */
+function snapshotLine(squads: readonly SeasonSquadInput[], teamsLabel: string): string {
+  const members = squads.flatMap((squad) => squad.members);
+  const counted = (mark: PosterMark, one: string, many: string): string | null => {
+    const n = members.filter((member) => member.marks.includes(mark)).length;
+    return n === 0 ? null : `${String(n)} ${n === 1 ? one : many}`;
+  };
+  return [
+    teamsLabel,
+    counted("captain", "captain", "captains"),
+    counted("icon", "icon", "icons"),
+    counted("retained", "retained", "retained"),
+  ]
+    .filter((part): part is string => part !== null)
+    .join(" · ");
 }
 
 /**
@@ -649,13 +842,75 @@ export function buildSeasonPoster(input: SeasonPosterInput): SeasonPoster {
   const players = input.squads.reduce((total, squad) => total + squad.members.length, 0);
   const spent = input.squads.reduce((total, squad) => total + squad.spentPaise, 0);
   const teamsLabel = `${String(squads.length)} team${squads.length === 1 ? "" : "s"}`;
+  const stage = input.stage ?? "after";
   return {
     competitionName: clamp(input.competitionName, 34),
     competitionLogoUrl: input.competitionLogoUrl,
+    stage,
     chip: teamsLabel,
-    countLine: `${String(players)} player${players === 1 ? "" : "s"} · ${teamsLabel}`,
+    countLine:
+      stage === "before"
+        ? snapshotLine(input.squads, teamsLabel)
+        : `${String(players)} player${players === 1 ? "" : "s"} · ${teamsLabel}`,
     spentLabel: formatAmount(paise(spent), input.unit),
     squads,
     largestSquad: squads.reduce((max, squad) => Math.max(max, squad.rows.length), 0),
   };
+}
+
+// --- Every team its own colour ------------------------------------------------
+
+/**
+ * Saturated, mutually distinct colours for teams whose organizer set none
+ * (founder, 2026-10-08: "each team a different colour"). Picked by name they
+ * collided — three crimson squads in a ten-team season — so they are dealt per
+ * SEASON instead (`seasonTeamColours`).
+ */
+export const TEAM_PALETTE = [
+  "#14B8A6", // teal
+  "#2563EB", // blue
+  "#EA580C", // orange
+  "#DC2626", // red
+  "#7C3AED", // violet
+  "#16A34A", // green
+  "#DB2777", // magenta
+  "#0891B2", // cyan
+  "#CA8A04", // mustard
+  "#4F46E5", // indigo
+  "#BE123C", // rose
+  "#65A30D", // lime
+] as const;
+
+/**
+ * Each team's colour for the season's posters: the organizer's own where set,
+ * otherwise the next palette colour no other team in the season wears, dealt
+ * in the teams' creation order (ids are ULIDs) so a team's colour never moves
+ * when another team is added later. Past twelve, the palette repeats.
+ */
+export function seasonTeamColours(
+  teams: readonly { id: string; color: string | null }[],
+): Map<string, string> {
+  const ordered = [...teams].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const used = new Set<string>();
+  for (const team of ordered) {
+    const own = normalizeHexColor(team.color);
+    if (own !== null) {
+      used.add(own);
+    }
+  }
+  const out = new Map<string, string>();
+  let next = 0;
+  for (const team of ordered) {
+    const own = normalizeHexColor(team.color);
+    if (own !== null) {
+      out.set(team.id, own);
+      continue;
+    }
+    const free = TEAM_PALETTE.find((colour) => !used.has(colour));
+    const colour = free ?? TEAM_PALETTE[next % TEAM_PALETTE.length] ?? TEAM_PALETTE[0];
+    next += 1;
+    used.add(colour);
+    out.set(team.id, colour);
+  }
+  return out;
 }

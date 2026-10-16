@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { PlayerPortrait } from "./player-portrait";
 
 describe("PlayerPortrait", () => {
-  it("draws the gold identity card when there is no photo — never a silhouette", () => {
+  it("draws the gold identity card when there is no photo — initials by default", () => {
     render(<PlayerPortrait name="Deepak Kadam" seed="reg-1" />);
     const frame = screen.getByTestId("player-portrait");
     expect(frame).toHaveAttribute("data-state", "identity");
@@ -39,5 +39,12 @@ describe("PlayerPortrait", () => {
   it("hides from assistive tech when decorative", () => {
     render(<PlayerPortrait name="Siddharth Iyer" seed="reg-4" decorative />);
     expect(screen.queryByRole("img")).toBeNull();
+  });
+
+  it("draws the season's cricketer in foil when the season chose it", () => {
+    render(<PlayerPortrait name="Rohit Sharma" seed="p9" noPhoto="silhouette" />);
+    const frame = screen.getByTestId("player-portrait");
+    expect(frame.querySelector("[data-placeholder='silhouette']")).not.toBeNull();
+    expect(screen.queryByTestId("portrait-initials")).toBeNull();
   });
 });

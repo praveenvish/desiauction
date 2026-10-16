@@ -1,4 +1,3 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
 import { E2E_MARK, clearTestDemoData, publishTestAvailability } from "./demo-availability";
@@ -222,7 +221,7 @@ test.describe("with times published", () => {
     await expect(page.getByText("Pick a time that suits you.")).toBeVisible();
   });
 
-  test("request → pick a time → confirmed → move it → cancel it", async ({ page }) => {
+  test("request → pick a time → confirmed → move it → cancel it", async ({ page }, testInfo) => {
     test.setTimeout(120_000);
 
     await page.goto("/schedule-demo");
@@ -250,7 +249,49 @@ test.describe("with times published", () => {
     const book = page.getByRole("button", { name: "Book this time" });
     await expect(book).toBeDisabled();
 
+    const originalViewport = page.viewportSize();
+    await page.setViewportSize({ width: 320, height: 900 });
+    for (const theme of ["daylight", "floodlight"] as const) {
+      await page.evaluate((value) => {
+        document.documentElement.setAttribute("data-theme", value);
+      }, theme);
+      await page.waitForFunction(() =>
+        document
+          .getAnimations()
+          .every(
+            (animation) =>
+              animation.effect?.getComputedTiming().iterations === Infinity ||
+              animation.playState !== "running",
+          ),
+      );
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+      );
+      const targets = await page.locator("label.demo-slot").evaluateAll((labels) =>
+        labels.map((label) => {
+          const rect = label.getBoundingClientRect();
+          return {
+            width: rect.width,
+            height: rect.height,
+            textFits: label.scrollWidth <= label.clientWidth,
+          };
+        }),
+      );
+      expect(targets.length).toBeGreaterThan(0);
+      for (const target of targets) {
+        expect(target.width).toBeGreaterThanOrEqual(44);
+        expect(target.height).toBeGreaterThanOrEqual(44);
+        expect(target.textFits).toBe(true);
+      }
+      await page.screenshot({ path: testInfo.outputPath(`picker-${theme}-320.png`) });
+    }
     const firstSlot = page.locator("label.demo-slot").first();
+    await firstSlot.scrollIntoViewIfNeeded();
+    await page.getByRole("radio").first().focus();
+    await page.keyboard.press("Space");
+    await expect(page.getByRole("radio").first()).toBeChecked();
+    await page.screenshot({ path: testInfo.outputPath("picker-keyboard-selection-320.png") });
+    if (originalViewport !== null) await page.setViewportSize(originalViewport);
     const chosenLabel = (await firstSlot.textContent())?.trim() ?? "";
     await firstSlot.click();
     await expect(book).toBeEnabled();

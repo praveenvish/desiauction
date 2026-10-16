@@ -2,16 +2,17 @@
  * The premium branded placeholder generator (C-25, IP-1_DESIGN §10).
  *
  * Pure and deterministic: the same seed always yields the same mark, across
- * sessions and machines. No human-figure silhouette is representable in this
- * API — a player without a photo gets a branded floodlit mark, never a grey
- * person-shape. Rendering consumes theme-stable `--identity-*` tokens so a
+ * sessions and machines. No generic human-figure silhouette is representable
+ * in this API — a player without a photo gets a branded floodlit mark, never a
+ * grey person-shape. (A season may choose the branded cricketer instead — see
+ * `silhouette.ts`, C-25 as amended 2026-10-05.) Rendering consumes theme-stable `--identity-*` tokens so a
  * player's identity does not change when the theme flips.
  */
 
 export type PlaceholderPattern = "beams" | "arcs" | "crease" | "contour";
 
 export interface PlaceholderIdentity {
-  /** Script-aware initials, at most 2 glyph clusters; null when unknowable. */
+  /** Script-aware initials, at most 2 letters; null when unknowable. */
   initials: string | null;
   /** Devanagari names render in the Devanagari-capable display stack. */
   script: "latin" | "devanagari";
@@ -36,24 +37,31 @@ function fnv1a(input: string): number {
 
 const DEVANAGARI = /[ऀ-ॿ]/;
 
-function firstGrapheme(word: string): string {
-  const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
-  const first = segmenter.segment(word)[Symbol.iterator]().next();
-  return first.done ? "" : first.value.segment;
+/**
+ * A word's first LETTER: a Devanagari word gives its base letter without vowel
+ * signs ("रोहित" → "र"). Mirrors `initialsOf` in @desiauction/core (this package
+ * does not depend on core): one rule for the badge here, the poster circle and
+ * the email, so a player's initials are the same everywhere.
+ */
+function firstLetter(word: string): string {
+  return /[\p{L}\p{N}]/u.exec(word)?.[0] ?? "";
 }
 
-/** Script-aware initials: first graphemes of the first and last words. */
+/** Script-aware initials: the first letters of the first and last words. */
 export function initialsFor(name: string): {
   initials: string | null;
   script: "latin" | "devanagari";
 } {
-  const words = name.trim().split(/\s+/).filter(Boolean);
+  const words = name
+    .trim()
+    .split(/\s+/)
+    .filter((word) => firstLetter(word) !== "");
   if (words.length === 0) {
     return { initials: null, script: "latin" };
   }
   const script = DEVANAGARI.test(name) ? "devanagari" : "latin";
-  const first = firstGrapheme(words[0] ?? "");
-  const last = words.length > 1 ? firstGrapheme(words[words.length - 1] ?? "") : "";
+  const first = firstLetter(words[0] ?? "");
+  const last = words.length > 1 ? firstLetter(words[words.length - 1] ?? "") : "";
   const raw = `${first}${last}`;
   if (raw === "") {
     return { initials: null, script };

@@ -12,6 +12,8 @@ import {
 } from "@desiauction/db";
 import { and, asc, eq, isNotNull, isNull, ne, sql } from "drizzle-orm";
 
+import { isRealAuction } from "@desiauction/auction";
+
 /**
  * THE AUCTIONEER — a per-season conduct grant (launch polish, Phase 3).
  *
@@ -122,6 +124,7 @@ async function teamOwnersOf(db: Db, competitionId: string): Promise<Set<string>>
       .where(
         and(
           eq(auctions.competitionId, competitionId),
+          isRealAuction(),
           ne(auctions.status, "abandoned"),
           isNotNull(auctionOwnerInvites.acceptedBy),
           isNull(auctionOwnerInvites.revokedAt),
@@ -134,6 +137,7 @@ async function teamOwnersOf(db: Db, competitionId: string): Promise<Set<string>>
       .where(
         and(
           eq(auctions.competitionId, competitionId),
+          isRealAuction(),
           ne(auctions.status, "abandoned"),
           isNull(paddleGrants.revokedAt),
         ),
@@ -145,6 +149,7 @@ async function teamOwnersOf(db: Db, competitionId: string): Promise<Set<string>>
       .where(
         and(
           eq(auctions.competitionId, competitionId),
+          isRealAuction(),
           ne(auctions.status, "abandoned"),
           isNull(paddles.releasedAt),
         ),

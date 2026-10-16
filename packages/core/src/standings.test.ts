@@ -1,3 +1,8 @@
+import { FORMAT_PRESETS } from "./scoring/formats";
+import { NEW_SEASON_SCORING_RULES } from "./scoring/season-rules";
+import { scoreForResult } from "./scoring/delivery/nrr";
+import { replayMatch } from "./scoring/delivery/replay";
+import type { EventType, MatchEvent, PayloadOf } from "./scoring/types";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -711,5 +716,172 @@ describe("the table, in a lobby", () => {
       RULES,
     );
     expect(rowFor(rows, A)).toMatchObject({ played: 0, points: 0 });
+  });
+});
+
+describe("season NRR scoring rules", () => {
+  const result: FixtureResultInput = {
+    homeTeamId: A,
+    awayTeamId: B,
+    outcome: "home_win",
+    homeScore: { runs: 100, balls: 60 },
+    awayScore: { runs: 90, balls: 60 },
+  };
+  it("backfills legacy fixtures independently on both sides in either order", () => {
+    const newer: FixtureResultInput = {
+      ...result,
+      homeScore: { runs: 50, balls: 30, nrr_balls: 60 },
+      awayScore: { runs: 40, balls: 20, nrr_balls: 30 },
+    };
+    for (const fixtures of [
+      [result, newer],
+      [newer, result],
+    ]) {
+      const row = rowFor(buildStandings(TEAMS, fixtures, CRICKET_RULES), A);
+      expect(row.scored).toMatchObject({ runs: 150, balls: 90, nrr_balls: 120 });
+      expect(row.conceded).toMatchObject({ runs: 130, balls: 80, nrr_balls: 90 });
+      expect(row.tiebreakers.net_run_rate).toBeCloseTo((150 / 120) * 6 - (130 / 90) * 6);
+      expect(CRICKET.standings.summariseSide(row.scored)).toBe("150/15.0");
+    }
+  });
+  it("honors a supplied revised denominator with the all-out flag false and preserves explicit zero", () => {
+    const fixtures = [{ ...result, homeScore: { runs: 100, balls: 60, nrr_balls: 90 } }];
+    const row = rowFor(
+      buildStandings(TEAMS, fixtures, { ...CRICKET_RULES, allOutUsesQuota: false }),
+      A,
+    );
+    expect(row.tiebreakers.net_run_rate).toBeCloseTo((100 / 90) * 6 - 9);
+    const zero = rowFor(
+      buildStandings(
+        TEAMS,
+        [{ ...result, homeScore: { runs: 100, balls: 60, nrr_balls: 0 } }],
+        CRICKET_RULES,
+      ),
+      A,
+    );
+    expect(zero.tiebreakers.net_run_rate).toBeNull();
+  });
+  it("excludes no-result scores only with its flag while retaining points and counts", () => {
+    const noResult: FixtureResultInput = { ...result, outcome: "no_result" };
+    const legacy = rowFor(buildStandings(TEAMS, [result, noResult], CRICKET_RULES), A);
+    const modern = rowFor(
+      buildStandings(TEAMS, [result, noResult], { ...CRICKET_RULES, excludeNoResultFromNrr: true }),
+      A,
+    );
+    expect(legacy.scored.runs).toBe(200);
+    expect(modern.scored.runs).toBe(100);
+    expect(modern).toMatchObject({ played: 2, noResult: 1, points: 3 });
+    expect(legacy).toMatchObject({ played: 2, noResult: 1, points: 3 });
+  });
+  it("retains the legacy aggregate shape without any recorded NRR denominator", () => {
+    expect(rowFor(buildStandings(TEAMS, [result], CRICKET_RULES), A).scored).toEqual({
+      runs: 100,
+      wickets: 0,
+      balls: 60,
+    });
+  });
+});
+
+it("uses all-out quota only when result production enables it, then aggregates that recorded denominator", () => {
+  function event<T extends EventType>(type: T, payload: PayloadOf<T>, seq: number): MatchEvent<T> {
+    return {
+      type,
+      payload,
+      seq,
+      eventId: `nrr-${String(seq)}`,
+      attempt: 1,
+      v: 1,
+      targetEventId: null,
+      actorPersonId: "scorer",
+      clientSeq: seq,
+      clientRecordedAt: "2026-10-09T00:00:00Z",
+    };
+  }
+  const state = replayMatch([
+    event(
+      "match_started",
+      {
+        format: {
+          ...FORMAT_PRESETS.t20,
+          playersPerSide: 2,
+          wicketsPerInnings: 1,
+          oversPerInnings: 1,
+          powerplayOvers: 1,
+          deathFromOver: 1,
+          maxOversPerBowler: 1,
+        },
+        conditions: {},
+        homeTeamId: A,
+        awayTeamId: B,
+      },
+      1,
+    ),
+    event(
+      "lineup_confirmed",
+      { teamId: A, battingOrder: ["a1", "a2"], captainId: "a1", keeperId: "a2", substitutes: [] },
+      2,
+    ),
+    event(
+      "lineup_confirmed",
+      { teamId: B, battingOrder: ["b1", "b2"], captainId: "b1", keeperId: "b2", substitutes: [] },
+      3,
+    ),
+    event("toss", { winnerTeamId: A, decision: "bat" }, 4),
+    event(
+      "innings_started",
+      { inningsNo: 1, battingTeamId: A, strikerId: "a1", nonStrikerId: "a2", bowlerId: "b1" },
+      5,
+    ),
+    event(
+      "ball",
+      {
+        strikerId: "a1",
+        nonStrikerId: "a2",
+        bowlerId: "b1",
+        runsBat: 2,
+        extras: {},
+        wicket: { kind: "run_out", playerOutId: "a1", fielderIds: ["b1"] },
+      },
+      6,
+    ),
+  ]);
+  for (const enabled of [false, true]) {
+    const scoringRules = { ...NEW_SEASON_SCORING_RULES, allOutUsesQuota: enabled };
+    const score = scoreForResult(state, scoringRules).home;
+    expect(score).toMatchObject({ runs: 2, balls: 1, nrr_balls: enabled ? 6 : 1 });
+    const result: FixtureResultInput = {
+      homeTeamId: A,
+      awayTeamId: B,
+      outcome: "away_win",
+      homeScore: { ...score },
+      awayScore: { runs: 4, balls: 1, nrr_balls: 1 },
+    };
+    expect(
+      rowFor(buildStandings(TEAMS, [result], { ...CRICKET_RULES, allOutUsesQuota: enabled }), A)
+        .tiebreakers.net_run_rate,
+    ).toBe(enabled ? -22 : -12);
+  }
+});
+
+describe("N-2 revised-target credit in the table", () => {
+  it("uses the credited runs and balls of a revised match, and plain runs elsewhere", () => {
+    const revised: FixtureResultInput = {
+      homeTeamId: A,
+      awayTeamId: B,
+      outcome: "away_win",
+      homeScore: { runs: 6, wickets: 0, balls: 6, nrr_runs: 4, nrr_balls: 3 },
+      awayScore: { runs: 6, wickets: 0, balls: 1, nrr_runs: 6, nrr_balls: 1 },
+    };
+    const legacy: FixtureResultInput = {
+      homeTeamId: A,
+      awayTeamId: B,
+      outcome: "home_win",
+      homeScore: { runs: 100, balls: 60 },
+      awayScore: { runs: 90, balls: 60 },
+    };
+    const row = rowFor(buildStandings(TEAMS, [revised, legacy], CRICKET_RULES), A);
+    expect(row.scored).toMatchObject({ runs: 106, nrr_runs: 104, nrr_balls: 63 });
+    expect(row.conceded).toMatchObject({ runs: 96, nrr_runs: 96, nrr_balls: 61 });
+    expect(row.tiebreakers.net_run_rate).toBeCloseTo((104 / 63) * 6 - (96 / 61) * 6);
   });
 });

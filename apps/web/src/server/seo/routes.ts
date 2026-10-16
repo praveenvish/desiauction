@@ -54,6 +54,7 @@ export const INDEXABLE_PAGES: readonly IndexablePage[] = [
   { path: "/security", updatedOn: "2026-09-26", changeFrequency: "monthly" },
   { path: "/rules-guidelines", updatedOn: "2026-09-26", changeFrequency: "monthly" },
   { path: "/schedule-demo", updatedOn: "2026-09-26", changeFrequency: "monthly" },
+  { path: "/founding-25", updatedOn: "2026-10-02", changeFrequency: "monthly" },
   { path: "/support", updatedOn: "2026-09-26", changeFrequency: "monthly" },
   { path: "/releases", updatedOn: "2026-09-26", changeFrequency: "monthly" },
   { path: "/c", updatedOn: "2026-09-26", changeFrequency: "daily" },
@@ -73,7 +74,7 @@ export const INDEXABLE_PAGES: readonly IndexablePage[] = [
  * listed. They are exempt from the header so their own metadata is what a
  * crawler reads.
  */
-const PUBLIC_UNLISTED = ["/login", "/contact", "/careers", "/case-studies", "/api-docs"] as const;
+const PUBLIC_UNLISTED = ["/login", "/contact", "/careers", "/api-docs"] as const;
 
 /**
  * Whole public subtrees. `/c/…` holds seasons, squads and player cards; the
@@ -84,12 +85,15 @@ const PUBLIC_SUBTREES = [
   "/help",
   "/legal",
   "/schedule-demo",
+  "/founding-25",
   "/newsletter",
   "/sports",
   "/for",
   "/compare",
   "/tools",
   "/guides",
+  // The hub sets its own noindex while content/case-studies.ts is empty.
+  "/case-studies",
 ] as const;
 
 /** Next's file-based metadata routes. These are fetched by crawlers and share scrapers. */
@@ -135,7 +139,11 @@ export const NOINDEX_HEADER = "noindex, nofollow";
  * the classification test to pass, so the two cannot drift.
  */
 export const CONSOLE_SEGMENTS = [
+  // Public bearer link, excluded from search; authentication is not required.
+  "m",
+  "match",
   "home",
+  "score",
   "account",
   "inbox",
   "money",
@@ -161,6 +169,10 @@ export const CONSOLE_SEGMENTS = [
   // but a duplicate of /c/[slug], so never indexed.
   "embed",
 ] as const;
+/** A bare /m prefix would also disallow the public /manifest.webmanifest. */
+export function robotsDisallows(): string[] {
+  return CONSOLE_SEGMENTS.map((segment) => (segment === "m" ? "/m/" : `/${segment}`));
+}
 
 /**
  * Paths robots.txt allows inside a disallowed segment. The more specific rule
@@ -176,7 +188,13 @@ export const ROBOTS_ALLOW_INSIDE_CONSOLE = [
  * Top-level `app/` segments that are neither pages nor consoles: route
  * handlers and health probes. They serve no HTML, so there is nothing to index.
  */
-export const INFRA_SEGMENTS = ["api", "healthz", "readyz", "indexnow-key.txt"] as const;
+export const INFRA_SEGMENTS = [
+  ".well-known",
+  "api",
+  "healthz",
+  "readyz",
+  "indexnow-key.txt",
+] as const;
 
 /** The first path segment of every public page, used by the classification test. */
 export function publicTopSegments(): ReadonlySet<string> {

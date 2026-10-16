@@ -12,6 +12,7 @@ import {
   teams,
   tournaments,
 } from "@desiauction/db";
+import { isRealAuction } from "@desiauction/auction";
 import { sportPackFor, type MoneyUnit } from "@desiauction/core";
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -128,6 +129,7 @@ export async function playerCareer(personId: string, sport?: string): Promise<Pl
       and(
         eq(auctions.competitionId, registrations.competitionId),
         ne(auctions.status, "abandoned"),
+        isRealAuction(),
       ),
     )
     .leftJoin(lots, and(eq(lots.registrationId, registrations.id), eq(lots.auctionId, auctions.id)))
@@ -639,4 +641,27 @@ export async function teamSeason(teamId: string, today: string): Promise<TeamSea
     }
   }
   return { upcoming, awaiting, results, record, place };
+}
+
+/** Session-derived identity at the /me call site; explicit self audience. */
+export async function ownCricketCareer(personId: string) {
+  const { cricketCareerFor } = await import("./career-stats");
+  return cricketCareerFor(systemDb, { kind: "self", personId });
+}
+
+/** The profile route supplies the authenticated session identity. */
+export async function ownCricketInsights(
+  personId: string,
+  filter: import("../insights/sample").InsightFilter = {},
+) {
+  const [{ batterInsights }, { bowlerInsights }] = await Promise.all([
+    import("../insights/batter"),
+    import("../insights/bowler"),
+  ]);
+  const scope = { kind: "self" as const, personId };
+  const [batter, bowler] = await Promise.all([
+    batterInsights(systemDb, scope, filter),
+    bowlerInsights(systemDb, scope, filter),
+  ]);
+  return { batter, bowler };
 }

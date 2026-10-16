@@ -1,3 +1,4 @@
+import { isRealAuction } from "@desiauction/auction";
 import {
   auctions,
   competitions,
@@ -177,7 +178,7 @@ export async function seasonOverview(
     db
       .select({ id: auctions.id, status: auctions.status, config: auctions.config })
       .from(auctions)
-      .where(eq(auctions.competitionId, competition.id))
+      .where(and(eq(auctions.competitionId, competition.id), isRealAuction()))
       .limit(1),
     db
       .select({

@@ -1,3 +1,4 @@
+import { isRealAuction } from "@desiauction/auction";
 import {
   auctions,
   auditLog,
@@ -126,6 +127,7 @@ async function blockedBy(db: Db, competitionId: string): Promise<string | null> 
       and(
         eq(auctions.competitionId, competitionId),
         inArray(auctions.status, ["scheduled", "live", "paused"]),
+        isRealAuction(),
       ),
     )
     .limit(1);

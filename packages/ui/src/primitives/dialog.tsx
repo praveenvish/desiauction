@@ -7,8 +7,11 @@ import styles from "./dialog.module.css";
 
 export interface DialogProps {
   open: boolean;
+  "data-testid"?: string;
   /** Fired on Escape, backdrop click, or programmatic close. */
   onClose: () => void;
+  /** An irreversible operation is running; keep its outcome and recovery visible. */
+  closeDisabled?: boolean;
   title: string;
   children: ReactNode;
   /** Action row — usually Buttons; the last one should be the primary. */
@@ -43,7 +46,16 @@ function firstField(node: HTMLDialogElement): HTMLElement | null {
  * Built on native <dialog>: browser-managed focus trap, Escape, ::backdrop,
  * top-layer stacking — the simplest correct modal (IP-1_DESIGN §13 spirit).
  */
-export function Dialog({ open, onClose, title, children, footer, size = "default" }: DialogProps) {
+export function Dialog({
+  open,
+  onClose,
+  closeDisabled = false,
+  title,
+  children,
+  footer,
+  size = "default",
+  "data-testid": testId,
+}: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
@@ -72,11 +84,17 @@ export function Dialog({ open, onClose, title, children, footer, size = "default
     // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
     <dialog
       ref={ref}
+      data-testid={testId}
       className={[styles["dialog"], size === "wide" ? styles["wide"] : ""]
         .filter(Boolean)
         .join(" ")}
       aria-labelledby={titleId}
-      onClose={onClose}
+      onCancel={(event) => {
+        if (closeDisabled) event.preventDefault();
+      }}
+      onClose={() => {
+        if (!closeDisabled) onClose();
+      }}
       onClick={(event) => {
         // A click on the backdrop targets the dialog element itself — but so
         // does a click on the dialog's own padding or the gap beside a footer
@@ -93,7 +111,7 @@ export function Dialog({ open, onClose, title, children, footer, size = "default
           event.clientX <= rect.right &&
           event.clientY >= rect.top &&
           event.clientY <= rect.bottom;
-        if (!inside) {
+        if (!inside && !closeDisabled) {
           onClose();
         }
       }}
@@ -119,6 +137,7 @@ export function Dialog({ open, onClose, title, children, footer, size = "default
           type="button"
           className={styles["close"]}
           onClick={onClose}
+          disabled={closeDisabled}
           aria-label={`Close ${title}`}
         >
           <IconClose />

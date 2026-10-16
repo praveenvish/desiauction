@@ -178,8 +178,12 @@ test.describe("SEO guardrail", () => {
     expect(base).not.toContain("build.invalid");
     const robots = await (await request.get("/robots.txt")).text();
     for (const segment of CONSOLE_SEGMENTS) {
-      expect(robots, `robots.txt disallows /${segment}`).toContain(`Disallow: /${segment}\n`);
+      const prefix = segment === "m" ? "/m/" : `/${segment}`;
+      expect(robots, `robots.txt disallows ${prefix}`).toContain(`Disallow: ${prefix}\n`);
     }
+    const disallows = [...robots.matchAll(/^Disallow: (.+)$/gm)].map((match) => match[1] ?? "");
+    expect(disallows.some((prefix) => "/m/example-token".startsWith(prefix))).toBe(true);
+    expect(disallows.some((prefix) => "/manifest.webmanifest".startsWith(prefix))).toBe(false);
   });
 
   test("the sitemap lists every page the registry calls indexable", async ({ request }) => {

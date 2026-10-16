@@ -1,5 +1,19 @@
-import { monogramOf, type PosterKind, type PosterSize, type PosterTheme } from "@desiauction/core";
-import type { ReactNode } from "react";
+import {
+  hasDevanagari,
+  monogramOf,
+  type PosterKind,
+  type PosterSize,
+  type PosterTheme,
+} from "@desiauction/core";
+import {
+  SHIELD_RATIO,
+  shieldDataUri,
+  shieldTones,
+  silhouetteDataUri,
+  type NoPhotoStyle,
+  type TeamBadge,
+} from "@desiauction/ui";
+import type { CSSProperties, ReactNode } from "react";
 
 import { mix, withAlpha } from "./poster-color";
 import { FIGURES } from "./poster-fonts";
@@ -60,6 +74,7 @@ export const MOTION_BANDS: Record<PosterKind, readonly MotionLayer[]> = {
   reveal: ["base", "hero", "items"],
   top: ["base", "hero", "items"],
   season: ["base", "hero", "items"],
+  result: ["base", "hero", "items", "stamp"],
 };
 
 export interface PosterRenderOptions {
@@ -89,6 +104,16 @@ export interface PosterRenderOptions {
    * that opens a 404 is worse than no code.
    */
   readonly shareUrl?: string | null;
+  /**
+   * How a player with no photo is drawn (0107): the season's initials or its
+   * cricketer. Omitted means initials, the default every season starts with.
+   */
+  readonly noPhoto?: NoPhotoStyle;
+  /**
+   * How a team with no logo is drawn (0111): the shield or initials. Omitted
+   * means the shield, the default every season starts with.
+   */
+  readonly teamBadge?: TeamBadge;
 }
 
 export interface PosterContext {
@@ -103,6 +128,68 @@ export function contextFor(options: PosterRenderOptions, teamColor: string | nul
     metrics: metricsFor(options.size),
     options,
   };
+}
+
+/** Does this poster draw a logo-less team as the shield (0111)? The default. */
+export function drawsShield(options: PosterRenderOptions): boolean {
+  return options.teamBadge !== "initials";
+}
+
+/**
+ * THE DEFAULT TEAM LOGO on a poster: the shield in the team's colour, its
+ * initials laid over it in the poster's own face (HarfBuzz shapes them; the
+ * SVG carries no text). `size` is the HEIGHT, the square slot it replaces.
+ */
+export function PosterShield({
+  size,
+  color,
+  initials,
+  fontFamily,
+  style,
+}: {
+  size: number;
+  color: string | null;
+  initials: string;
+  fontFamily?: string;
+  style?: CSSProperties;
+}) {
+  const width = Math.round(size / SHIELD_RATIO);
+  const letters = initials.trim();
+  return (
+    <div
+      style={{
+        position: "relative",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width,
+        height: size,
+        flexShrink: 0,
+        ...style,
+      }}
+    >
+      <img
+        src={shieldDataUri(color)}
+        width={width}
+        height={size}
+        style={{ position: "absolute", left: 0, top: 0 }}
+        alt=""
+      />
+      <div
+        style={{
+          display: "flex",
+          marginTop: -Math.round(size * 0.06),
+          fontFamily: fontFamily ?? "Geist Sans, Anek Devanagari, sans-serif",
+          fontSize: Math.round(size * (letters.length >= 3 ? 0.26 : 0.33)),
+          fontWeight: 800,
+          lineHeight: 1,
+          color: shieldTones(color).ink,
+        }}
+      >
+        {letters}
+      </div>
+    </div>
+  );
 }
 
 /** Is this band drawn at all in the render in progress? */
@@ -151,6 +238,40 @@ export interface TileProps {
    * own sponsor lockup on the first real render.
    */
   fit?: "cover" | "contain";
+  /** A TEAM's crest: with no logo it wears the season's shield (0111). */
+  team?: boolean;
+  /**
+   * A PLAYER's face, as opposed to a crest or a logo: when it has no photo and
+   * the season chose the cricketer (0107), the cricketer is drawn instead of
+   * the initials. A missing crest is still a monogram.
+   */
+  face?: boolean;
+}
+
+/**
+ * The cricketer for a face tile with no photo, over the tile's own fill (the
+ * team gradient), with the grille cut in the panel colour.
+ */
+export function silhouetteFor(ctx: PosterContext, figure: string): string {
+  return silhouetteDataUri({ field: null, figure, cutout: ctx.skin.palette.panel });
+}
+
+/**
+ * What a hero draws for a player with no photo when the season chose the
+ * cricketer (0107): the figure, as if it were the photograph, so it gets the
+ * same lit arch, rim and number behind it. Null for an initials season — the
+ * hero then draws the giant number or initials, as before.
+ */
+export function noPhotoFigure(ctx: PosterContext): string | null {
+  if (ctx.options.noPhoto !== "silhouette") {
+    return null;
+  }
+  const { palette } = ctx.skin;
+  return silhouetteDataUri({
+    field: null,
+    figure: mix(palette.heading, palette.surface, 0.25),
+    cutout: palette.surface,
+  });
 }
 
 /**
@@ -175,7 +296,19 @@ export function Tile({
   ringWidth,
   round = false,
   fit = "cover",
+  face = false,
+  team = false,
 }: TileProps) {
+  if (team && src === null && drawsShield(ctx.options)) {
+    return (
+      <PosterShield
+        size={height}
+        color={ring ?? null}
+        initials={monogram}
+        style={vis(ctx, layer)}
+      />
+    );
+  }
   const { skin } = ctx;
   const { palette } = skin;
   const border = ring ?? palette.border;
@@ -207,7 +340,24 @@ export function Tile({
         ...vis(ctx, layer),
       }}
     >
-      {src === null || !shown(ctx, layer) ? (
+      {!shown(ctx, layer) ? (
+        monogram
+      ) : src === null && face && ctx.options.noPhoto === "silhouette" ? (
+        // Square, never stretched to the tile's shape, standing on its bottom
+        // edge — shoulders cut by the frame, like a cropped photo.
+        <img
+          style={{ alignSelf: "flex-end" }}
+          // The figure in the team's own light rather than flat white: it reads as
+          // that team's player, and a real photo beside it still stands out.
+          src={silhouetteFor(
+            ctx,
+            ring === null ? palette.accent : mix(ring, skin.palette.heading, 0.6),
+          )}
+          width={Math.min(width, height)}
+          height={Math.min(width, height)}
+          alt=""
+        />
+      ) : src === null ? (
         monogram
       ) : (
         <img
@@ -719,7 +869,10 @@ export function TitleBlock({
           color: palette.heading,
           fontSize: size,
           fontWeight: 700,
-          lineHeight: 1.02,
+          // A Devanagari title carries marks above its headline (ओ's sign, a
+          // reph) that Latin capitals never have; at 1.02 they rose into the
+          // kicker over it.
+          lineHeight: hasDevanagari(title) ? 1.3 : 1.02,
           ...vis(ctx, layer),
         }}
       >

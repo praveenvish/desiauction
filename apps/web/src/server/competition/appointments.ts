@@ -103,7 +103,8 @@ export async function appointmentsOf(db: Db, competitionId: string): Promise<App
       bought: sql<boolean>`exists (
         select 1 from ${lots} join ${auctions} on ${auctions.id} = ${lots.auctionId}
         where ${lots.registrationId} = ${registrations.id}
-          and ${lots.status} = 'sold' and ${auctions.status} <> 'abandoned')`,
+          and ${lots.status} = 'sold' and ${auctions.status} <> 'abandoned'
+          and ${auctions.kind} = 'real')`,
     })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))

@@ -274,7 +274,7 @@ function documentBlock(document: string): string {
 
 /** Big, alone, and copied as the digits only — the spacing is letter-spacing, not spaces. */
 function codeBlock(code: string): string {
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:6px 0 24px;"><tr><td align="center" class="da-sunken" style="background:${SUNKEN};border:1px solid ${RULE};border-radius:14px;padding:22px 12px;"><div class="da-heading" style="font:700 40px/48px ${MONO};letter-spacing:12px;padding-left:12px;color:${INK};">${escape(code)}</div></td></tr></table>`;
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:6px 0 24px;"><tr><td align="center" class="da-sunken" style="background:${SUNKEN};border:1px solid ${RULE};border-radius:14px;padding:22px 12px;"><div class="da-heading da-code-value" style="font:700 40px/48px ${MONO};letter-spacing:12px;padding-left:12px;color:${INK};">${escape(code)}</div></td></tr></table>`;
 }
 
 function button(action: { label: string; url: string }, font: string): string {
@@ -391,7 +391,7 @@ function detailsTable(details: readonly (readonly [string, string])[], font: str
   const rows = details
     .map(([label, value], i) => {
       const rule = i === 0 ? "" : `border-top:1px solid ${RULE};`;
-      return `<tr><td class="da-muted da-rule" style="padding:11px 16px 11px 0;${rule}font:14px/20px ${font};color:${MUTED};vertical-align:top;">${escape(label)}</td><td class="da-heading da-rule" align="right" style="padding:11px 0;${rule}font:600 14px/20px ${font};color:${INK};text-align:right;vertical-align:top;font-variant-numeric:tabular-nums;${value.length <= SHORT_VALUE ? "white-space:nowrap;" : ""}">${escape(value)}</td></tr>`;
+      return `<tr><td class="da-muted da-rule" style="padding:11px 16px 11px 0;${rule}font:14px/20px ${font};color:${MUTED};vertical-align:top;">${escape(label)}</td><td class="da-heading da-rule da-detail-value" align="right" style="padding:11px 0;${rule}font:600 14px/20px ${font};color:${INK};text-align:right;vertical-align:top;font-variant-numeric:tabular-nums;${value.length <= SHORT_VALUE ? "white-space:nowrap;" : ""}">${escape(value)}</td></tr>`;
     })
     .join("");
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" class="da-sunken" style="margin:4px 0 24px;background:${SUNKEN};border-radius:12px;"><tr><td style="padding:4px 18px;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${rows}</table></td></tr></table>`;
@@ -410,6 +410,10 @@ body { margin:0; padding:0; -webkit-text-size-adjust:100%; }
   .da-band { padding-left:22px !important; padding-right:22px !important; }
   .da-btn-wrap { width:100% !important; }
   .da-btn { display:block !important; }
+  .da-detail-value { white-space:normal !important; overflow-wrap:anywhere !important; }
+}
+@media (max-width: 360px) {
+  .da-code-value { font-size:32px !important; line-height:40px !important; letter-spacing:6px !important; padding-left:6px !important; }
 }
 /*da:dark*/
 @media (prefers-color-scheme: dark) {

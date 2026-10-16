@@ -48,6 +48,15 @@ export const DEFAULT_LEAD_MINUTES = 120;
 export const DEFAULT_LATE_MINUTES = 180;
 
 /**
+ * A PRACTICE AUCTION (0101) NEVER HOLDS A DEPLOY. It is a rehearsal the engine
+ * rehydrates like any room after a restart, and one an organiser forgot to end
+ * would otherwise freeze every deploy until someone found it. Read through
+ * `to_jsonb` so the check also runs on a database that has not yet applied
+ * 0101 — it runs BEFORE the migrations it guards.
+ */
+const REAL_ONLY = `coalesce(to_jsonb(a) ->> 'kind', 'real') = 'real'`;
+
+/**
  * `paused` counts as live, and that is the point rather than an edge case.
  *
  * A paused auction is a room of people waiting — a dispute being settled, a
@@ -61,6 +70,7 @@ export const LIVE_QUERY = `
     from auctions a
     join competitions c on c.id = a.competition_id
    where a.status in ('live', 'paused')
+     and ${REAL_ONLY}
    order by a.name
 `;
 
@@ -83,7 +93,7 @@ export const IMMINENT_QUERY = `
   select c.name,
          to_char(c.auction_starts_at at time zone 'Asia/Kolkata', 'DD Mon HH24:MI') as starts_ist
     from competitions c
-    join auctions a on a.competition_id = c.id and a.status = 'scheduled'
+    join auctions a on a.competition_id = c.id and a.status = 'scheduled' and ${REAL_ONLY}
    where c.auction_starts_at is not null
      and c.auction_starts_at >= now() - make_interval(mins => :late)
      and c.auction_starts_at <= now() + make_interval(mins => :lead)

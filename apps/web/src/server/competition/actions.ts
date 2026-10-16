@@ -10,18 +10,20 @@ import {
   isMinor,
   rejectionEvent,
   parseRegistrationRecords,
-  planImport,
   sampleRow,
   signatureOf,
   slugifyName,
   tokenizeCsv,
   validateNewPlayer,
+  looksLikePlaceholderPhone,
+  normalizePhone,
   importFieldsFor,
   isFeeStatus,
   type FeeStatus,
   type ColumnMapping,
   type ImportFieldOption,
   type CsvRowError,
+  type PlaceholderPhone,
   type DateOrder,
   type DetectedMapping,
   type ImportPolicy,
@@ -46,9 +48,10 @@ import {
   withTenantDb,
   type Db,
 } from "@desiauction/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { isNoPhotoStyle, isTeamBadge } from "@desiauction/ui";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { cache } from "react";
@@ -60,6 +63,8 @@ import { env } from "../../env";
 import { logger } from "../logger";
 import { notifyIndexNow } from "../seo/indexnow";
 
+import { registrationWriteState } from "./registration-write-state";
+import { squadWriteState } from "./squad-write-state";
 import { currentSession } from "../auth/actions";
 import {
   playerProfileFor,
@@ -73,6 +78,7 @@ import { ForbiddenError } from "../orgs/authz";
 import { canSettlement } from "../settlement/authz";
 import { orgsFor } from "../orgs/orgs";
 import { canCompetition, requireCompetitionCapability } from "./authz";
+import { isTeamFormation } from "./team-entry-code";
 import {
   advanceCompetition,
   cloneCompetition,
@@ -80,9 +86,12 @@ import {
   createTeam,
   holdBlocker,
   importSheetOf,
+  isAuctionSource,
   markImportSheetSynced,
   publishBlockers,
   setAuctionStart,
+  setCompetitionNoPhotoStyle,
+  setCompetitionTeamBadge,
   setCompetitionSquadListing,
   setCompetitionVisibility,
   squadListingState,
@@ -109,6 +118,8 @@ import {
   addNote,
   assignTeam,
   auctionHoldsRoster,
+  seasonRosterLocked,
+  confirmAdults,
   rosterAuction,
   setRegistrationMarks,
   transition,
@@ -129,9 +140,13 @@ import { captainRefusalMessage, marksFreezeWithRoster, squadMarksIn } from "./ro
 import {
   CaptainImportRefused,
   commitRegistrationImport,
-  existingForImport,
+  PhoneAttachImportRefused,
+  planAgainstStored,
+  screenAgainstStored,
+  storedForImport,
   RosterFieldImportRefused,
 } from "./registration-import";
+import { attachPhoneToClubOnly } from "./club-only-phone";
 import {
   forgetImportMapping,
   saveImportMapping,
@@ -162,7 +177,9 @@ import {
   type OrphanPreSigned,
   type RegistrationPage,
   type RegistrationQuery,
+  REGISTRATION_MISSING,
   REGISTRATION_OUTCOMES,
+  type RegistrationMissing,
   type RegistrationOutcome,
   type RegistrationRow,
   type RegistrationSort,
@@ -273,6 +290,10 @@ export async function createCompetitionAction(
   const sport = formString(formData, "sport");
   // 0091: rupees or points. Absent (older forms) is rupees; anything else is
   // refused rather than guessed — the unit decides whether money is owed.
+  const formationRaw = formString(formData, "teamFormation") || "auction";
+  if (!isTeamFormation(formationRaw)) {
+    return { error: "Choose how teams will be formed.", field: "form" };
+  }
   const unitRaw = formString(formData, "auctionUnit");
   if (unitRaw !== "" && !isMoneyUnit(unitRaw)) {
     return { error: "Choose rupees or points for the auction.", field: "form" };
@@ -321,6 +342,7 @@ export async function createCompetitionAction(
       async (db) => {
         await requireCompetitionCapability(db, session.personId, { orgId }, "competition.create");
         return createCompetition(db, orgId, session.personId, {
+          teamFormation: formationRaw,
           name,
           location,
           startsOn,
@@ -532,6 +554,7 @@ const teamsWorkspaceViewOnce = cache(async (slug: string): Promise<TeamsWorkspac
     const workspace = await teamsWorkspace(db, competition, {
       money: canSeeMoney,
       roster: canSeeRoster,
+      manage: canManage,
     });
     return {
       ...workspace,
@@ -697,7 +720,82 @@ export async function setSquadListingAction(
   return { ok: true };
 }
 
-export type DetailsField = "name" | "startsOn" | "endsOn" | "location" | "auctionUnit" | "form";
+/**
+ * Initials or the cricketer for players with no photo (0107) — the season
+ * overview's "How the season looks" card. `competition.manage`, like every
+ * other choice on that card. Every page under the season, its public pages,
+ * posters and link previews follow it from the next render.
+ */
+export async function setNoPhotoStyleAction(
+  slug: string,
+  style: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!isNoPhotoStyle(style)) {
+    return { ok: false, error: "Choose initials or the player silhouette." };
+  }
+  const session = await requireSession();
+  const competition = await resolveCompetitionScoped(session.personId, slug);
+  if (competition === null) {
+    return { ok: false, error: "Not available." };
+  }
+  try {
+    await inCompetitionOrg(session.personId, competition, (db) =>
+      requireCompetitionCapability(
+        db,
+        session.personId,
+        { orgId: competition.orgId, competitionId: competition.id },
+        "competition.manage",
+      ),
+    );
+  } catch {
+    return { ok: false, error: "You can't manage this competition." };
+  }
+  await inCompetitionOrg(session.personId, competition, (db) =>
+    setCompetitionNoPhotoStyle(db, competition, session.personId, style),
+  );
+  revalidatePath(`/seasons/${competition.slug}`, "layout");
+  revalidatePath(`/c/${competition.slug}`, "layout");
+  return { ok: true };
+}
+
+/**
+ * The shield or initials for teams with no logo (0111) — the same card and
+ * the same capability as the no-photo choice above.
+ */
+export async function setTeamBadgeAction(
+  slug: string,
+  badge: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!isTeamBadge(badge)) {
+    return { ok: false, error: "Choose the shield or initials." };
+  }
+  const session = await requireSession();
+  const competition = await resolveCompetitionScoped(session.personId, slug);
+  if (competition === null) {
+    return { ok: false, error: "Not available." };
+  }
+  try {
+    await inCompetitionOrg(session.personId, competition, (db) =>
+      requireCompetitionCapability(
+        db,
+        session.personId,
+        { orgId: competition.orgId, competitionId: competition.id },
+        "competition.manage",
+      ),
+    );
+  } catch {
+    return { ok: false, error: "You can't manage this competition." };
+  }
+  await inCompetitionOrg(session.personId, competition, (db) =>
+    setCompetitionTeamBadge(db, competition, session.personId, badge),
+  );
+  revalidatePath(`/seasons/${competition.slug}`, "layout");
+  revalidatePath(`/c/${competition.slug}`, "layout");
+  return { ok: true };
+}
+
+export type DetailsField =
+  "name" | "startsOn" | "endsOn" | "location" | "auctionUnit" | "auctionSource" | "form";
 
 /**
  * DA-11: give a season's name, dates and location a way to change.
@@ -717,6 +815,8 @@ export async function updateCompetitionDetailsAction(
     entryCategory?: string;
     /** 0091: "" or absent leaves the unit as it stands. */
     auctionUnit?: string;
+    /** 0110: "" or absent leaves where the auction happens as it stands. */
+    auctionSource?: string;
   },
 ): Promise<{ ok: boolean; error?: string; field?: DetailsField }> {
   const session = await requireSession();
@@ -744,9 +844,14 @@ export async function updateCompetitionDetailsAction(
   if (unit !== "" && !isMoneyUnit(unit)) {
     return { ok: false, error: "Choose rupees or points for the auction.", field: "form" };
   }
+  const source = input.auctionSource ?? "";
+  if (source !== "" && !isAuctionSource(source)) {
+    return { ok: false, error: "Choose where the auction happens.", field: "form" };
+  }
   const result = await inCompetitionOrg(session.personId, competition, (db) =>
     updateCompetitionDetails(db, competition, session.personId, {
       ...(isMoneyUnit(unit) ? { auctionUnit: unit } : {}),
+      ...(isAuctionSource(source) ? { auctionSource: source } : {}),
       name: input.name,
       location: input.location.trim() === "" ? null : input.location.trim(),
       startsOn: input.startsOn === "" ? null : input.startsOn,
@@ -768,9 +873,21 @@ export async function updateCompetitionDetailsAction(
           error: "The auction has been created in this unit — rupees or points can't change now.",
           field: "auctionUnit",
         };
+      case "source_locked":
+        return {
+          ok: false,
+          error:
+            "This season already has an auction — abort it first to switch where the auction happens.",
+          field: "auctionSource",
+        };
       default:
         return { ok: false, error: "The end date falls before the start date.", field: "endsOn" };
     }
+  }
+  // 0110: an imported season's public squads show placed players — the switch
+  // changes what the public pages say.
+  if (isAuctionSource(source) && source !== competition.auctionSource) {
+    revalidatePath(`/c/${competition.slug}`, "layout");
   }
   return { ok: true };
 }
@@ -871,10 +988,10 @@ export async function createTeamAction(
   // settlement sealed. A fifth team appearing after the hammer fell left the
   // season permanently inconsistent — five teams against a four-team auction
   // and a four-team reconciled case — and with no delete, unfixable.
-  const auction = await inCompetitionOrg(session.personId, competition, (db) =>
-    auctionOf(db, competition.id),
+  const teamsLocked = await inCompetitionOrg(session.personId, competition, (db) =>
+    seasonRosterLocked(db, competition.id),
   );
-  if (auction !== null && auction.status !== "scheduled") {
+  if (teamsLocked) {
     return {
       ok: false,
       error: "The auction has started — the teams are locked for this season.",
@@ -1004,7 +1121,7 @@ export async function triageRegistrationAction(
             : "That action isn't available for this registration.",
     };
   }
-  return { ok: true, notifying: notifyLater(gate, [registrationId], event) };
+  return { ok: true, notifying: await notifyLater(gate, [registrationId], event) };
 }
 
 /**
@@ -1021,15 +1138,27 @@ export async function triageRegistrationAction(
  * suppressed) is still written to the registration's timeline by
  * `notifyDecision`, and the count returned here is how many people we are
  * about to text, never a claim that they were reached.
+ *
+ * Only people WITH a phone count: a club-only player (0104) has none, and an
+ * email-only account cannot be texted either — the outbox suppresses both, so
+ * a toast saying "SMS on its way" for them was a promise nothing would keep.
  */
-function notifyLater(
+async function notifyLater(
   gate: { personId: string; competition: CompetitionSummary },
   registrationIds: readonly string[],
   event: RegistrationEvent,
-): number {
+): Promise<number> {
   if (registrationIds.length === 0 || event.type === "submit") {
     return 0;
   }
+  const textable = await inCompetitionOrg(gate.personId, gate.competition, async (db) => {
+    const rows = await db
+      .select({ id: registrations.id })
+      .from(registrations)
+      .innerJoin(people, eq(people.id, registrations.personId))
+      .where(and(inArray(registrations.id, [...registrationIds]), isNotNull(people.phone)));
+    return rows.length;
+  });
   after(async () => {
     const notice = await notifyAffected(gate, registrationIds, event);
     if ((notice.notifyFailed ?? 0) > 0) {
@@ -1044,7 +1173,7 @@ function notifyLater(
       );
     }
   });
-  return registrationIds.length;
+  return textable;
 }
 
 /**
@@ -1078,6 +1207,35 @@ async function notifyAffected(
   } catch {
     return { notifyFailed: registrationIds.length };
   }
+}
+
+/**
+ * "Mark 18+" on the Players list: the organizer states the selected players are
+ * 18 or older, so a photo of unknown age may show on public pages (0106). Same
+ * review gate as the rest of the bulk bar. A player already confirmed keeps
+ * the first confirmation; a date of birth that says under 18 still wins at
+ * read time (`mayPublishPhoto`).
+ */
+export async function bulkConfirmAdultAction(
+  slug: string,
+  registrationIds: string[],
+): Promise<{ ok: true; confirmed: number } | { ok: false; error: string }> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error };
+  }
+  const confirmed = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    confirmAdults(
+      db,
+      gate.competition.orgId,
+      gate.competition.id,
+      registrationIds,
+      gate.personId,
+      new Date(),
+    ),
+  );
+  revalidatePath(`/c/${gate.competition.slug}`);
+  return { ok: true, confirmed };
 }
 
 /** Bulk triage — same review gate, same core event, applied atomically (identical to N singles). */
@@ -1118,7 +1276,7 @@ export async function bulkTriageAction(
     ok: true,
     applied: result.applied.length,
     skipped: result.skipped.length,
-    notifying: notifyLater(gate, result.applied, event),
+    notifying: await notifyLater(gate, result.applied, event),
   };
 }
 
@@ -1229,10 +1387,7 @@ async function auctionLocksRoster(
   // than a member (withdrawing themselves) that is still correct: the server
   // resolved the season from the public link and opens its org's boundary to
   // read one fact about it, exactly as `submitRegistration` does to write.
-  const auction = await inCompetitionOrg(personId, competition, (db) =>
-    auctionOf(db, competition.id),
-  );
-  return auction !== null && auction.status !== "scheduled";
+  return inCompetitionOrg(personId, competition, (db) => seasonRosterLocked(db, competition.id));
 }
 
 const ROSTER_LOCKED = "The auction has started — squads are set by the auction now, not by hand.";
@@ -1639,6 +1794,8 @@ export interface DashboardParams {
   teamId?: string;
   /** A playing role — the pack's key. */
   role?: string;
+  /** "photo" | "phone" | "role": players still missing that detail. */
+  missing?: string;
   sort?: string;
   page?: string;
 }
@@ -1667,6 +1824,9 @@ function dashboardFilter(
     ...(params.teamId !== undefined && params.teamId !== "" ? { teamId: params.teamId } : {}),
     // Compared for equality in SQL, so an unknown role narrows to nobody.
     ...(params.role !== undefined && params.role !== "" ? { role: params.role } : {}),
+    ...(REGISTRATION_MISSING.includes(params.missing as RegistrationMissing)
+      ? { missing: params.missing as RegistrationMissing }
+      : {}),
   };
 }
 
@@ -2098,6 +2258,29 @@ export async function registrationDetailAction(
     : { ok: true, ...found };
 }
 
+/**
+ * MANY PLAYERS IN ONE CALL — the player desk's before/after reads around a
+ * captain or team change. Next runs a client's server actions one at a time,
+ * so a row per call made a captain toggle on a full team ~17 round trips.
+ * All-or-nothing: any id not in this season refuses the whole read.
+ */
+export async function registrationRowsAction(
+  slug: string,
+  registrationIds: readonly string[],
+): Promise<{ ok: true; rows: RegistrationRow[] } | { ok: false; error: string }> {
+  if (registrationIds.length > 200) return { ok: false, error: "Too many players at once." };
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error };
+  }
+  const rows = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    Promise.all(registrationIds.map((id) => registrationRowById(db, gate.competition.id, id))),
+  );
+  return rows.every((row): row is RegistrationRow => row !== null)
+    ? { ok: true, rows }
+    : { ok: false, error: "That player is not in this season." };
+}
+
 export interface SquadCandidate {
   /** The registration id — also the seed of the player's initials mark. */
   id: string;
@@ -2111,6 +2294,8 @@ export interface SquadCandidate {
   isIcon: boolean;
   isCaptain: boolean;
   isRetained: boolean;
+  /** Typed results (0105): what they went for, ×100. Null = none typed. */
+  handPrice: number | null;
 }
 
 /**
@@ -2144,6 +2329,7 @@ export async function squadCandidatesAction(slug: string): Promise<SquadCandidat
           isIcon: row.isIcon,
           isCaptain: row.isCaptain,
           isRetained: row.isRetained,
+          handPrice: row.handPrice ?? null,
         })),
       );
       if (page * result.pageSize >= result.total) {
@@ -2256,6 +2442,68 @@ export async function updateRegistrationDetailsAction(
   return result.value;
 }
 
+/**
+ * Give a club-only player (0104) their real number — the player sheet's
+ * "Add phone". Same gate as every other correction (`registration.review`).
+ *
+ * A filler is refused, as on the add form. Whether the number already has an
+ * account is never said (0075): the player becomes an ordinary stub, or moves
+ * onto that account, and the sheet looks the same either way — see
+ * `attachPhoneToClubOnly`. From here the player can sign in and gets messages.
+ */
+export async function addPlayerPhoneAction(
+  slug: string,
+  registrationId: string,
+  rawPhone: string,
+): Promise<RegistrationEditResult> {
+  const read = normalizePhone(rawPhone.trim());
+  if (!read.ok) {
+    return { ok: false, error: "Enter a 10-digit Indian mobile number." };
+  }
+  if (looksLikePlaceholderPhone(read.phone)) {
+    return {
+      ok: false,
+      error: "This looks like a made-up number. Add the player's real mobile number.",
+    };
+  }
+  const phone = read.phone;
+  const result = await inSeasonAs(
+    slug,
+    "registration.review",
+    async ({ db, personId, competition }): Promise<RegistrationEditResult> => {
+      const attached = await attachPhoneToClubOnly(db, {
+        competitionId: competition.id,
+        orgId: competition.orgId,
+        actorId: personId,
+        registrationId,
+        phone,
+        source: "organizer_manual",
+      });
+      if (!attached.ok) {
+        return {
+          ok: false,
+          error:
+            attached.reason === "already_in_season"
+              ? "This number is already registered in this season."
+              : "This player already has a phone number.",
+        };
+      }
+      const row = await registrationRowById(db, competition.id, registrationId);
+      return row === null
+        ? { ok: false, error: "That player is not in this season." }
+        : { ok: true, row };
+    },
+  );
+  if (!result.ok) {
+    return {
+      ok: false,
+      error:
+        result.reason === "forbidden" ? "You can't edit players in this season." : "Not available.",
+    };
+  }
+  return result.value;
+}
+
 /** Set (or clear) a team's coach (organizer, `team.manage`). */
 /**
  * DA-35: rename a team / correct its short name or colour. Same capability as
@@ -2285,10 +2533,10 @@ export async function updateTeamAction(
   } catch {
     return { ok: false, error: "You can't manage teams here." };
   }
-  const auction = await inCompetitionOrg(session.personId, competition, (db) =>
-    auctionOf(db, competition.id),
+  const teamsLocked = await inCompetitionOrg(session.personId, competition, (db) =>
+    seasonRosterLocked(db, competition.id),
   );
-  if (auction !== null && auction.status !== "scheduled") {
+  if (teamsLocked) {
     return {
       ok: false,
       error: "The auction has started — the teams are locked for this season.",
@@ -2388,6 +2636,21 @@ export async function addPlayerAction(
     }
     return { ok: false, error: "Fix the highlighted fields.", fieldErrors };
   }
+  /*
+   * A filler typed into the form is REFUSED here, where the file reads one as
+   * blank: a person is at the keyboard, and the honest answer for a player
+   * with no number is the empty box. Stored, 9999999999 would be a real
+   * stranger's identity (see core placeholder-phone.ts).
+   */
+  if (check.value.phone !== null && looksLikePlaceholderPhone(check.value.phone)) {
+    return {
+      ok: false,
+      error: "Fix the highlighted fields.",
+      fieldErrors: {
+        phone: "This looks like a made-up number. Leave it blank if the player has no phone.",
+      },
+    };
+  }
   const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
     addPlayerByPhone(db, gate.competition.id, gate.competition.orgId, gate.personId, {
       ...check.value,
@@ -2399,11 +2662,19 @@ export async function addPlayerAction(
     }),
   );
   if (!result.ok) {
-    return {
-      ok: false,
-      error: "This phone number is already registered in this competition.",
-      fieldErrors: { phone: "already registered here" },
-    };
+    return result.reason === "duplicate_name"
+      ? {
+          ok: false,
+          error: "A player with this name and no phone is already in this season.",
+          fieldErrors: {
+            name: "already here without a phone — add a phone, or make the name different",
+          },
+        }
+      : {
+          ok: false,
+          error: "This phone number is already registered in this competition.",
+          fieldErrors: { phone: "already registered here" },
+        };
   }
   return {
     ok: true,
@@ -2520,6 +2791,16 @@ export interface ImportPreview {
    * file has no photo column (or the column holds no links).
    */
   photoLinks?: number;
+  /**
+   * Numbers set aside as fillers (9000000001, 9999999999, a run of
+   * consecutive numbers): those players import with NO phone. Listed so the
+   * organizer sees each one by name and can say "that one is real".
+   */
+  placeholders?: PlaceholderPhone[];
+  /** Valid players arriving with no phone at all — club-only (0104). */
+  withoutPhone?: number;
+  /** Valid players arriving with no role — set before approving. */
+  withoutRole?: number;
   /**
    * What committing would actually DO, against what is already stored. Absent
    * only when the file could not be read at all.
@@ -2769,6 +3050,12 @@ export interface ImportShape {
    * never a default — because a reference is a claim until someone checks it.
    */
   paidWhenReferenced?: boolean;
+  /**
+   * Numbers the organizer said are REAL although they read as fillers
+   * (E.164, from the preview's `placeholders`). Every other filler imports as
+   * no phone — see core placeholder-phone.ts for why one is never stored.
+   */
+  realPhones?: string[];
 }
 
 /**
@@ -2837,6 +3124,7 @@ function parseUnderShape(
     // the football pack recognised all of them.
     pack: sportPackFor(sport),
     ...(shape?.dateOrder !== undefined ? { dateOrder: shape.dateOrder } : {}),
+    ...(shape?.realPhones !== undefined ? { realPhones: shape.realPhones } : {}),
   });
   if (shape?.paidWhenReferenced !== true) {
     return parsed;
@@ -2883,22 +3171,27 @@ export async function importPreviewAction(
     shape?.valueMaps ?? {},
   );
   if (result.rows.length === 0) {
-    return { validCount: 0, errors: result.errors, unplaced };
+    return { validCount: 0, errors: result.errors, unplaced, placeholders: result.placeholders };
   }
   const policy = shape?.policy ?? "fill-blanks";
-  const diff = await inCompetitionOrg(gate.personId, gate.competition, async (db) => {
-    const stored = await existingForImport(
-      db,
-      gate.competition.id,
-      result.rows.map((row) => row.phone),
-    );
-    return planImport(result.rows, stored, policy, sportPackFor(gate.competition.sport));
+  const { diff, screened } = await inCompetitionOrg(gate.personId, gate.competition, async (db) => {
+    const stored = await storedForImport(db, gate.competition.id, result.rows);
+    // The two refusals only the server can see, listed with the parser's own.
+    const screened = screenAgainstStored(result.rows, stored);
+    return {
+      screened,
+      diff: planAgainstStored(screened.rows, stored, policy, sportPackFor(gate.competition.sport)),
+    };
   });
+  const errors = [...result.errors, ...screened.errors].sort((a, b) => a.line - b.line);
   return {
-    validCount: result.rows.length,
-    errors: result.errors,
+    validCount: screened.rows.length,
+    errors,
     unplaced,
-    photoLinks: result.rows.filter((row) => row.photoDriveId !== null).length,
+    placeholders: result.placeholders,
+    withoutPhone: screened.rows.filter((row) => row.phone === null).length,
+    withoutRole: screened.rows.filter((row) => row.role === "").length,
+    photoLinks: screened.rows.filter((row) => row.photoDriveId !== null).length,
     diff: {
       counts: diff.counts,
       // Capped for the screen; the counts above are the whole truth and the
@@ -2957,6 +3250,8 @@ export async function importCommitAction(
     policy?: ImportPolicy;
     /** Read from the season's connected Sheet — a landed import stamps "last synced". */
     fromSheet?: boolean;
+    /** "Everyone in this sheet is 18 or older" — ticked by the organizer (0106). */
+    adultsConfirmed?: boolean;
   },
 ): Promise<ImportCommitResult> {
   const gate = await reviewGate(slug);
@@ -2982,9 +3277,6 @@ export async function importCommitAction(
       error: `Fix ${String(parsed.errors.length)} row error(s) before importing.`,
     };
   }
-  if (parsed.rows.length === 0) {
-    return { ok: false, error: "No valid rows to import." };
-  }
   /*
    * THE ROSTER LOCK, APPLIED TO A FILE.
    *
@@ -3005,7 +3297,12 @@ export async function importCommitAction(
   const carriesSquad = marksFreezeWithRoster(squadMarksIn(parsed.rows));
   const SQUAD_COLUMNS_LOCKED =
     "The auction has started, so team, Icon and Retained columns can no longer be imported. Remove them from the file to import the rest.";
-  let result: Awaited<ReturnType<typeof commitRegistrationImport>> | "squad_locked";
+  let result:
+    | Awaited<ReturnType<typeof commitRegistrationImport>>
+    | "squad_locked"
+    | "needs_fixing"
+    | "nothing_valid";
+  let skipped = parsed.errors.length;
   try {
     result = await inCompetitionOrg(gate.personId, gate.competition, async (db) => {
       // Read FOR SHARE in the commit's own transaction, so the lock this file
@@ -3015,14 +3312,28 @@ export async function importCommitAction(
       if (carriesSquad && locked) {
         return "squad_locked" as const;
       }
+      // Judged in the commit's own transaction, against what is stored NOW —
+      // the same screen the preview ran, so a skipped row is one it listed.
+      const screened = screenAgainstStored(
+        parsed.rows,
+        await storedForImport(db, gate.competition.id, parsed.rows),
+      );
+      skipped += screened.errors.length;
+      if (screened.errors.length > 0 && options?.skipInvalid !== true) {
+        return "needs_fixing" as const;
+      }
+      if (screened.rows.length === 0) {
+        return "nothing_valid" as const;
+      }
       return commitRegistrationImport(
         db,
         gate.competition.id,
         gate.competition.orgId,
         gate.personId,
-        parsed.rows,
+        screened.rows,
         options?.shape?.policy ?? options?.policy ?? "fill-blanks",
         locked && auction !== null ? auction.id : null,
+        options?.adultsConfirmed === true ? new Date() : null,
       );
     });
   } catch (error) {
@@ -3030,6 +3341,12 @@ export async function importCommitAction(
       return {
         ok: false,
         error: `${captainRefusalMessage(error.refusal)} Nothing was imported — remove that captain from the file to import the rest.`,
+      };
+    }
+    if (error instanceof PhoneAttachImportRefused) {
+      return {
+        ok: false,
+        error: `${error.player} is already registered in this season under the number this file gives them. Nothing was imported — remove that number from the file to import the rest.`,
       };
     }
     if (error instanceof RosterFieldImportRefused) {
@@ -3043,6 +3360,12 @@ export async function importCommitAction(
   if (result === "squad_locked") {
     return { ok: false, error: SQUAD_COLUMNS_LOCKED };
   }
+  if (result === "needs_fixing") {
+    return { ok: false, error: `Fix ${String(skipped)} row error(s) before importing.` };
+  }
+  if (result === "nothing_valid") {
+    return { ok: false, error: "No valid rows to import." };
+  }
   if (options?.fromSheet === true) {
     await inCompetitionOrg(gate.personId, gate.competition, (db) =>
       markImportSheetSynced(db, gate.competition.id),
@@ -3055,7 +3378,7 @@ export async function importCommitAction(
     unchanged: result.unchanged,
     reinstated: result.reinstated,
     named: result.named,
-    skipped: parsed.errors.length,
+    skipped,
   };
 }
 
@@ -3118,4 +3441,25 @@ export async function exportRegistrationsAction(
     return { ok: false, error: "That team is not in this season." };
   }
   return { ok: true, csv, filename };
+}
+
+/** Team-only saved marks, under the same capability as the mark writer. */
+export async function squadWriteStateAction(slug: string, ids: string[], teamIds: string[]) {
+  const result = await inSeasonAs(slug, "team.manage", ({ db, competition }) =>
+    squadWriteState(db, competition.id, ids, teamIds),
+  );
+  if (!result.ok || result.value === null)
+    return { ok: false as const, error: "Saved squad state is not available." };
+  return { ok: true as const, ...result.value };
+}
+
+export async function registrationWriteStateAction(slug: string, ids: string[]) {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) return { ok: false as const, error: gate.error };
+  const rows = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    registrationWriteState(db, gate.competition.id, ids),
+  );
+  return rows === null
+    ? { ok: false as const, error: "Saved registration state is not available." }
+    : { ok: true as const, rows };
 }

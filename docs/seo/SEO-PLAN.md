@@ -704,7 +704,7 @@ Each page has:
 
 **Already true, no change needed:** the board and the overlay carry the DesiAuction wordmark, and share cards carry the brand.
 
-**Founder half (not engineering):**
+**Founder half (not engineering):** the copy, order and log live in [`OUTREACH-KIT.md`](OUTREACH-KIT.md).
 - directory listings (Product Hunt, G2, Capterra/GetApp India, SaaSworthy, Techjockey, AlternativeTo)
 - a stream kit for organizers (YouTube description text with the season link)
 - local sports press, academy and turf associations, college fests

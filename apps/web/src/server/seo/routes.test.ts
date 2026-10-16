@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
+import robots from "../../app/robots";
 
 import { istCalendarDate } from "../../lib/format-date";
 
@@ -15,6 +16,7 @@ import {
   isPublicPath,
   isoCalendarDate,
   publicTopSegments,
+  robotsDisallows,
 } from "./routes";
 
 /**
@@ -33,6 +35,23 @@ function topLevelSegments(): string[] {
 }
 
 describe("route registry", () => {
+  it("keeps share-token matches excluded while canonical public fixtures remain public", () => {
+    expect(isPublicPath("/m/share-secret")).toBe(false);
+    expect(isPublicPath("/match/confirm/bearer-secret")).toBe(false);
+    expect(shellKind("/match/confirm/bearer-secret")).toBe("bare");
+    expect(isPublicPath("/c/league/m/42")).toBe(true);
+    expect(shellKind("/c/league/m/42")).toBe("bare");
+    expect(shellKind("/m/share-secret")).toBe("bare");
+    expect(CONSOLE_SEGMENTS).toContain("m");
+    const rules = robots().rules;
+    const disallows = (Array.isArray(rules) ? rules : [rules]).flatMap((rule) =>
+      typeof rule.disallow === "string" ? [rule.disallow] : (rule.disallow ?? []),
+    );
+    expect(disallows).toContain("/m/");
+    expect(disallows.some((prefix) => "/m/example-token".startsWith(prefix))).toBe(true);
+    expect(disallows.some((prefix) => "/manifest.webmanifest".startsWith(prefix))).toBe(false);
+    expect(disallows.some((prefix) => "/c/league/m/42".startsWith(prefix))).toBe(false);
+  });
   it("classifies every top-level app segment exactly once", () => {
     const publicSegments = publicTopSegments();
     const consoles = new Set<string>(CONSOLE_SEGMENTS);
@@ -69,7 +88,7 @@ describe("route registry", () => {
 
   it("never lets a robots.txt Disallow prefix swallow a public page", () => {
     // robots.txt matches by prefix: `Disallow: /help` would also hide /helpful.
-    const disallows = CONSOLE_SEGMENTS.map((segment) => `/${segment}`);
+    const disallows = robotsDisallows();
     const publicPaths = [
       ...INDEXABLE_PAGES.map((page) => page.path),
       ...[...publicTopSegments()].map((segment) => `/${segment}`),
@@ -143,6 +162,7 @@ describe("isPublicPath", () => {
     "/about",
     "/schedule-demo",
     "/schedule-demo/pick",
+    "/founding-25",
     "/c",
     "/c/vpl-1-513q",
     "/c/vpl-1-513q/t/strikers",

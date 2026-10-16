@@ -1,5 +1,5 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { writeFile } from "node:fs/promises";
+import { expect, test, type Browser, type Page, type Route } from "@playwright/test";
 import { completeAuction, leaveCockpit } from "./complete-auction";
 import { latestOtp } from "./otp";
 import { issuePaddleTo, queueAllFromSetup } from "./auction-tabs";
@@ -21,6 +21,8 @@ import { axeClean } from "./axe";
 // an auction night that conduct-ceremony.spec.ts already certifies.
 
 test.describe.configure({ mode: "serial" });
+// Response interception exercises loss of an actual committed answer.
+test.use({ serviceWorkers: "block" });
 
 async function otpLogin(page: Page, phone: string): Promise<void> {
   if (!page.url().includes("/login")) {
@@ -32,7 +34,8 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
     timeout: 30_000,
   });
   const code = await latestOtp(phone);
-  await page.getByLabel("6-digit code").fill(code);
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(code);
   await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).not.toHaveURL(/\/login/);
 }
@@ -52,6 +55,158 @@ async function moneyReady(page: Page): Promise<void> {
   });
 }
 
+/** Commit the actual action, then lose only its answer. No stubbed successful write. */
+async function loseCommittedAnswer(
+  page: Page,
+  activate: () => Promise<void>,
+  beforeReload?: () => Promise<void>,
+) {
+  let actionBody = "";
+  let dispatches = 0;
+  const handler = async (route: Route) => {
+    const request = route.request();
+    if (request.method() !== "POST" || !request.headers()["next-action"]) {
+      await route.continue();
+      return;
+    }
+    dispatches += 1;
+    if (dispatches !== 1) {
+      await route.continue();
+      return;
+    }
+    actionBody = request.postData() ?? "";
+    const response = await route.fetch();
+    expect(response.ok()).toBe(true);
+    expect(await response.text()).toContain('"ok":true');
+    await route.abort("failed");
+  };
+  const endpoint = new URL(page.url()).pathname;
+  await page.route(`**${endpoint}`, handler);
+  await activate();
+  const saved = page.getByTestId("financial-recovery");
+  await expect(saved).toContainText("Outcome unconfirmed");
+  const key = await saved.getAttribute("data-intent-key");
+  if (!key) throw new Error("Unanswered action lost its immutable intent key");
+  expect(actionBody).toContain(key);
+  if (beforeReload) await beforeReload();
+  await page.reload();
+  await moneyReady(page);
+  await expect(saved).toHaveAttribute("data-intent-key", key);
+  await expect(saved).toContainText("Outcome unconfirmed");
+  expect(dispatches).toBe(1);
+  await expect(
+    page.getByRole("heading", { name: "Review your saved financial action" }),
+  ).toBeVisible();
+  await page.getByTestId("goto-financial-review").focus();
+  await page.keyboard.press("Enter");
+  await expect(saved.getByTestId("review-financial-work")).toBeFocused();
+  await page.unroute(`**${endpoint}`, handler);
+  return saved;
+}
+
+/** Exact money and saved-work text must fit its real clipping containers. */
+async function financeReflow(page: Page) {
+  const original = page.viewportSize();
+  for (const theme of ["daylight", "floodlight"]) {
+    await page.evaluate((value) => {
+      document.documentElement.setAttribute("data-theme", value);
+    }, theme);
+    // Contrast is measured after the actual native colour transition finishes.
+    // Preserve both states so a transition race cannot conceal a stable defect.
+    const transition = await page.evaluate(async () => {
+      const button = document.querySelector<HTMLButtonElement>(
+        "button[aria-label^='Record a payment from']",
+      );
+      if (!button) throw new Error("Missing actual finance collection control");
+      const before = getComputedStyle(button).color;
+      const animations = document
+        .getAnimations()
+        .filter((animation) => animation instanceof CSSTransition);
+      const properties = animations.map((animation) => animation.transitionProperty);
+      await Promise.all(animations.map((animation) => animation.finished));
+      return { before, after: getComputedStyle(button).color, properties };
+    });
+    await test.info().attach(`finance-${theme}-colour-transition`, {
+      body: JSON.stringify(transition),
+      contentType: "application/json",
+    });
+    for (const width of [320, 390, 768, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true);
+      const figures = page.locator(".mn-figures dd, .money-recovery-record dd");
+      const bounds = await figures.evaluateAll((elements) =>
+        elements.map((element) => {
+          const range = document.createRange();
+          range.selectNodeContents(element);
+          const rects = Array.from(range.getClientRects()).filter(
+            (r) => r.width > 0 && r.height > 0,
+          );
+          const box = element.getBoundingClientRect();
+          const clipped = rects.some((r) => r.left < box.left - 1 || r.right > box.right + 1);
+          let ancestor = element.parentElement;
+          let hidden = false;
+          while (ancestor) {
+            const style = getComputedStyle(ancestor);
+            const clip = ancestor.getBoundingClientRect();
+            if (["hidden", "clip", "auto", "scroll"].includes(style.overflowX))
+              hidden ||= rects.some((r) => r.left < clip.left - 1 || r.right > clip.right + 1);
+            if (["hidden", "clip", "auto", "scroll"].includes(style.overflowY))
+              hidden ||= rects.some((r) => r.top < clip.top - 1 || r.bottom > clip.bottom + 1);
+            ancestor = ancestor.parentElement;
+          }
+          return { text: element.textContent, clipped, hidden };
+        }),
+      );
+      expect(bounds.length).toBeGreaterThan(4);
+      expect(
+        bounds.every((value) => !value.clipped && !value.hidden),
+        JSON.stringify(bounds),
+      ).toBe(true);
+      await axeClean(page, `finance recovery ${theme} ${String(width)}`);
+      await page.screenshot({
+        path: test.info().outputPath(`finance-recovery-${theme}-${String(width)}.png`),
+        fullPage: true,
+      });
+    }
+  }
+  if (original) await page.setViewportSize(original);
+  await page.evaluate(() => {
+    document.documentElement.setAttribute("data-theme", "daylight");
+  });
+}
+
+async function financialKeyCount(page: Page) {
+  return page.evaluate(
+    () =>
+      new Promise<number>((resolve, reject) => {
+        const opening = indexedDB.open("keyval-store");
+        opening.onerror = () => {
+          reject(opening.error ?? new Error("Account store unavailable"));
+        };
+        opening.onsuccess = () => {
+          const db = opening.result;
+          const tx = db.transaction("keyval", "readonly");
+          const keys = tx.objectStore("keyval").getAllKeys();
+          keys.onerror = () => {
+            reject(keys.error ?? new Error("Financial keys unreadable"));
+          };
+          keys.onsuccess = () => {
+            resolve(
+              keys.result.filter(
+                (key) => typeof key === "string" && key.startsWith("ls1:finance-intent:"),
+              ).length,
+            );
+          };
+          tx.oncomplete = () => {
+            db.close();
+          };
+        };
+      }),
+  );
+}
+
 async function caseReady(page: Page): Promise<void> {
   await expect(page.getByTestId("case-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
@@ -61,8 +216,8 @@ async function caseReady(page: Page): Promise<void> {
 function playersCsv(stamp: string): string {
   const header = "name,phone,role,base_price_band";
   const rows = Array.from({ length: 3 }, (_, i) => {
-    const phone = `9${stamp}${i}`.slice(0, 10);
-    return `Settle Player ${i},${phone},batter,C`;
+    const phone = `9${stamp}${String(i)}`.slice(0, 10);
+    return `Settle Player ${String(i)},${phone},batter,C`;
   });
   return [header, ...rows].join("\n");
 }
@@ -85,7 +240,6 @@ const OWNER = `76${STAMP}`;
 const TREASURER = `77${STAMP}`;
 
 test("founder demo: complete an auction → settle it → close, prove and replay the evidence", async ({
-  browser,
   page,
 }) => {
   test.setTimeout(240_000);
@@ -241,7 +395,23 @@ test("founder demo: complete an auction → settle it → close, prove and repla
   await page.getByTestId("pay-team").selectOption(kingsOption);
   await page.getByTestId("pay-method").selectOption("manual:cash");
   await page.getByTestId("pay-amount").fill("1,20,000");
-  await page.getByTestId("record-payment").click();
+  await expect(page.getByTestId("record-payment")).toBeEnabled();
+  const savedPayment = await loseCommittedAnswer(page, () =>
+    page.getByTestId("record-payment").click(),
+  );
+  await expect(savedPayment).toContainText("1,20,000");
+  await expect(savedPayment).toContainText("Kings");
+  await expect(savedPayment).toContainText("Cash");
+  await expect(page.getByTestId("pay-amount")).toHaveValue("1,20,000");
+  await expect(page.getByTestId("pay-amount")).toBeDisabled();
+  await expect(page.getByTestId("record-payment")).toBeDisabled();
+  await axeClean(page, "settlement · unanswered committed payment restored");
+  await financeReflow(page);
+  await savedPayment.getByRole("button", { name: "Review original action" }).click();
+  await expect(savedPayment).toHaveCount(0);
+  await expect(
+    page.getByRole("status").filter({ hasText: "original action was found" }),
+  ).toBeVisible();
   // The gateway enums (`created`/`captured`) are no longer printed at a desk
   // where the money arrived as cash in an envelope.
   await expect(page.getByTestId("payments-table")).toContainText("Recorded", { timeout: 20_000 });
@@ -251,6 +421,55 @@ test("founder demo: complete an auction → settle it → close, prove and repla
   await page.getByRole("button", { name: "Confirm received" }).first().click();
   await expect(page.getByTestId("payments-table")).toContainText("Received", { timeout: 20_000 });
   await expect(page.getByTestId("discharged")).toContainText("₹1,20,000");
+  await expect(page.getByTestId("outstanding")).toContainText("₹80,000");
+
+  // A real partial refund gives the team its due back. Lose its committed answer,
+  // keep the original dialog draft, then deliberately record the returned money again.
+  await page.getByRole("button", { name: "More for Kings's payment" }).click();
+  await page.getByRole("menuitem", { name: "Refund…" }).click();
+  await page.getByTestId("refund-amount").fill("1000.01");
+  await page.getByTestId("refund-reason").fill("Partial cash correction — नकद सुधार");
+  const savedRefund = await loseCommittedAnswer(
+    page,
+    () => page.getByTestId("confirm-refund").click(),
+    async () => {
+      await expect(
+        page.getByRole("status").filter({ hasText: "original action was found" }),
+      ).toHaveCount(0);
+      await expect(page.getByTestId("refund-amount")).toHaveValue("1000.01");
+      await expect(page.getByTestId("refund-reason")).toHaveValue(
+        "Partial cash correction — नकद सुधार",
+      );
+      await expect(page.getByTestId("refund-amount")).toBeDisabled();
+      await expect(page.getByTestId("refund-reason")).toBeDisabled();
+      await page.getByRole("dialog").getByRole("button", { name: "Cancel", exact: true }).click();
+      await page.getByRole("button", { name: "More for Kings's payment" }).click();
+      await page.getByRole("menuitem", { name: "Refund…" }).click();
+      await expect(page.getByTestId("refund-amount")).toHaveValue("1000.01");
+      await expect(page.getByTestId("refund-reason")).toHaveValue(
+        "Partial cash correction — नकद सुधार",
+      );
+      await expect(page.getByTestId("confirm-refund")).toBeDisabled();
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Review saved work", exact: true })
+        .click();
+      await expect(page.getByTestId("review-financial-work")).toBeFocused();
+    },
+  );
+  await expect(savedRefund).toContainText("1000.01");
+  await expect(savedRefund).toContainText("Partial cash correction — नकद सुधार");
+  await expect(page.getByTestId("outstanding")).toContainText("₹81,000.01");
+  await expect(page.getByTestId("refund-reinstatement-note")).toContainText("₹1,000.01");
+  await savedRefund.getByRole("button", { name: "Review original action" }).click();
+  await expect(savedRefund).toHaveCount(0);
+  await page.getByTestId("pay-team").selectOption(kingsOption);
+  await page.getByTestId("pay-amount").fill("1000.01");
+  await expect(page.getByTestId("record-payment")).toBeEnabled();
+  await page.getByTestId("record-payment").click();
+  await expect(page.getByRole("button", { name: "Confirm received" })).toHaveCount(1);
+  await page.getByRole("button", { name: "Confirm received" }).click();
+  await expect(page.getByTestId("discharged")).toContainText("₹1,21,000.01");
   await expect(page.getByTestId("outstanding")).toContainText("₹80,000");
 
   // --- Waive the remaining obligation (controller, with a reason) -------------
@@ -268,7 +487,14 @@ test("founder demo: complete an auction → settle it → close, prove and repla
   await page.getByTestId("waive-amount").fill("80000");
   await expect(page.getByTestId("confirm-waive")).toBeDisabled();
   await page.getByTestId("waive-reason").fill("Sponsor covered the shortfall");
-  await page.getByTestId("confirm-waive").click();
+  const savedWaiver = await loseCommittedAnswer(page, () =>
+    page.getByTestId("confirm-waive").click(),
+  );
+  await expect(savedWaiver).toContainText("80000");
+  await expect(savedWaiver).toContainText("Chargers");
+  await expect(savedWaiver).toContainText("Sponsor covered the shortfall");
+  await savedWaiver.getByRole("button", { name: "Review original action" }).click();
+  await expect(savedWaiver).toHaveCount(0);
   await expect(page.getByTestId("waived")).toContainText("₹80,000", { timeout: 20_000 });
   await expect(page.getByTestId("outstanding")).toContainText("₹0");
 
@@ -306,6 +532,29 @@ test("founder demo: complete an auction → settle it → close, prove and repla
   });
   await expect(page.getByTestId("replay-result")).toContainText("byte-for-byte");
   await axeClean(page, "case review · evidence");
+  expect(await financialKeyCount(page)).toBeGreaterThan(0);
+  const account = await page.context().newPage();
+  await account.goto("/account");
+  await account.getByRole("button", { name: "Sign out", exact: true }).click();
+  await account.getByRole("button", { name: "Stay signed in", exact: true }).click();
+  expect(await financialKeyCount(page)).toBeGreaterThan(0);
+  await account.getByRole("button", { name: "Sign out", exact: true }).click();
+  await account.getByTestId("sign-out-confirm").click();
+  await expect(account).toHaveURL(/\/login/);
+  await expect.poll(() => financialKeyCount(page)).toBe(0);
+  await otpLogin(account, OWNER);
+  await account.goto(`/seasons/${slug}/money`);
+  await moneyReady(account);
+  await expect(account.getByTestId("case-status")).toHaveText("Reconciled");
+  await expect(account.getByTestId("discharged")).toContainText("₹1,21,000.01");
+  await expect(account.getByTestId("refund-reinstatement-note")).toContainText("₹1,000.01");
+  await expect(account.getByTestId("outstanding")).toContainText("₹0");
+  await writeFile(
+    test.info().outputPath("financial-route-fixture.json"),
+    JSON.stringify({ cookies: await account.context().cookies(), slug, orgSlug, caseUrl }),
+    { mode: 0o600 },
+  );
+  await account.close();
 });
 
 test("case review: the audit surfaces, deep-linked", async ({ page }) => {
@@ -360,7 +609,7 @@ test("settlement dashboard: stats, saved views, search and bulk navigation", asy
   await expect(page.getByTestId("stat-closed")).toHaveText("1");
   await expect(page.getByTestId("stat-attention")).toHaveText("0");
   await expect(page.getByTestId("stat-outstanding")).toContainText("₹0");
-  await expect(page.getByTestId("stat-today")).toContainText("₹1,20,000");
+  await expect(page.getByTestId("stat-today")).toContainText("₹1,21,000.01");
 
   // The default view is "needs attention" — and nothing needs attention.
   await expect(page.getByText("Nothing matches this view")).toBeVisible();
@@ -397,7 +646,7 @@ test("permissions: a member with no settlement grant cannot reach the books", as
     expect(console_.status()).toBe(404);
     const dashboard = await stranger.request.get(`/org/${orgSlug}/settlement`);
     expect(dashboard.status()).toBe(404);
-    const review = await stranger.request.get(`${caseUrl.split("?")[0] ?? ""}`);
+    const review = await stranger.request.get(caseUrl.split("?")[0] ?? "");
     expect(review.status()).toBe(404);
   });
 });

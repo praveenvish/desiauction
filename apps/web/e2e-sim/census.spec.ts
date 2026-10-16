@@ -182,7 +182,8 @@ async function signIn(
   await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code", {
     timeout: 30_000,
   });
-  await page.getByLabel("6-digit code").fill(await latestOtp(phone));
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(await latestOtp(phone));
   await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).not.toHaveURL(/\/login/, { timeout: 30_000 });
   if (page.url().includes("/onboarding")) {

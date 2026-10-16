@@ -1,6 +1,9 @@
+import { NoPhotoStyleProvider, TeamBadgeProvider } from "@desiauction/ui";
 import type { ReactNode } from "react";
 
 import { MoneyUnitProvider } from "../../../components/money-unit";
+import { seasonNoPhotoStyle } from "../../../server/competition/season-no-photo";
+import { seasonTeamBadge } from "../../../server/competition/season-team-badge";
 import { seasonUnit } from "../../../server/competition/season-unit";
 
 /**
@@ -22,5 +25,17 @@ export default async function SeasonLayout({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  return <MoneyUnitProvider unit={await seasonUnit(slug)}>{children}</MoneyUnitProvider>;
+  // And how it draws a player with no photo (0107) and a team with no logo (0111).
+  const [unit, noPhoto, badge] = await Promise.all([
+    seasonUnit(slug),
+    seasonNoPhotoStyle(slug),
+    seasonTeamBadge(slug),
+  ]);
+  return (
+    <MoneyUnitProvider unit={unit}>
+      <NoPhotoStyleProvider style={noPhoto}>
+        <TeamBadgeProvider badge={badge}>{children}</TeamBadgeProvider>
+      </NoPhotoStyleProvider>
+    </MoneyUnitProvider>
+  );
 }

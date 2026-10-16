@@ -12,25 +12,25 @@ import { unstable_rethrow } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { env } from "../env";
+import { splashImages } from "../lib/apple-splash";
+import { INSTALL_BOOTSTRAP } from "../lib/pwa-bootstrap";
 import { ReportProblemProvider } from "../components/report-problem/report-problem";
 import { AppLinkProvider } from "../components/shell/app-link-provider";
 import { NavigationProgress } from "../components/shell/navigation-progress";
 import { ActionFailureNotice } from "../components/action-failure-notice";
+import { AppInstall } from "../components/pwa/app-install";
 import { ClientErrorListener } from "../components/client-error-listener";
 import { WebVitalsReporter } from "../components/web-vitals-reporter";
 import { ProductShell } from "../components/shell/product-shell";
-import { THEME_BOOTSTRAP } from "../components/shell/theme-toggle";
-import { platformDoorCapabilities } from "../server/admin/actions";
+import { THEME_BOOTSTRAP } from "../components/shell/theme-bootstrap";
+import type { platformDoorCapabilities } from "../server/admin/actions";
 import { currentSession, logoutAction } from "../server/auth/actions";
-import { inboxState } from "../server/auth/security-events";
-import { competitionsView } from "../server/competition/actions";
-import { myOrgs } from "../server/orgs/actions";
-import { rolesOf } from "../server/roles/roles";
+import type { competitionsView } from "../server/competition/actions";
+import type { myOrgs } from "../server/orgs/actions";
+import type { rolesOf } from "../server/roles/roles";
 import { seasonRoleFor, type NavRoles, type SeasonRole } from "../components/shell/nav";
-import { myRegistrations } from "../server/competition/public";
-import { finopsOrgIds } from "../server/financial-operations/actions";
+import type { myRegistrations } from "../server/competition/public";
 import { requestLogger } from "../server/logger";
-import { settlementOrgIds } from "../server/settlement/actions";
 
 export const metadata: Metadata = {
   // WITHOUT metadataBase, Next resolves every relative metadata URL — including
@@ -53,6 +53,23 @@ export const metadata: Metadata = {
     locale: "en_IN",
   },
   twitter: { card: "summary_large_image" },
+  // Lets Google show a LARGE image beside a result (mobile results, Discover)
+  // rather than a small one or none. It grants nothing on its own: indexing is
+  // still decided by the route registry's header, and a page that states its
+  // own `robots` (a squad page, a noindex page) replaces this whole object.
+  robots: { "max-image-preview": "large" },
+  // The installed app on an iPhone (Share → Add to Home Screen). iOS reads
+  // these tags, not the manifest's display mode: without `capable` it opens
+  // the site in a Safari frame. The status bar stays "default" (solid, above
+  // the page), because "black-translucent" would draw it over every header.
+  // `startupImage`: the launch screen, one per screen and orientation
+  // (lib/apple-splash.ts); without a match iOS flashes white.
+  appleWebApp: {
+    capable: true,
+    title: "DesiAuction",
+    statusBarStyle: "default",
+    startupImage: splashImages().map(({ url, media }) => ({ url, media })),
+  },
 };
 
 // Console default is Daylight; live surfaces pin floodlight per C-4 (doc 18).
@@ -146,6 +163,28 @@ export default async function RootLayout({
   if (session !== null) {
     const personId = session.personId;
     try {
+      // Anonymous public pages never use these private-workspace readers. Load
+      // their modules only after the session gate, retaining the same readers,
+      // current grants, parallel calls and failure boundary for signed-in people.
+      const [
+        { myOrgs },
+        { competitionsView },
+        { settlementOrgIds },
+        { finopsOrgIds },
+        { inboxState },
+        { platformDoorCapabilities },
+        { rolesOf },
+        { myRegistrations },
+      ] = await Promise.all([
+        import("../server/orgs/actions"),
+        import("../server/competition/actions"),
+        import("../server/settlement/actions"),
+        import("../server/financial-operations/actions"),
+        import("../server/auth/security-events"),
+        import("../server/admin/actions"),
+        import("../server/roles/roles"),
+        import("../server/competition/public"),
+      ]);
       const [orgs, competitionsView_, settlementOrgs, financeOrgs, unreadCount, platform, lens] =
         await Promise.all([
           myOrgs(),
@@ -195,6 +234,7 @@ export default async function RootLayout({
       ? null
       : {
           organizes: roles.organizes.length > 0,
+          scores: roles.scores.length,
           // The Clubs item is offered only past one club (nav.ts).
           clubs: roles.organizes.length,
           // EVERY team, not `currentTeam()`'s one: an owner with teams in two
@@ -258,6 +298,7 @@ export default async function RootLayout({
     orgSlug: orgSlugById.get(competition.orgId) ?? "",
     // A points season (0091) has nothing to settle: no Money tab, no settle
     // shortcut in search, whatever the person's grants in the club.
+    teamFormation: competition.teamFormation ?? "auction",
     canSettle: settlementOrgs.has(competition.orgId) && competition.auctionUnit === "inr",
     ...(ownTeamBySlug.has(competition.slug)
       ? { ownTeamId: ownTeamBySlug.get(competition.slug) as string }
@@ -273,10 +314,17 @@ export default async function RootLayout({
   return (
     // `suppressHydrationWarning`: the bootstrap below rewrites `data-theme`
     // before React hydrates, which is a deliberate server/client difference.
-    <html lang="en" data-theme="daylight" suppressHydrationWarning>
+    <html
+      lang="en"
+      data-theme="daylight"
+      data-ui-treatment={env.UI_TREATMENT}
+      data-ui-contract="ui-r1"
+      suppressHydrationWarning
+    >
       <body>
-        {/* Replay the remembered console theme before first paint (no flash).
-            The one inline script the app writes itself, so it carries the
+        {/* Replay the remembered console theme before first paint (no flash),
+            and catch the browser's install event before hydration
+            (lib/pwa-bootstrap.ts). The one inline script the app writes itself, so it carries the
             request's nonce like every script Next emits (middleware.ts).
             `suppressHydrationWarning`: browsers HIDE a nonce once the
             element is parsed (the attribute reads back as ""), so exfiltrating
@@ -287,7 +335,7 @@ export default async function RootLayout({
         <script
           nonce={nonce}
           suppressHydrationWarning
-          dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }}
+          dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP + INSTALL_BOOTSTRAP }}
         />
         {/* Every shell, every route: a click is answered before the network is. */}
         <NavigationProgress />
@@ -297,6 +345,8 @@ export default async function RootLayout({
         <WebVitalsReporter />
         {/* …and said to the person, when what they asked for never came back. */}
         <ActionFailureNotice />
+        {/* …and installs as an app, and says so when it is offline (sw.js). */}
+        <AppInstall register={env.NODE_ENV === "production"} />
         <AppLinkProvider>
           <ReportProblemProvider signedIn={session !== null} defaultEmail={session?.email ?? null}>
             <ProductShell

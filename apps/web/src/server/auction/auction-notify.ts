@@ -265,11 +265,13 @@ export async function completeAuctionOnce<T>(
       sql`select pg_advisory_xact_lock(hashtextextended(${`auction-complete:${input.auctionId}`}, 0))`,
     );
     const [before] = await db
-      .select({ status: auctions.status })
+      .select({ status: auctions.status, kind: auctions.kind })
       .from(auctions)
       .where(eq(auctions.id, input.auctionId))
       .limit(1);
     const result = await send();
+    // A practice (0101) completes like the night but tells nobody anything.
+    const real = before?.kind === "real";
     /*
      * THE ONE MESSAGE THE PLAYER WAS NEVER SENT.
      *
@@ -283,9 +285,9 @@ export async function completeAuctionOnce<T>(
      * swallows its own failures so a completed auction can never be undone by
      * a notification.
      */
-    const fresh = accepted(result) && before?.status !== "completed";
+    const fresh = real && accepted(result) && before.status !== "completed";
     let owed = false;
-    if (!fresh) {
+    if (real && !fresh) {
       const [after] = await db
         .select({ status: auctions.status })
         .from(auctions)

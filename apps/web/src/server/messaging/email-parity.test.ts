@@ -1,3 +1,4 @@
+import { initialsOf } from "@desiauction/core";
 import { describe, expect, it } from "vitest";
 
 import { financeDocumentMail, financeVariantFor } from "@desiauction/messaging/email-adapter";
@@ -88,12 +89,10 @@ function soldMail(facts: SoldFacts): ComposedMail {
     ...(facts.bidCount > 1 ? [`${String(facts.bidCount)} bids`] : []),
     ...(new Set(facts.bidders).size > 1 ? [`${String(new Set(facts.bidders).size)} teams`] : []),
   ].join(" · ");
-  const words = facts.name.trim().split(/\s+/);
-  const monogram = (
-    words.length >= 2
-      ? `${words[0]?.[0] ?? ""}${words[1]?.[0] ?? ""}`
-      : (words[0] ?? "").slice(0, 2)
-  ).toUpperCase();
+  // Changed on purpose: initials are LETTERS of any script (`initialsOf`). The
+  // old copy took raw characters, so "{<Player> & …" got "{<" and a Hindi name
+  // a vowel sign.
+  const monogram = initialsOf(facts.name, { words: "first-two", singleWord: 2 }) || "DA";
   return {
     subject: `Congratulations — ${facts.teamName} bought you for ${facts.price}`,
     ...renderEmail({

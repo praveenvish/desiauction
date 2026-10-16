@@ -21,7 +21,14 @@ import {
   SectionCard,
   Select,
 } from "@desiauction/ui";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type CSSProperties,
+} from "react";
 
 import { useMoney } from "../../../../components/money-unit";
 import { withViewTransition } from "../../../../lib/view-transition";
@@ -57,6 +64,7 @@ const KIND_LABEL: Record<PosterKind, { label: string; hint: string }> = {
   reveal: { label: "Meet the squad", hint: "The same squad, announced — faces only, no money" },
   top: { label: "Top buys", hint: "The night's biggest signings, ranked" },
   season: { label: "All squads", hint: "Every franchise in the season on one sheet" },
+  result: { label: "Match result", hint: "Result and Player of the Match" },
 };
 
 /**
@@ -65,6 +73,9 @@ const KIND_LABEL: Record<PosterKind, { label: string; hint: string }> = {
  * so the picker can never advertise a colour the poster does not use.
  */
 const THEME_LABEL: Record<PosterTheme, { name: string; hint: string }> = {
+  stadium: { name: "Stadium", hint: "Each team in its own colours" },
+  broadcast: { name: "Broadcast", hint: "TV graphic, team colour and list" },
+  scorecard: { name: "Scorecard", hint: "A clean team sheet table" },
   floodlight: { name: "Floodlight", hint: "The night look" },
   matchday: { name: "Matchday", hint: "The team's own colour" },
   minimal: { name: "Minimal", hint: "Light and editorial" },
@@ -94,7 +105,8 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
   const [kind, setKind] = useState<PosterKind>(kinds[0] ?? "player");
   const [playerId, setPlayerId] = useState(view.players[0]?.id ?? "");
   const [teamId, setTeamId] = useState(view.teams[0]?.id ?? "");
-  const [theme, setTheme] = useState<PosterTheme>("floodlight");
+  const [fixtureId, setFixtureId] = useState(view.results?.[0]?.id ?? "");
+  const [theme, setTheme] = useState<PosterTheme>("stadium");
   const [wantedSize, setSize] = useState<PosterSize>("portrait");
   const [count, setCount] = useState<TopBuyCount>(5);
   const [prices, setPrices] = useState(true);
@@ -122,10 +134,17 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
   const sizes = POSTER_KIND_SIZES[kind];
   const size = sizes.includes(wantedSize) ? wantedSize : (sizes[0] ?? "portrait");
 
-  const subjects = kind === "team" || kind === "reveal" ? view.teams : view.players;
-  const subjectId = kind === "team" || kind === "reveal" ? teamId : playerId;
-  const needsSubject = kind === "player" || kind === "team" || kind === "reveal";
-  const showPrices = kind !== "reveal";
+  const subjects =
+    kind === "result"
+      ? (view.results ?? [])
+      : kind === "team" || kind === "reveal"
+        ? view.teams
+        : view.players;
+  const subjectId =
+    kind === "result" ? fixtureId : kind === "team" || kind === "reveal" ? teamId : playerId;
+  const needsSubject =
+    kind === "result" || kind === "player" || kind === "team" || kind === "reveal";
+  const showPrices = kind !== "reveal" && kind !== "result";
 
   const base =
     kind === "top"
@@ -196,10 +215,12 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
 
           {!needsSubject ? null : (
             <Select
-              label={kind === "player" ? "Player" : "Team"}
+              label={kind === "result" ? "Match" : kind === "player" ? "Player" : "Team"}
               value={subjectId}
               onChange={(event) => {
-                if (kind === "player") {
+                if (kind === "result") {
+                  setFixtureId(event.target.value);
+                } else if (kind === "player") {
                   setPlayerId(event.target.value);
                 } else {
                   setTeamId(event.target.value);
@@ -275,8 +296,17 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
                       aria-hidden
                       style={{
                         // The poster's palette, not the app's: these are the
-                        // rasterizer's literal colours by design.
-                        background: palette.surface,
+                        // rasterizer's literal colours by design. Stadium has
+                        // no one colour — every team brings its own — so its
+                        // swatch is a strip of them.
+                        background:
+                          value === "stadium"
+                            ? "linear-gradient(90deg, #14B8A6, #2563EB 33%, #EA580C 66%, #DB2777)"
+                            : value === "broadcast"
+                              ? "linear-gradient(110deg, #EA580C 0 46%, #FDE047 46% 50%, #0A0C10 50%)"
+                              : value === "scorecard"
+                                ? "linear-gradient(180deg, #C2410C 0 34%, #0F1214 34%)"
+                                : palette.surface,
                         borderColor: palette.border,
                       }}
                     >
@@ -397,12 +427,7 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
                     by our own route at a fixed size, and next/image would
                     re-encode a PNG that is already exactly what the user is
                     about to download. */}
-                <img
-                  key={previewSrc}
-                  src={previewSrc}
-                  alt="Poster preview"
-                  className="poster-preview-image"
-                />
+                <StillPreview key={previewSrc} src={previewSrc} size={size} />
               </div>
             ) : (
               // Keyed by the URL: a new poster is a new panel, so its loading
@@ -476,6 +501,72 @@ function PreviewTabs({
  * cannot, the old real-time recording, which says so instead of appearing to
  * hang.
  */
+/**
+ * The poster, with its two other states said out loud.
+ *
+ * A plain <img> (the board's crest does the same): the poster is drawn by our
+ * own route at a fixed size, and next/image would re-encode a PNG that is
+ * already exactly what the user is about to download. But a bare <img> has no
+ * way to say "this one is refused" — the route answers a refusal with a sentence,
+ * and the image just never painted, which read as a poster stuck loading. So a
+ * failure asks the route again and shows its sentence.
+ */
+function StillPreview({ src, size }: { src: string; size: PosterSize }) {
+  const { width, height } = POSTER_SIZES[size];
+  const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
+  const [reason, setReason] = useState<string | null>(null);
+  const onError = () => {
+    setState("failed");
+    void fetch(src, { cache: "no-store" })
+      .then(async (response) =>
+        response.ok ? null : (await response.text()).slice(0, 300) || null,
+      )
+      .catch(() => null)
+      .then(setReason);
+  };
+  if (state === "failed") {
+    return (
+      <p className="st-note" role="alert" data-testid="poster-preview-failed">
+        {reason ?? "This poster could not be made. Try again in a moment."}
+      </p>
+    );
+  }
+  return (
+    <>
+      <img
+        src={src}
+        width={width}
+        height={height}
+        style={{ "--ps-preview-ratio": String(width / height) } as CSSProperties}
+        alt="Poster preview"
+        className="poster-preview-image"
+        data-state={state}
+        data-testid="poster-preview-image"
+        // A server-rendered image can settle before hydration attaches the
+        // handlers, and React never replays those events: read it on mount.
+        ref={(node) => {
+          if (node !== null && node.complete && state === "loading") {
+            if (node.naturalWidth > 0) {
+              setState("ready");
+            } else {
+              onError();
+            }
+          }
+        }}
+        onLoad={() => {
+          setState("ready");
+        }}
+        onError={onError}
+      />
+      {state === "loading" ? (
+        <p className="st-note" role="status">
+          Making the poster…
+        </p>
+      ) : null}
+    </>
+  );
+}
+
 function MotionPanel({ src, size }: { src: string; size: PosterSize }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const sceneRef = useRef<Scene | null>(null);
