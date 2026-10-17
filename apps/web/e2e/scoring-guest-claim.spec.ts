@@ -87,6 +87,9 @@ test("a guest mobile-link retry keeps one registration and the account holder ac
     const other = await recipient.newPage();
     await other.goto("/inbox");
     await expect(other.getByText(offerLine, { exact: true })).toBeVisible();
+    // The inbox refreshes itself once it has been read; leaving mid-refresh
+    // makes Firefox abort the next navigation (NS_BINDING_ABORTED).
+    await other.waitForLoadState("networkidle");
     await other.goto("/me/claims");
     const offer = other.getByRole("region", { name: "Claim retry guest" });
     await expect(offer).toBeVisible();
