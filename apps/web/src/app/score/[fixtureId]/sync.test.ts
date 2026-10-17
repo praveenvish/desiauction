@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { retryDelay, sendBatch, startSync, SyncRefusal } from "./sync";
+import { OFFLINE_RECHECK_MS, retryDelay, sendBatch, startSync, SyncRefusal } from "./sync";
 import type { QueueItem } from "./queue";
 
 const item: QueueItem = {
@@ -106,6 +106,37 @@ describe("scoring send loop", () => {
     sender.stop();
     target.dispatchEvent(new Event("online"));
     expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+  it("sends once the browser is back online even if no `online` event arrives", async () => {
+    vi.useFakeTimers();
+    const target = fakeWindow();
+    const connection = (target as unknown as { navigator: { onLine: boolean } }).navigator;
+    connection.onLine = false;
+    let remaining = [item];
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ acks: [] })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ attempt: 1, lastSeq: 0, events: [] })));
+    const sender = startSync(
+      "fixture",
+      {
+        batch: () => Promise.resolve({ items: remaining, deviceId: "device", attempt: 1 }),
+        received: () => {
+          remaining = [];
+          return Promise.resolve();
+        },
+        failed: vi.fn(),
+      },
+      target,
+      fetcher,
+    );
+    await sender.flush();
+    await vi.advanceTimersByTimeAsync(OFFLINE_RECHECK_MS);
+    expect(fetcher).not.toHaveBeenCalled();
+    connection.onLine = true;
+    await vi.advanceTimersByTimeAsync(OFFLINE_RECHECK_MS);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    sender.stop();
   });
   it("a business refusal preserves its server message", async () => {
     const fetcher = vi

@@ -66,6 +66,10 @@ jobs:
       OTP_PROVIDER: dev
       PLAYWRIGHT_PRECOMPILED: "1"
       NEXT_DIST_DIR: .next-e2e
+      # Canonical and OG URLs must point at the server the suite runs, or the
+      # specs that fetch them (ls1-screens, the T10 journey) hit :3000. The
+      # per-commit e2e job has had this since LS-1; the nightly lacked it.
+      PUBLIC_BASE_URL: http://localhost:3050
       ALLOW_INSECURE_LOCAL_PRODUCTION: "1"
     steps:
       - uses: actions/checkout@v4
@@ -83,25 +87,38 @@ jobs:
       - run: pnpm --filter @desiauction/db db:migrate
       - run: pnpm --filter @desiauction/engine db:migrate
 
-      - run: pnpm test:integration
-
-      # RLS runtime verification under the production role recipe.
+      # The production role recipe, BEFORE the integration suites: apps/live's
+      # reads as its own role (F07) and refuses to run without its URL, as the
+      # per-commit job already arranges. Until the oracle step stopped failing
+      # first, this job had never reached the suites to find that out.
       #
-      # The invocation passed TWO passwords to a script that requires FOUR and
-      # sets ON_ERROR_STOP — so it aborted at the engine-role statement and this
-      # step had never actually created desiauction_engine, desiauction_runner,
-      # or applied the append-only revokes. The four-role recipe was therefore
-      # never verified by anything (audit 2026-08-18, P1-3).
-      - name: RLS probe under non-BYPASSRLS role
+      # The invocation once passed TWO passwords to a script that requires them
+      # all and sets ON_ERROR_STOP — so it aborted at the engine-role statement
+      # and never created desiauction_engine or desiauction_runner, or applied
+      # the append-only revokes (audit 2026-08-18, P1-3).
+      # The same throwaway passwords as ci.yml: integration tests that prove
+      # every runtime role is refused (finalize.regression) connect with them.
+      - name: Create the five production roles
         run: |
           PGPASSWORD=desiauction psql -h localhost -p 5433 -U desiauction -d desiauction \
             --single-transaction -v ON_ERROR_STOP=1 \
-            -v app_password='nightly-app' -v system_password='nightly-system' \
-            -v engine_password='nightly-engine' -v runner_password='nightly-runner' \
-            -v live_password='nightly-live' \
+            -v app_password='ci-app' -v system_password='ci-system' \
+            -v engine_password='ci-engine' -v runner_password='ci-runner' \
+            -v live_password='ci-live' \
             -f ops/db/create-app-role.sql
-          APP_DATABASE_URL='postgres://desiauction_app:nightly-app@localhost:5433/desiauction' \
-            pnpm --filter @desiauction/web rls:verify
+
+      - run: pnpm test:integration --force --concurrency=1
+        env:
+          APP_DATABASE_URL: postgres://desiauction_app:ci-app@localhost:5433/desiauction
+          SYSTEM_DATABASE_URL: postgres://desiauction_system:ci-system@localhost:5433/desiauction
+          RUNNER_DATABASE_URL: postgres://desiauction_runner:ci-runner@localhost:5433/desiauction
+          LIVE_DATABASE_URL: postgres://desiauction_live:ci-live@localhost:5433/desiauction
+
+      # RLS runtime verification under the production role recipe.
+      - name: RLS probe under non-BYPASSRLS role
+        run: pnpm --filter @desiauction/web rls:verify
+        env:
+          APP_DATABASE_URL: postgres://desiauction_app:ci-app@localhost:5433/desiauction
 
       # Snapshot-consistent backup restore drill (host pg tools match the
       # service major via the postgres apt repo).
@@ -142,6 +159,10 @@ jobs:
       OTP_PROVIDER: dev
       PLAYWRIGHT_PRECOMPILED: "1"
       NEXT_DIST_DIR: .next-e2e
+      # Canonical and OG URLs must point at the server the suite runs, or the
+      # specs that fetch them (ls1-screens, the T10 journey) hit :3000. The
+      # per-commit e2e job has had this since LS-1; the nightly lacked it.
+      PUBLIC_BASE_URL: http://localhost:3050
       ALLOW_INSECURE_LOCAL_PRODUCTION: "1"
     steps:
       - uses: actions/checkout@v4

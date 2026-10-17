@@ -78,7 +78,11 @@ export function ShowcaseGrid({
   // Keep the URL in sync so a filtered/squads view is shareable + back-friendly.
   useEffect(() => {
     const qs = serializeShowcaseParams({ view, filter, sort, query });
-    router.replace(qs === "" ? pathname : `${pathname}?${qs}`, { scroll: false });
+    const next = qs === "" ? pathname : `${pathname}?${qs}`;
+    // Already there (every visit to a season before its auction): a replace
+    // would still be a navigation and a server round trip, for nothing.
+    if (`${window.location.pathname}${window.location.search}` === next) return;
+    router.replace(next, { scroll: false });
   }, [view, filter, sort, query, pathname, router]);
 
   const counts = useMemo(

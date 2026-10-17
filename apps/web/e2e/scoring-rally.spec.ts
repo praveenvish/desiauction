@@ -141,7 +141,10 @@ for (const theme of ["daylight", "floodlight"] as const) {
 
 test("Android Chrome volume opt-in requires delivered keys; discovery never scores", async ({
   browser,
+  browserName,
 }) => {
+  // Hardware volume keys can only be sent through Chromium's DevTools protocol.
+  test.skip(browserName !== "chromium", "volume keys are sent over CDP, Chromium only");
   const fixture = await seedScoringFixture({
     sport: "badminton",
     formatKey: "badminton_bo3",

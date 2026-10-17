@@ -54,7 +54,10 @@ for (const theme of ["daylight", "floodlight"] as const) {
       await capture(page, `lobby-pad-${theme}`);
       const acceptedSsr = await viewer.reload();
       if (!acceptedSsr) throw new Error("Accepted lobby SSR response missing");
-      expect(await acceptedSsr.text()).toContain("Lobby table");
+      // The server's HTML, read with the context's request client: Firefox's
+      // protocol cannot hand back a compressed page body
+      // (NS_ERROR_INVALID_CONTENT_ENCODING), whatever the page holds.
+      expect(await (await viewer.request.get(viewer.url())).text()).toContain("Lobby table");
       await viewer.evaluate(
         (value) => document.documentElement.setAttribute("data-theme", value),
         theme,

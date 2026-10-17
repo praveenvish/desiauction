@@ -134,6 +134,9 @@ test("a gendered category refuses a declared mismatch, and the profile fix opens
   await page.getByLabel("Gender").selectOption("male");
   await page.getByRole("button", { name: "Save profile", exact: true }).click();
   await expect(page.getByText("Profile saved")).toBeVisible();
+  // Saving refreshes the page; leaving mid-refresh makes Firefox abort the
+  // next navigation (NS_BINDING_ABORTED).
+  await page.waitForLoadState("networkidle");
 
   // The register page opens on step 2 (name is set), PREFILLED from the
   // profile — the PI-1 write-back and prefill meeting in one control.

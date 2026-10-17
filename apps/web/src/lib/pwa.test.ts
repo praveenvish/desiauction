@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import manifest from "../app/manifest";
 import { splashImages } from "./apple-splash";
-import { installOffer, isAppleMobile } from "./pwa";
+import { installOffer, isAppleMobile, PERSIST_WAIT_MS, requestPersistentStorage } from "./pwa";
 
 const PUBLIC = path.resolve(__dirname, "../../public");
 const WORKER_SOURCE = readFileSync(path.join(PUBLIC, "sw.js"), "utf8");
@@ -31,6 +31,33 @@ describe("installOffer", () => {
 
   it("offers nothing in a browser that cannot install", () => {
     expect(installOffer(facts)).toBe("none");
+  });
+});
+
+describe("requestPersistentStorage", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("passes the browser's answer through", async () => {
+    vi.stubGlobal("navigator", { storage: { persist: () => Promise.resolve(true) } });
+    expect(await requestPersistentStorage()).toBe(true);
+  });
+
+  it("stops waiting on a prompt nobody answers (Firefox), so preparation finishes", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("navigator", { storage: { persist: () => new Promise<boolean>(() => {}) } });
+    const answer = requestPersistentStorage();
+    await vi.advanceTimersByTimeAsync(PERSIST_WAIT_MS);
+    expect(await answer).toBe(false);
+  });
+
+  it("is false without the API, or when it throws", async () => {
+    vi.stubGlobal("navigator", {});
+    expect(await requestPersistentStorage()).toBe(false);
+    vi.stubGlobal("navigator", { storage: { persist: () => Promise.reject(new Error("no")) } });
+    expect(await requestPersistentStorage()).toBe(false);
   });
 });
 

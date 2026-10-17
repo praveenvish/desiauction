@@ -170,7 +170,7 @@ describe.skipIf(oracleConfig?.preflight === true)("Cricsheet curated oracle", ()
 if (oracleConfig)
   it(
     oracleConfig.preflight ? "source preflight" : "full Cricsheet oracle",
-    () => {
+    async () => {
       const failures: string[] = [];
       const skips: { file: string; reason: string; evidence: string }[] = [];
       let normalizations = 0;
@@ -179,7 +179,12 @@ if (oracleConfig)
       const sourceAuditLedger: (CricsheetExpected["sourceNormalizations"][number] & {
         match: string;
       })[] = [];
-      for (const file of oracleConfig.files) {
+      for (const [index, file] of oracleConfig.files.entries()) {
+        // Seven thousand matches in one synchronous loop starved the worker's
+        // event loop for minutes, and vitest's own progress call timed out
+        // ("Timeout calling onTaskUpdate") on CI, failing a run whose oracle
+        // had passed. Yield now and then.
+        if (index % 100 === 0) await new Promise((resolve) => setImmediate(resolve));
         try {
           const json = JSON.parse(readFileSync(file, "utf8")) as CricsheetJson;
           const verified = oracleConfig.preflight ? null : verify(json);

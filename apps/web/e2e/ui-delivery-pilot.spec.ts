@@ -11,6 +11,7 @@ import {
   committedQueue,
   persistedQueue,
   readScoringFixture,
+  openPadOffline,
 } from "./scoring-fixtures";
 
 test("delivery routine controls remain reachable with a populated over in both themes", async ({
@@ -107,6 +108,7 @@ test("Hindi delivery labels and long player names retain keyboard controls and n
 test("delivery finish separates unfinished, queued and accepted progression without losing an offline finish", async ({
   page,
   context,
+  browserName,
 }, info) => {
   test.setTimeout(180000);
   const fixture = await seedScoringFixture();
@@ -160,8 +162,7 @@ test("delivery finish separates unfinished, queued and accepted progression with
   }
   await queued.getByRole("button", { name: "Back to match", exact: true }).click();
   await expect(queued).toHaveCount(0);
-  await page.goto(`/score/${fixture.fixtureId}`);
-  await expect(page).toHaveURL(`/score/shell#${fixture.fixtureId}`);
+  await openPadOffline(page, fixture.fixtureId, browserName);
   await expect(
     page.getByRole("dialog", { name: "Finish waiting to sync", exact: true }),
   ).toBeVisible();
