@@ -59,7 +59,10 @@ const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
 
 const MARK = "FR1P4-REGRESSION";
-const NOW = new Date("2026-09-18T09:00:00.000Z");
+// Anchored to the real clock: review links expire REVIEW_LINK_TTL_MS after they
+// are made, and the page checks that against the time it is opened. A fixed
+// date here turned every link-opening test red 30 days after it was written.
+const NOW = new Date(Math.floor(Date.now() / 60_000) * 60_000);
 const HOUR = 60 * 60 * 1000;
 const sent: OutgoingMail[] = [];
 
