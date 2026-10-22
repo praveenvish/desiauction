@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs watch src/index.ts",
-    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node24 --outfile=dist/index.mjs --external:fastify --external:ws --external:pino --external:pino-pretty --external:postgres --external:drizzle-orm --external:zod --external:@sentry/node --external:ulidx",
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node24 --outfile=dist/index.mjs --external:fastify --external:ws --external:pino --external:postgres --external:drizzle-orm --external:zod --external:ulidx",
     "lint": "eslint src scripts --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --exclude '**/*.integration.test.ts'",
@@ -19,6 +19,7 @@
     "fastify": "^5.12.1",
     "pino": "^9.9.0",
     "postgres": "^3.4.0",
+    "ulidx": "^2.4.0",
     "ws": "^8.18.0",
     "zod": "^4.1.0"
   },
