@@ -21,8 +21,10 @@ export const metadata: Metadata = { title: "Page not found" };
 export default function NotFound() {
   return (
     <main className="content-page">
-      {/* Next serves a not-found under its own `<html id="__next_error__">`
-          shell, so the root layout's theme bootstrap never runs here — see
+      {/* Every 404 is server-rendered under the root layout now (Next is
+          patched for a real route's `notFound()`). Only if that render fails
+          too does Next fall back to its `<html id="__next_error__">` shell,
+          where the root layout's theme bootstrap never runs — see
           ThemeReplay. */}
       <ThemeReplay />
       {/* A dead end owns its heading: the console shell stands its title down

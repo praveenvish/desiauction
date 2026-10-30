@@ -37,7 +37,7 @@ import {
   type ShellNavItem,
 } from "@desiauction/ui";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSelectedLayoutSegments } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { AdminSectionNav } from "../../app/admin/admin-section-nav";
@@ -50,6 +50,7 @@ import { NewsletterForm } from "../../components/marketing/newsletter-form";
 import { personContact, personLabel } from "../../lib/person-label";
 import { promptInstall, useInstallOffer } from "../../lib/pwa";
 import { track } from "../../lib/telemetry";
+import { actionSlotIsCurrent } from "./action-slot";
 import { BrandMark, BrandWordmark } from "./brand";
 import { SocialLinks } from "./social-links";
 import {
@@ -361,7 +362,11 @@ export function ProductShell({
    * server's action takes the slot back rather than the bar going empty.
    */
   const [publishedAction, setPublishedAction] = useState<ReactNode | null>(null);
-  const pageAction = publishedAction ?? serverAction ?? null;
+  // A soft navigation leaves an unmatched slot showing the last page's action;
+  // see action-slot.ts for why that is checked here rather than routed away.
+  const actionSlot = useSelectedLayoutSegments("action");
+  const currentServerAction = actionSlotIsCurrent(actionSlot, pathname) ? serverAction : null;
+  const pageAction = publishedAction ?? currentServerAction ?? null;
   // The Live shell's status strip, published by the page that owns the socket.
   const [liveStatus, setLiveStatus] = useState<ReactNode | null>(null);
   const searchRef = useRef<InlineSearchHandle | null>(null);

@@ -192,6 +192,10 @@ test("the tournaments index: first run, needs-you, cards, and the toolbar", asyn
     .first()
     .click();
   await expect(page).toHaveURL(/\/seasons\/[^/?#]+$/, COLD);
+  // ...and the index's "New tournament" stays behind. A soft navigation leaves
+  // an unmatched `@action` slot showing what it last rendered; the shell hides
+  // a slot that was rendered for another page (shell/action-slot.ts).
+  await expect(page.getByTestId("new-tournament")).toHaveCount(0);
 });
 
 test("tournaments index: axe zero violations", async ({ page }) => {
