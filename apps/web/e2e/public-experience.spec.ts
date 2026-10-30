@@ -145,6 +145,17 @@ test("invalid routes render the branded 404 — no crash, no leak", async ({ pag
   ]) {
     const response = await page.goto(route);
     expect(response?.status(), `${route} should be 404`).toBe(404);
+    // Server-rendered, not left to the browser. A `notFound()` from a real
+    // route used to arrive as an empty `__next_error__` shell that only a
+    // client render filled in; Next is patched to render the not-found on the
+    // server instead (patches/next@15.5.25.patch, renderToStream).
+    //
+    // Fetched again rather than read off `response`: from the third navigation
+    // in a page, Firefox under Playwright cannot hand back ANY document body
+    // (NS_ERROR_INVALID_CONTENT_ENCODING, 200 pages included).
+    const html = await (await page.request.get(route)).text();
+    expect(html, `${route} is server-rendered`).toMatch(/This page doesn(&#x27;|')t exist/);
+    expect(html, `${route} is not the client-rendered error shell`).not.toContain("__next_error__");
     await expect(page.getByText("This page doesn't exist")).toBeVisible();
   }
 });
@@ -160,10 +171,15 @@ test("invalid routes render the branded 404 — no crash, no leak", async ({ pag
  * The two kinds of 404 are NOT the same, which is why this needs its own test.
  * `/help/not-a-real-article` matches a real route (`help/[slug]`) that calls
  * `notFound()`, so the router's tree keeps its shape. `/pricing/nonsense`
- * matches NO route, so Next serves its internal `/_not-found` — and the tree it
- * hands the client has no `action` key, because that synthetic route carries no
- * parallel slots. Every prefetch sent from that page then dies inside Next
- * reading `flightRouterState[1]["action"][0]` of undefined.
+ * matches NO route, so Next serves its internal `/_not-found` — and a tree
+ * from there without an `action` key made every prefetch die inside Next
+ * reading `flightRouterState[1]["action"][0]` of undefined. Next is patched
+ * for that now (patches/next@15.5.25.patch), on the server and in the client
+ * router, which then threw "is not iterable" taking in the slot it had never
+ * had — the first click out of the 404 crashed the page. It was first fixed with
+ * catch-all routes instead, which turned every mistyped address into a
+ * page-level `notFound()` — the client-rendered kind that sometimes stayed
+ * blank. Unmatched addresses go to `/_not-found` again, server-rendered.
  *
  * The visitor still gets out — the router falls back to a hard navigation — so
  * nothing fails visibly. What it costs is every onward link becoming a full
@@ -209,6 +225,10 @@ test("a mistyped address does not make every onward link fail on the server", as
     // A URL matching no route at all — not one that resolves and calls notFound().
     const response = await page.goto("/pricing/nonsense");
     expect(response?.status()).toBe(404);
+    // In the HTML the server sent, not drawn later by the browser. A page-level
+    // `notFound()` is served as an empty `__next_error__` shell that only a
+    // client render fills, and ~1 in 10 of those stayed blank under load.
+    expect(await response?.text()).toMatch(/This page doesn(&#x27;|')t exist/);
     await expect(page.getByText("This page doesn't exist")).toBeVisible();
     // The prefetches are fired after paint; give the router time to send them.
     await page.waitForTimeout(2000);
